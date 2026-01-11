@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Car Classes</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Type</th>
+          <th>Capacity</th>
+          <th>Weight</th>
+          <th>Load Limit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for car_class in car_classes %}
+        <tr>
+          <td><a href="{{ url_for('main.car_class_detail', class_id=car_class.id) }}">{{ car_class.code }}</a></td>
+          <td>{{ car_class.car_type or "-" }}</td>
+          <td>{{ car_class.capacity or "-" }}</td>
+          <td>{{ car_class.weight or "-" }}</td>
+          <td>{{ car_class.load_limit or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No car classes yet. Add a car to create one automatically.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

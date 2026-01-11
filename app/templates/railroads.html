@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Railroads</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Reporting Mark</th>
+          <th>Name</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Merged Into</th>
+          <th>Merged From</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for railroad in railroads %}
+        <tr>
+          <td><a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">{{ railroad.reporting_mark or "-" }}</a></td>
+          <td><a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">{{ railroad.name }}</a></td>
+          <td>{{ railroad.start_date or "-" }}</td>
+          <td>{{ railroad.end_date or "-" }}</td>
+          <td>{{ railroad.merged_into or "-" }}</td>
+          <td>{{ railroad.merged_from or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">No railroads yet. Add a car to create one automatically.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

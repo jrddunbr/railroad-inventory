@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Car Number {{ number }}</h1>
+    <p>Select the car you want to view.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Reporting Mark</th>
+          <th>Type</th>
+          <th>Class</th>
+          <th>Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for car in cars %}
+        <tr>
+          <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
+          <td>{{ car.reporting_mark or '-' }}</td>
+          <td>{{ car.car_type }}</td>
+          <td>{{ car.car_class.code if car.car_class else '-' }}</td>
+          <td>{{ car.location.name if car.location else '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No cars found with that number.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

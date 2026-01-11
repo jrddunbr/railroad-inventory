@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Edit Car Class</h1>
+    <form method="post" action="{{ url_for('main.car_class_edit', class_id=car_class.id) }}">
+      <div class="grid">
+        <div>
+          <label for="code">Code</label>
+          <input id="code" name="code" value="{{ car_class.code }}" required />
+        </div>
+        <div>
+          <label for="car_type">Car Type</label>
+          <input id="car_type" name="car_type" value="{{ car_class.car_type or '' }}" />
+        </div>
+        <div>
+          <label for="wheel_arrangement">Wheel Arrangement</label>
+          <input id="wheel_arrangement" name="wheel_arrangement" value="{{ car_class.wheel_arrangement or '' }}" />
+        </div>
+        <div>
+          <label for="tender_axles">Tender Axles</label>
+          <input id="tender_axles" name="tender_axles" value="{{ car_class.tender_axles or '' }}" />
+        </div>
+        <div>
+          <label for="is_locomotive">Locomotive</label>
+          <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car_class.is_locomotive %}checked{% endif %} />
+        </div>
+        <div>
+          <label for="capacity">Capacity</label>
+          <input id="capacity" name="capacity" value="{{ car_class.capacity or '' }}" />
+        </div>
+        <div>
+          <label for="weight">Weight</label>
+          <input id="weight" name="weight" value="{{ car_class.weight or '' }}" />
+        </div>
+        <div>
+          <label for="load_limit">Load Limit</label>
+          <input id="load_limit" name="load_limit" value="{{ car_class.load_limit or '' }}" />
+        </div>
+        <div>
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes">{{ car_class.notes or '' }}</textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="{{ url_for('main.car_class_detail', class_id=car_class.id) }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

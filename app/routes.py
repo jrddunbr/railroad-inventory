@@ -1,0 +1,443 @@
+from __future__ import annotations
+
+import re
+from typing import Optional
+
+from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+
+from app import db
+from app.models import Car, CarClass, Location, Railroad
+
+
+main_bp = Blueprint("main", __name__)
+
+
+def get_or_create_location(name: str) -> Optional[Location]:
+    if not name:
+        return None
+    loc = Location.query.filter_by(name=name).first()
+    if loc:
+        return loc
+    location_type = "bag"
+    if "-F" in name:
+        location_type = "flat"
+    elif "staging" in name.lower() or " st" in name.lower():
+        location_type = "staging_track"
+    elif "yard" in name.lower() or " yd" in name.lower():
+        location_type = "yard_track"
+    elif "Carrier" in name or "carrier" in name:
+        location_type = "carrier"
+    loc = Location(name=name, location_type=location_type)
+    db.session.add(loc)
+    return loc
+
+
+@main_bp.route("/")
+def index():
+    return redirect(url_for("main.inventory"))
+
+
+@main_bp.route("/inventory")
+def inventory():
+    cars = Car.query.order_by(Car.id.desc()).all()
+    return render_template("inventory.html", cars=cars)
+
+
+@main_bp.route("/railroads")
+def railroads():
+    railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
+    return render_template("railroads.html", railroads=railroads)
+
+
+@main_bp.route("/railroads/<int:railroad_id>")
+def railroad_detail(railroad_id: int):
+    railroad = Railroad.query.get_or_404(railroad_id)
+    cars = Car.query.filter_by(railroad_id=railroad.id).order_by(Car.id.desc()).all()
+    return render_template("railroad_detail.html", railroad=railroad, cars=cars)
+
+
+@main_bp.route("/railroads/<int:railroad_id>/delete", methods=["POST"])
+def railroad_delete(railroad_id: int):
+    railroad = Railroad.query.get_or_404(railroad_id)
+    if Car.query.filter_by(railroad_id=railroad.id).count() > 0:
+        return "Cannot delete railroad with cars assigned.", 400
+    db.session.delete(railroad)
+    db.session.commit()
+    return redirect(url_for("main.railroads"))
+
+
+@main_bp.route("/railroads/<int:railroad_id>/edit", methods=["GET", "POST"])
+def railroad_edit(railroad_id: int):
+    railroad = Railroad.query.get_or_404(railroad_id)
+    if request.method == "POST":
+        railroad.reporting_mark = request.form.get("reporting_mark", "").strip()
+        railroad.name = request.form.get("name", "").strip()
+        railroad.start_date = request.form.get("start_date", "").strip()
+        railroad.end_date = request.form.get("end_date", "").strip()
+        railroad.merged_into = request.form.get("merged_into", "").strip()
+        railroad.merged_from = request.form.get("merged_from", "").strip()
+        railroad.notes = request.form.get("notes", "").strip()
+        db.session.commit()
+        return redirect(url_for("main.railroad_detail", railroad_id=railroad.id))
+    return render_template("railroad_form.html", railroad=railroad)
+
+
+@main_bp.route("/car-classes")
+def car_classes():
+    classes = CarClass.query.order_by(CarClass.code).all()
+    car_classes = [c for c in classes if not c.is_locomotive]
+    locomotive_classes = [c for c in classes if c.is_locomotive]
+    return render_template("car_classes.html", car_classes=car_classes)
+
+
+@main_bp.route("/locomotive-classes")
+def locomotive_classes():
+    classes = CarClass.query.order_by(CarClass.code).all()
+    locomotive_classes = [c for c in classes if c.is_locomotive]
+    return render_template("locomotive_classes.html", locomotive_classes=locomotive_classes)
+
+
+@main_bp.route("/car-classes/<int:class_id>")
+def car_class_detail(class_id: int):
+    car_class = CarClass.query.get_or_404(class_id)
+    cars = Car.query.filter_by(car_class_id=car_class.id).order_by(Car.id.desc()).all()
+    return render_template("car_class_detail.html", car_class=car_class, cars=cars)
+
+
+@main_bp.route("/car-classes/<int:class_id>/delete", methods=["POST"])
+def car_class_delete(class_id: int):
+    car_class = CarClass.query.get_or_404(class_id)
+    if Car.query.filter_by(car_class_id=car_class.id).count() > 0:
+        return "Cannot delete class with cars assigned.", 400
+    db.session.delete(car_class)
+    db.session.commit()
+    return redirect(url_for("main.car_classes"))
+
+
+@main_bp.route("/car-classes/<int:class_id>/edit", methods=["GET", "POST"])
+def car_class_edit(class_id: int):
+    car_class = CarClass.query.get_or_404(class_id)
+    if request.method == "POST":
+        car_class.code = request.form.get("code", "").strip()
+        car_class.car_type = request.form.get("car_type", "").strip()
+        car_class.wheel_arrangement = request.form.get("wheel_arrangement", "").strip()
+        car_class.tender_axles = request.form.get("tender_axles", "").strip()
+        car_class.is_locomotive = request.form.get("is_locomotive") == "on"
+        car_class.capacity = request.form.get("capacity", "").strip()
+        car_class.weight = request.form.get("weight", "").strip()
+        car_class.load_limit = request.form.get("load_limit", "").strip()
+        car_class.notes = request.form.get("notes", "").strip()
+        db.session.commit()
+        return redirect(url_for("main.car_class_detail", class_id=car_class.id))
+    return render_template("car_class_form.html", car_class=car_class)
+
+
+@main_bp.route("/locations/<int:location_id>")
+def location_detail(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    cars = Car.query.filter_by(location_id=location.id).order_by(Car.id.desc()).all()
+    return render_template("location_detail.html", location=location, cars=cars)
+
+
+@main_bp.route("/cars/<int:car_id>")
+def car_detail(car_id: int):
+    car = Car.query.get_or_404(car_id)
+    return render_template("car_detail.html", car=car)
+
+
+@main_bp.route("/cars/<int:car_id>/delete", methods=["POST"])
+def car_delete(car_id: int):
+    car = Car.query.get_or_404(car_id)
+    db.session.delete(car)
+    db.session.commit()
+    return redirect(url_for("main.inventory"))
+
+
+@main_bp.route("/cars/by-number")
+def car_by_number():
+    number = request.args.get("number", "").strip()
+    if not number:
+        return redirect(url_for("main.inventory"))
+    cars = Car.query.filter_by(car_number=number).order_by(Car.id.desc()).all()
+    if len(cars) == 1:
+        return redirect(url_for("main.car_detail", car_id=cars[0].id))
+    return render_template("car_number_list.html", number=number, cars=cars)
+
+
+@main_bp.route("/cars/<int:car_id>/edit", methods=["GET", "POST"])
+def car_edit(car_id: int):
+    car = Car.query.get_or_404(car_id)
+    if request.method == "POST":
+        apply_car_form(car, request.form)
+        db.session.commit()
+        return redirect(url_for("main.car_detail", car_id=car.id))
+    railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
+    classes = CarClass.query.order_by(CarClass.code).all()
+    locations = Location.query.order_by(Location.name).all()
+    return render_template(
+        "car_form.html",
+        car=car,
+        railroads=railroads,
+        classes=classes,
+        locations=locations,
+        form_action=url_for("main.car_edit", car_id=car.id),
+    )
+
+
+@main_bp.route("/cars/new", methods=["GET", "POST"])
+def car_new():
+    if request.method == "POST":
+        car = Car(car_type=request.form.get("car_type", ""))
+        apply_car_form(car, request.form)
+        db.session.add(car)
+        db.session.commit()
+        return redirect(url_for("main.car_detail", car_id=car.id))
+    railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
+    classes = CarClass.query.order_by(CarClass.code).all()
+    locations = Location.query.order_by(Location.name).all()
+    return render_template(
+        "car_form.html",
+        car=None,
+        railroads=railroads,
+        classes=classes,
+        locations=locations,
+        form_action=url_for("main.car_new"),
+    )
+
+
+@main_bp.route("/search")
+def search():
+    query = request.args.get("q", "").strip()
+    cars = []
+    if query:
+        like = f"%{query}%"
+        cars = (
+            Car.query.join(Location, isouter=True)
+            .join(Railroad, isouter=True)
+            .join(CarClass, isouter=True)
+            .filter(
+                db.or_(
+                    Car.car_number.ilike(like),
+                    Car.reporting_mark.ilike(like),
+                    Car.car_type.ilike(like),
+                    Car.load.ilike(like),
+                    Car.notes.ilike(like),
+                    Location.name.ilike(like),
+                    Railroad.name.ilike(like),
+                    CarClass.code.ilike(like),
+                )
+            )
+            .all()
+        )
+    return render_template("search.html", cars=cars, query=query)
+
+
+@main_bp.route("/api/cars")
+def api_cars():
+    cars = Car.query.all()
+    return jsonify([serialize_car(car) for car in cars])
+
+
+@main_bp.route("/api/cars/<int:car_id>")
+def api_car_detail(car_id: int):
+    car = Car.query.get_or_404(car_id)
+    return jsonify(serialize_car(car))
+
+
+@main_bp.route("/api/railroads")
+def api_railroads():
+    railroads = Railroad.query.all()
+    return jsonify([
+        {
+            "id": r.id,
+            "reporting_mark": r.reporting_mark,
+            "name": r.name,
+            "start_date": r.start_date,
+            "end_date": r.end_date,
+            "merged_into": r.merged_into,
+            "merged_from": r.merged_from,
+            "notes": r.notes,
+        }
+        for r in railroads
+    ])
+
+
+@main_bp.route("/api/car-classes")
+def api_car_classes():
+    classes = CarClass.query.all()
+    return jsonify([
+        {
+            "id": c.id,
+            "code": c.code,
+            "car_type": c.car_type,
+            "is_locomotive": c.is_locomotive,
+            "wheel_arrangement": c.wheel_arrangement,
+            "tender_axles": c.tender_axles,
+            "capacity": c.capacity,
+            "weight": c.weight,
+            "load_limit": c.load_limit,
+            "notes": c.notes,
+        }
+        for c in classes
+    ])
+
+
+@main_bp.route("/api/search")
+def api_search():
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify([])
+    like = f"%{query}%"
+    cars = (
+        Car.query.join(Location, isouter=True)
+        .join(Railroad, isouter=True)
+        .join(CarClass, isouter=True)
+        .filter(
+            db.or_(
+                Car.car_number.ilike(like),
+                Car.reporting_mark.ilike(like),
+                Car.car_type.ilike(like),
+                Car.load.ilike(like),
+                Car.notes.ilike(like),
+                Location.name.ilike(like),
+                Railroad.name.ilike(like),
+                CarClass.code.ilike(like),
+            )
+        )
+        .all()
+    )
+    return jsonify([serialize_car(car) for car in cars])
+
+
+def apply_car_form(car: Car, form) -> None:
+    reporting_mark = form.get("reporting_mark", car.reporting_mark or "").strip() if "reporting_mark" in form else None
+    railroad_name = form.get("railroad_name", car.railroad.name if car.railroad else "").strip() if "railroad_name" in form else None
+    railroad = None
+    if reporting_mark is not None or railroad_name is not None:
+        if reporting_mark:
+            railroad = Railroad.query.filter_by(reporting_mark=reporting_mark).first()
+            if not railroad:
+                railroad = Railroad(reporting_mark=reporting_mark, name=railroad_name or reporting_mark)
+                db.session.add(railroad)
+        elif railroad_name:
+            railroad = Railroad.query.filter_by(name=railroad_name).first()
+            if not railroad:
+                railroad = Railroad(reporting_mark=None, name=railroad_name)
+                db.session.add(railroad)
+        car.railroad = railroad
+        car.reporting_mark = reporting_mark or (railroad.reporting_mark if railroad else None)
+
+    car.car_type = form.get("car_type", "").strip()
+    car.car_number = form.get("car_number", "").strip()
+    car.brand = form.get("brand", "").strip()
+    car.upc = form.get("upc", "").strip()
+    car.dcc_id = form.get("dcc_id", "").strip()
+    car.traction_drivers = form.get("traction_drivers") == "on"
+    capacity_value = form.get("capacity", "").strip()
+    weight_value = form.get("weight", "").strip()
+    load_limit_value = form.get("load_limit", "").strip()
+    car.built = form.get("built", "").strip()
+    car.alt_date = form.get("alt_date", "").strip()
+    car.reweight_date = form.get("reweight_date", "").strip()
+    car.other_lettering = form.get("other_lettering", "").strip()
+    car.msrp = form.get("msrp", "").strip()
+    car.price = form.get("price", "").strip()
+    car.load = form.get("load", "").strip()
+    car.repairs_required = form.get("repairs_required", "").strip()
+    car.notes = form.get("notes", "").strip()
+    car.is_locomotive = form.get("is_locomotive") == "on"
+
+    class_code = form.get("car_class", "").strip()
+    if class_code:
+        car_class = CarClass.query.filter_by(code=class_code).first()
+        created_class = False
+        if not car_class:
+            car_class = CarClass(code=class_code)
+            db.session.add(car_class)
+            created_class = True
+        class_wheel = form.get("class_wheel_arrangement", "").strip()
+        class_tender = form.get("class_tender_axles", "").strip()
+        class_is_locomotive = form.get("is_locomotive") == "on"
+        if class_wheel and not car_class.wheel_arrangement:
+            car_class.wheel_arrangement = class_wheel
+        if class_tender and not car_class.tender_axles:
+            car_class.tender_axles = class_tender
+        if car.car_type and not car_class.car_type:
+            car_class.car_type = car.car_type
+        if car_class.is_locomotive is None:
+            car_class.is_locomotive = class_is_locomotive
+
+        if capacity_value and (created_class or not car_class.capacity):
+            car_class.capacity = capacity_value
+        if weight_value and (created_class or not car_class.weight):
+            car_class.weight = weight_value
+        if load_limit_value and (created_class or not car_class.load_limit):
+            car_class.load_limit = load_limit_value
+
+        if created_class:
+            car.capacity_override = None
+            car.weight_override = None
+            car.load_limit_override = None
+        else:
+            car.capacity_override = (
+                capacity_value if capacity_value and car_class.capacity and capacity_value != car_class.capacity else None
+            )
+            car.weight_override = (
+                weight_value if weight_value and car_class.weight and weight_value != car_class.weight else None
+            )
+            car.load_limit_override = (
+                load_limit_value if load_limit_value and car_class.load_limit and load_limit_value != car_class.load_limit else None
+            )
+        car.car_class = car_class
+        if not car.car_type and car_class.car_type:
+            car.car_type = car_class.car_type
+        if car_class.is_locomotive is not None:
+            car.is_locomotive = car_class.is_locomotive
+    else:
+        car.car_class = None
+        car.capacity_override = capacity_value or None
+        car.weight_override = weight_value or None
+        car.load_limit_override = load_limit_value or None
+
+    location_name = form.get("location", "").strip()
+    if location_name:
+        car.location = get_or_create_location(location_name)
+    else:
+        car.location = None
+
+
+def serialize_car(car: Car) -> dict:
+    class_capacity = car.car_class.capacity if car.car_class else None
+    class_weight = car.car_class.weight if car.car_class else None
+    class_load_limit = car.car_class.load_limit if car.car_class else None
+    return {
+        "id": car.id,
+        "car_type": car.car_type,
+        "car_number": car.car_number,
+        "reporting_mark": car.reporting_mark,
+        "railroad": car.railroad.name if car.railroad else None,
+        "car_class": car.car_class.code if car.car_class else None,
+        "location": car.location.name if car.location else None,
+        "brand": car.brand,
+        "upc": car.upc,
+        "dcc_id": car.dcc_id,
+        "wheel_arrangement": car.car_class.wheel_arrangement if car.car_class else None,
+        "tender_axles": car.car_class.tender_axles if car.car_class else None,
+        "traction_drivers": car.traction_drivers,
+        "capacity": car.capacity_override or class_capacity,
+        "weight": car.weight_override or class_weight,
+        "load_limit": car.load_limit_override or class_load_limit,
+        "built": car.built,
+        "alt_date": car.alt_date,
+        "reweight_date": car.reweight_date,
+        "other_lettering": car.other_lettering,
+        "msrp": car.msrp,
+        "price": car.price,
+        "load": car.load,
+        "repairs_required": car.repairs_required,
+        "notes": car.notes,
+        "is_locomotive": car.is_locomotive,
+        "capacity_override": car.capacity_override,
+        "weight_override": car.weight_override,
+        "load_limit_override": car.load_limit_override,
+    }

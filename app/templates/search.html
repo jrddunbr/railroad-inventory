@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Search</h1>
+    <form method="get" action="{{ url_for('main.search') }}">
+      <div class="actions">
+        <input name="q" placeholder="Search by location, car number, or notes" value="{{ query }}" />
+        <button type="submit">Search</button>
+      </div>
+    </form>
+    {% if query %}
+      <h3>Results for "{{ query }}"</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Reporting Mark</th>
+            <th>Car #</th>
+            <th>Type</th>
+            <th>Class</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for car in cars %}
+          <tr>
+            <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
+            <td>
+              {% if car.railroad %}
+                <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.reporting_mark or "-" }}</a>
+              {% else %}
+                {{ car.reporting_mark or "-" }}
+              {% endif %}
+            </td>
+            <td>
+              {% if car.car_number %}
+                <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>{{ car.car_type }}</td>
+            <td>
+              {% if car.car_class %}
+                <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if car.location %}
+                <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6">No matches found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+{% endblock %}

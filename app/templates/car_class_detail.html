@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Class {{ car_class.code }}</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.car_class_edit', class_id=car_class.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('main.car_class_delete', class_id=car_class.id) }}" onsubmit="return confirm('Delete this class?');">
+        <button type="submit" class="tag">Delete</button>
+      </form>
+      <a class="tag" href="{{ url_for('main.car_classes') }}">Back to Classes</a>
+    </div>
+    <div class="grid">
+      <div>
+        <p><strong>Car Type:</strong> {{ car_class.car_type or "-" }}</p>
+        <p><strong>Wheel Arrangement:</strong> {{ car_class.wheel_arrangement or "-" }}</p>
+        {% if car_class.tender_axles %}
+          <p><strong>Tender Axles:</strong> {{ car_class.tender_axles }}</p>
+        {% endif %}
+        <p><strong>Locomotive:</strong>
+          {% if car_class.is_locomotive is none %}
+            -
+          {% elif car_class.is_locomotive %}
+            Yes
+          {% else %}
+            No
+          {% endif %}
+        </p>
+      </div>
+      <div>
+        <p><strong>Capacity:</strong> {{ car_class.capacity or "-" }}</p>
+        <p><strong>Weight:</strong> {{ car_class.weight or "-" }}</p>
+        <p><strong>Load Limit:</strong> {{ car_class.load_limit or "-" }}</p>
+      </div>
+      <div>
+        <p><strong>Notes:</strong> {{ car_class.notes or "-" }}</p>
+      </div>
+    </div>
+    <h3>Cars</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Reporting Mark</th>
+          <th>Car #</th>
+          <th>Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for car in cars %}
+        <tr>
+          <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
+          <td>
+            {% if car.railroad %}
+              <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.reporting_mark or "-" }}</a>
+            {% else %}
+              {{ car.reporting_mark or "-" }}
+            {% endif %}
+          </td>
+          <td>
+            {% if car.car_number %}
+              <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if car.location %}
+              <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No cars assigned to this class yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

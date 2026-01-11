@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>{{ railroad.reporting_mark or "-" }} - {{ railroad.name }}</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('main.railroad_delete', railroad_id=railroad.id) }}" onsubmit="return confirm('Delete this railroad?');">
+        <button type="submit" class="tag">Delete</button>
+      </form>
+      <a class="tag" href="{{ url_for('main.railroads') }}">Back to Railroads</a>
+    </div>
+    <div class="grid">
+      <div>
+        <p><strong>Start:</strong> {{ railroad.start_date or "-" }}</p>
+        <p><strong>End:</strong> {{ railroad.end_date or "-" }}</p>
+        <p><strong>Merged Into:</strong> {{ railroad.merged_into or "-" }}</p>
+        <p><strong>Merged From:</strong> {{ railroad.merged_from or "-" }}</p>
+      </div>
+      <div>
+        <p><strong>Notes:</strong> {{ railroad.notes or "-" }}</p>
+      </div>
+    </div>
+    <h3>Cars</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Car #</th>
+          <th>Type</th>
+          <th>Class</th>
+          <th>Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for car in cars %}
+        <tr>
+          <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
+          <td>
+            {% if car.car_number %}
+              <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ car.car_type }}</td>
+          <td>
+            {% if car.car_class %}
+              <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if car.location %}
+              <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No cars assigned to this railroad yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

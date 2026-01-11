@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>{{ 'Edit Car' if car else 'Add New Car' }}</h1>
+    <form method="post" action="{{ form_action }}" data-mode="{{ 'edit' if car else 'new' }}">
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Railroad</h2>
+        <div class="grid">
+          <div>
+            <label for="reporting_mark">Reporting Mark</label>
+            <input id="reporting_mark" name="reporting_mark" value="{{ car.reporting_mark if car else '' }}" {% if car and car.railroad %}disabled{% endif %} />
+          </div>
+          <div>
+            <label for="railroad_name">Railroad Name</label>
+            <input id="railroad_name" name="railroad_name" value="{{ car.railroad.name if car and car.railroad else '' }}" {% if car and car.railroad %}disabled{% endif %} />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Location</h2>
+        <div class="grid">
+          <div>
+            <label for="location">Location</label>
+            <input list="locations" id="location" name="location" value="{{ car.location.name if car and car.location else '' }}" />
+            <datalist id="locations">
+              {% for loc in locations %}
+                <option value="{{ loc.name }}"></option>
+              {% endfor %}
+            </datalist>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Car ID</h2>
+        <div class="grid">
+          <div>
+            <label for="car_number">Car #</label>
+            <input id="car_number" name="car_number" value="{{ car.car_number if car else '' }}" />
+          </div>
+          <div>
+            <label for="dcc_id">DCC ID</label>
+            <input id="dcc_id" name="dcc_id" value="{{ car.dcc_id if car else '' }}" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Car Info</h2>
+        <div class="grid">
+          <div>
+            <label for="car_class">Car Class</label>
+            <input list="car_classes" id="car_class" name="car_class" value="{{ car.car_class.code if car and car.car_class else '' }}" />
+            <datalist id="car_classes">
+              {% for class in classes %}
+                <option value="{{ class.code }}"></option>
+              {% endfor %}
+            </datalist>
+          </div>
+          <div>
+            <label for="car_type">Car Type</label>
+            <input id="car_type" name="car_type" value="{{ car.car_type if car else '' }}" required />
+          </div>
+          <div>
+            <label for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>
+            <input id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.car_class.wheel_arrangement if car and car.car_class else '' }}" {% if car and car.car_class and car.car_class.wheel_arrangement %}disabled{% endif %} />
+          </div>
+          <div>
+            <label for="class_tender_axles">Class Tender Axles</label>
+            <input id="class_tender_axles" name="class_tender_axles" value="{{ car.car_class.tender_axles if car and car.car_class else '' }}" {% if car and car.car_class and car.car_class.tender_axles %}disabled{% endif %} />
+          </div>
+          <div>
+            <label for="weight">Weight</label>
+            <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else '' }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="load_limit">Load Limit</label>
+            <input id="load_limit" name="load_limit" value="{{ car.load_limit_override if car and car.load_limit_override else '' }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="capacity">Capacity</label>
+            <input id="capacity" name="capacity" value="{{ car.capacity_override if car and car.capacity_override else '' }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="built">Built</label>
+            <input id="built" name="built" value="{{ car.built if car else '' }}" />
+          </div>
+          <div>
+            <label for="alt_date">Alt Date</label>
+            <input id="alt_date" name="alt_date" value="{{ car.alt_date if car else '' }}" />
+          </div>
+          <div>
+            <label for="reweight_date">Reweight Date</label>
+            <input id="reweight_date" name="reweight_date" value="{{ car.reweight_date if car else '' }}" />
+          </div>
+          <div>
+            <label for="other_lettering">Other Lettering</label>
+            <input id="other_lettering" name="other_lettering" value="{{ car.other_lettering if car else '' }}" />
+          </div>
+          <div>
+            <label for="traction_drivers">Traction Drivers</label>
+            <input id="traction_drivers" type="checkbox" name="traction_drivers" {% if car and car.traction_drivers %}checked{% endif %} />
+          </div>
+          <div>
+            <label for="load">Load</label>
+            <input id="load" name="load" value="{{ car.load if car else '' }}" />
+          </div>
+          <div>
+            <label for="is_locomotive">Locomotive</label>
+            <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car and car.is_locomotive %}checked{% endif %} {% if car and car.car_class and car.car_class.is_locomotive is not none %}disabled{% endif %} />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Asset</h2>
+        <div class="grid">
+          <div>
+            <label for="msrp">MSRP</label>
+            <input id="msrp" name="msrp" value="{{ car.msrp if car else '' }}" />
+          </div>
+          <div>
+            <label for="price">Purchase Price</label>
+            <input id="price" name="price" value="{{ car.price if car else '' }}" />
+          </div>
+          <div>
+            <label for="brand">Brand</label>
+            <input id="brand" name="brand" value="{{ car.brand if car else '' }}" />
+          </div>
+          <div>
+            <label for="upc">UPC</label>
+            <input id="upc" name="upc" value="{{ car.upc if car else '' }}" />
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Other Information</h2>
+        <div class="grid">
+          <div>
+            <label for="repairs_required">Repairs Required</label>
+            <textarea id="repairs_required" name="repairs_required" rows="4">{{ car.repairs_required if car else '' }}</textarea>
+          </div>
+          <div>
+            <label for="notes">Notes</label>
+            <textarea id="notes" name="notes" rows="4">{{ car.notes if car else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="{{ url_for('main.inventory') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+  <script>
+    const classFields = {
+      wheel: document.getElementById('class_wheel_arrangement'),
+      tender: document.getElementById('class_tender_axles'),
+      capacity: document.getElementById('capacity'),
+      weight: document.getElementById('weight'),
+      loadLimit: document.getElementById('load_limit'),
+      carType: document.getElementById('car_type'),
+      locomotive: document.getElementById('is_locomotive'),
+    };
+
+    const hasValue = (input) => input && input.value && input.value.trim() !== '';
+
+    const setGrayDefault = (input, value) => {
+      if (!input || !input.dataset.grayDefault) return;
+      if (hasValue(input)) return;
+      if (!value) return;
+      input.value = value;
+      input.dataset.defaultValue = value;
+      input.dataset.isDefault = 'true';
+      input.style.color = '#666666';
+    };
+
+    const clearGrayDefault = (input) => {
+      if (!input || input.dataset.isDefault !== 'true') return;
+      input.value = '';
+      input.dataset.isDefault = 'false';
+      input.style.color = '';
+    };
+
+    const wheelField = document.getElementById('class_wheel_arrangement')?.closest('div');
+    const tenderField = document.getElementById('class_tender_axles')?.closest('div');
+    const locomotiveInput = document.getElementById('is_locomotive');
+    const updateTenderVisibility = () => {
+      if (!locomotiveInput) return;
+      const show = locomotiveInput.checked;
+      if (wheelField) wheelField.style.display = show ? '' : 'none';
+      if (tenderField) tenderField.style.display = show ? '' : 'none';
+    };
+
+    const applyClassDetails = (carClass) => {
+      if (!carClass) return;
+      if (classFields.wheel && !hasValue(classFields.wheel)) classFields.wheel.value = carClass.wheel_arrangement || '';
+      if (classFields.tender && !hasValue(classFields.tender)) classFields.tender.value = carClass.tender_axles || '';
+      setGrayDefault(classFields.capacity, carClass.capacity);
+      setGrayDefault(classFields.weight, carClass.weight);
+      setGrayDefault(classFields.loadLimit, carClass.load_limit);
+      if (classFields.carType && !hasValue(classFields.carType) && carClass.car_type) {
+        classFields.carType.value = carClass.car_type;
+      }
+      if (classFields.locomotive && carClass.is_locomotive !== null && carClass.is_locomotive !== undefined) {
+        classFields.locomotive.checked = !!carClass.is_locomotive;
+      }
+      updateTenderVisibility();
+    };
+
+    const classInput = document.getElementById('car_class');
+    const loadClassDetails = async (code) => {
+      if (!code) return;
+      try {
+        const response = await fetch('{{ url_for("main.api_car_classes") }}');
+        if (!response.ok) return;
+        const classes = await response.json();
+        const match = classes.find((item) => item.code === code);
+        applyClassDetails(match);
+      } catch (error) {
+        console.warn('Failed to load car class details', error);
+      }
+    };
+
+    if (classInput) {
+      classInput.addEventListener('change', () => loadClassDetails(classInput.value.trim()));
+      if (classInput.value.trim()) {
+        loadClassDetails(classInput.value.trim());
+      }
+    }
+
+    if (locomotiveInput) {
+      locomotiveInput.addEventListener('change', updateTenderVisibility);
+      updateTenderVisibility();
+    }
+
+    const reportingInput = document.getElementById('reporting_mark');
+    const railroadInput = document.getElementById('railroad_name');
+    if (reportingInput && railroadInput) {
+      reportingInput.addEventListener('change', async () => {
+        const mark = reportingInput.value.trim();
+        if (!mark || railroadInput.value.trim()) return;
+        try {
+          const response = await fetch('{{ url_for("main.api_railroads") }}');
+          if (!response.ok) return;
+          const railroads = await response.json();
+          const match = railroads.find((item) => item.reporting_mark === mark);
+          if (match && match.name) {
+            railroadInput.value = match.name;
+          }
+        } catch (error) {
+          console.warn('Failed to load railroad details', error);
+        }
+      });
+    }
+
+    [classFields.capacity, classFields.weight, classFields.loadLimit].forEach((input) => {
+      if (!input) return;
+      input.addEventListener('focus', () => clearGrayDefault(input));
+      input.addEventListener('input', () => {
+        if (input.dataset.isDefault === 'true') {
+          clearGrayDefault(input);
+        }
+        input.style.color = '';
+      });
+    });
+
+    const form = document.querySelector('form[data-mode]');
+    if (form) {
+      form.addEventListener('submit', () => {
+        [classFields.capacity, classFields.weight, classFields.loadLimit].forEach((input) => {
+          if (input && input.dataset.isDefault === 'true') {
+            input.value = '';
+          }
+        });
+      });
+    }
+  </script>
+{% endblock %}

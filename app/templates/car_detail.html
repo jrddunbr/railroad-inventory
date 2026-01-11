@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>{{ car.reporting_mark or "" }} {{ car.car_number or "" }}</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" onsubmit="return confirm('Delete this car?');">
+        <button type="submit" class="tag">Delete</button>
+      </form>
+      <a class="tag" href="{{ url_for('main.inventory') }}">Back to Inventory</a>
+    </div>
+    <div class="grid">
+      <div>
+        <h3>Identity</h3>
+        <p><strong>Type:</strong> {{ car.car_type }}</p>
+        <p><strong>Class:</strong>
+          {% if car.car_class %}
+            <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
+          {% else %}
+            -
+          {% endif %}
+        </p>
+        <p><strong>Railroad:</strong>
+          {% if car.railroad %}
+            <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.name }}</a>
+          {% else %}
+            -
+          {% endif %}
+        </p>
+        <p><strong>Reporting Mark:</strong>
+          {% if car.railroad %}
+            <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.reporting_mark or "-" }}</a>
+          {% else %}
+            {{ car.reporting_mark or "-" }}
+          {% endif %}
+        </p>
+      </div>
+      <div>
+        <h3>Location</h3>
+        <p><strong>Location:</strong>
+          {% if car.location %}
+            <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
+          {% else %}
+            -
+          {% endif %}
+        </p>
+      </div>
+      <div>
+        <h3>Specs</h3>
+        <p><strong>Wheel Arrangement:</strong> {{ car.car_class.wheel_arrangement if car.car_class else "-" }}</p>
+        {% if car.car_class and car.car_class.tender_axles %}
+          <p><strong>Tender Axles:</strong> {{ car.car_class.tender_axles }}</p>
+        {% endif %}
+        <p><strong>DCC ID:</strong> {{ car.dcc_id or "-" }}</p>
+      </div>
+      <div>
+        <h3>Pricing</h3>
+        <p><strong>MSRP:</strong> {{ car.msrp or "-" }}</p>
+        <p><strong>Price:</strong> {{ car.price or "-" }}</p>
+      </div>
+      <div>
+        <h3>Lettering</h3>
+        <p><strong>Capacity:</strong>
+          {% if car.capacity_override %}
+            {{ car.capacity_override }} (override)
+          {% else %}
+            {{ car.car_class.capacity if car.car_class else "-" }}
+          {% endif %}
+        </p>
+        <p><strong>Weight:</strong>
+          {% if car.weight_override %}
+            {{ car.weight_override }} (override)
+          {% else %}
+            {{ car.car_class.weight if car.car_class else "-" }}
+          {% endif %}
+        </p>
+        <p><strong>Load Limit:</strong>
+          {% if car.load_limit_override %}
+            {{ car.load_limit_override }} (override)
+          {% else %}
+            {{ car.car_class.load_limit if car.car_class else "-" }}
+          {% endif %}
+        </p>
+        <p><strong>Built:</strong> {{ car.built or "-" }}</p>
+        <p><strong>Alt Date:</strong> {{ car.alt_date or "-" }}</p>
+        <p><strong>Reweigh Date:</strong> {{ car.reweight_date or "-" }}</p>
+      </div>
+      <div>
+        <h3>Maintenance</h3>
+        <p><strong>Repairs Required:</strong> {{ car.repairs_required or "None" }}</p>
+        <p><strong>Notes:</strong> {{ car.notes or "-" }}</p>
+      </div>
+    </div>
+  </div>
+{% endblock %}

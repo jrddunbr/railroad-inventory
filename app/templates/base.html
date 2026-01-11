@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Model Inventory</title>
+  <link rel="stylesheet" href="https://unpkg.com/@cloudscape-design/components@3.0.0/styles.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
+  <style>
+    :root {
+      --mi-bg: #f5f2ea;
+      --mi-ink: #222222;
+      --mi-accent: #2d5f5d;
+      --mi-panel: #ffffff;
+      --mi-border: #d6d1c8;
+    }
+    body {
+      font-family: "IBM Plex Sans", sans-serif;
+      background: radial-gradient(circle at top, #fef9f0 0%, var(--mi-bg) 55%, #efe9de 100%);
+      color: var(--mi-ink);
+      margin: 0;
+    }
+    header {
+      background: var(--mi-panel);
+      border-bottom: 1px solid var(--mi-border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+    .brand {
+      font-size: 20px;
+      font-weight: 600;
+    }
+    .container {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 64px);
+    }
+    nav {
+      border-right: 1px solid var(--mi-border);
+      padding: 16px;
+    }
+    nav a {
+      display: block;
+      margin-bottom: 12px;
+      color: var(--mi-ink);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    nav a.active {
+      color: var(--mi-accent);
+    }
+    main {
+      padding: 24px;
+    }
+    .panel {
+      background: var(--mi-panel);
+      border: 1px solid var(--mi-border);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(34, 34, 34, 0.06);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--mi-border);
+      vertical-align: top;
+    }
+    input, select, textarea, button {
+      font-family: inherit;
+      font-size: 14px;
+    }
+    .grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 16px;
+    }
+    .actions form {
+      margin: 0;
+    }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e8efe8;
+      color: #2d5f5d;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .keyboard-hint {
+      font-size: 12px;
+      color: #666666;
+      margin-top: 8px;
+    }
+    @media (max-width: 900px) {
+      .container {
+        grid-template-columns: 1fr;
+      }
+      nav {
+        border-right: none;
+        border-bottom: 1px solid var(--mi-border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      nav a {
+        margin-bottom: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Model Inventory</div>
+    <div class="actions" style="margin-top: 0;">
+      <form method="get" action="{{ url_for('main.search') }}">
+        <input name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
+      </form>
+      <a href="{{ url_for('main.car_new') }}" class="tag">Add New</a>
+    </div>
+  </header>
+  <div class="container">
+    <nav>
+      <a href="{{ url_for('main.inventory') }}" class="{% if request.path == '/inventory' %}active{% endif %}">Inventory</a>
+      <a href="{{ url_for('main.railroads') }}" class="{% if request.path == '/railroads' %}active{% endif %}">Railroads</a>
+      <a href="{{ url_for('main.car_classes') }}" class="{% if request.path == '/car-classes' %}active{% endif %}">Car Classes</a>
+      <a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>
+      <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
+    </nav>
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <script>
+    const focusable = () => Array.from(document.querySelectorAll('a, button, input, select, textarea'))
+      .filter(el => !el.hasAttribute('disabled'));
+
+    document.addEventListener('keydown', (event) => {
+      if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.key)) {
+        return;
+      }
+      const items = focusable();
+      if (items.length === 0) return;
+      const current = document.activeElement;
+      let index = items.indexOf(current);
+      if (index === -1) index = 0;
+      if (["ArrowDown", "ArrowRight"].includes(event.key)) {
+        index = (index + 1) % items.length;
+      } else {
+        index = (index - 1 + items.length) % items.length;
+      }
+      items[index].focus();
+      event.preventDefault();
+    });
+  </script>
+</body>
+</html>

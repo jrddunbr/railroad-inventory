@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Edit Railroad</h1>
+    <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">
+      <div class="grid">
+        <div>
+          <label for="reporting_mark">Reporting Mark</label>
+          <input id="reporting_mark" name="reporting_mark" value="{{ railroad.reporting_mark }}" required />
+        </div>
+        <div>
+          <label for="name">Name</label>
+          <input id="name" name="name" value="{{ railroad.name }}" required />
+        </div>
+        <div>
+          <label for="start_date">Start Date</label>
+          <input id="start_date" name="start_date" value="{{ railroad.start_date or '' }}" />
+        </div>
+        <div>
+          <label for="end_date">End Date</label>
+          <input id="end_date" name="end_date" value="{{ railroad.end_date or '' }}" />
+        </div>
+        <div>
+          <label for="merged_into">Merged Into</label>
+          <input id="merged_into" name="merged_into" value="{{ railroad.merged_into or '' }}" />
+        </div>
+        <div>
+          <label for="merged_from">Merged From</label>
+          <input id="merged_from" name="merged_from" value="{{ railroad.merged_from or '' }}" />
+        </div>
+        <div>
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes">{{ railroad.notes or '' }}</textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}
