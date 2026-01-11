@@ -4,20 +4,6 @@
     <h1>{{ 'Edit Car' if car else 'Add New Car' }}</h1>
     <form method="post" action="{{ form_action }}" data-mode="{{ 'edit' if car else 'new' }}">
       <div class="panel" style="margin-bottom: 16px;">
-        <h2>Railroad</h2>
-        <div class="grid">
-          <div>
-            <label for="reporting_mark">Reporting Mark</label>
-            <input id="reporting_mark" name="reporting_mark" value="{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else '') }}" {% if car and car.railroad %}disabled{% endif %} />
-          </div>
-          <div>
-            <label for="railroad_name">Railroad Name</label>
-            <input id="railroad_name" name="railroad_name" value="{{ car.railroad.name if car and car.railroad else '' }}" {% if car and car.railroad %}disabled{% endif %} />
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" style="margin-bottom: 16px;">
         <h2>Location</h2>
         <div class="grid">
           <div>
@@ -28,6 +14,20 @@
                 <option value="{{ loc.name }}"></option>
               {% endfor %}
             </datalist>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom: 16px;">
+        <h2>Railroad</h2>
+        <div class="grid">
+          <div>
+            <label for="reporting_mark">Reporting Mark</label>
+            <input id="reporting_mark" name="reporting_mark" value="{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else '') }}" {% if car and car.railroad %}disabled{% endif %} />
+          </div>
+          <div>
+            <label for="railroad_name">Railroad Name</label>
+            <input id="railroad_name" name="railroad_name" value="{{ car.railroad.name if car and car.railroad else '' }}" {% if car and car.railroad %}disabled{% endif %} />
           </div>
         </div>
       </div>
@@ -48,6 +48,8 @@
 
       <div class="panel" style="margin-bottom: 16px;">
         <h2>Car Info</h2>
+        <p class="keyboard-hint">CAPY - Load Capacity; LD LMT - Load Limit; LT WT - Car Weight</p>
+        <h3>Basics</h3>
         <div class="grid">
           <div>
             <label for="car_class">Car Class</label>
@@ -62,26 +64,24 @@
             <label for="car_type">Car Type</label>
             <input id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else '') }}" required data-gray-default="true" />
           </div>
+        </div>
+        <h3>Weight Specifications</h3>
+        <div class="grid">
           <div>
-            <label for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>
-            <input id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.wheel_arrangement_override if car and car.wheel_arrangement_override else (car.car_class.wheel_arrangement if car and car.car_class else '') }}" data-gray-default="true" />
-          </div>
-          <div>
-            <label for="class_tender_axles">Class Tender Axles</label>
-            <input id="class_tender_axles" name="class_tender_axles" value="{{ car.tender_axles_override if car and car.tender_axles_override else (car.car_class.tender_axles if car and car.car_class else '') }}" data-gray-default="true" />
-          </div>
-          <div>
-            <label for="weight">Weight</label>
-            <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else '' }}" data-gray-default="true" />
+            <label for="capacity">Capacity</label>
+            <input id="capacity" name="capacity" value="{{ car.capacity_override if car and car.capacity_override else '' }}" data-gray-default="true" />
           </div>
           <div>
             <label for="load_limit">Load Limit</label>
             <input id="load_limit" name="load_limit" value="{{ car.load_limit_override if car and car.load_limit_override else '' }}" data-gray-default="true" />
           </div>
           <div>
-            <label for="capacity">Capacity</label>
-            <input id="capacity" name="capacity" value="{{ car.capacity_override if car and car.capacity_override else '' }}" data-gray-default="true" />
+            <label for="weight">Weight</label>
+            <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else '' }}" data-gray-default="true" />
           </div>
+        </div>
+        <h3>Dates</h3>
+        <div class="grid">
           <div>
             <label for="built">Built</label>
             <input id="built" name="built" value="{{ car.built if car else '' }}" />
@@ -93,6 +93,17 @@
           <div>
             <label for="reweight_date">Reweight Date</label>
             <input id="reweight_date" name="reweight_date" value="{{ car.reweight_date if car else '' }}" />
+          </div>
+        </div>
+        <h3>Other Info</h3>
+        <div class="grid">
+          <div>
+            <label for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>
+            <input id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.wheel_arrangement_override if car and car.wheel_arrangement_override else (car.car_class.wheel_arrangement if car and car.car_class else '') }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="class_tender_axles">Class Tender Axles</label>
+            <input id="class_tender_axles" name="class_tender_axles" value="{{ car.tender_axles_override if car and car.tender_axles_override else (car.car_class.tender_axles if car and car.car_class else '') }}" data-gray-default="true" />
           </div>
           <div>
             <label for="other_lettering">Other Lettering</label>
@@ -235,6 +246,26 @@
     if (locomotiveInput) {
       locomotiveInput.addEventListener('change', updateTenderVisibility);
       updateTenderVisibility();
+    }
+
+    const focusNextField = (current) => {
+      const form = current?.closest('form');
+      if (!form) return;
+      const focusable = Array.from(form.querySelectorAll('input, select, textarea, button, [tabindex]'))
+        .filter((el) => !el.disabled && el.type !== 'hidden' && el.tabIndex !== -1);
+      const index = focusable.indexOf(current);
+      if (index > -1 && index + 1 < focusable.length) {
+        focusable[index + 1].focus();
+      }
+    };
+
+    const locationInput = document.getElementById('location');
+    if (locationInput) {
+      locationInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        focusNextField(locationInput);
+      });
     }
 
     const reportingInput = document.getElementById('reporting_mark');
