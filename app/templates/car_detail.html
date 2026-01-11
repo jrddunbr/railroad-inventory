@@ -64,21 +64,21 @@
         <h3>Lettering</h3>
         <p><strong>Capacity:</strong>
           {% if car.capacity_override %}
-            {{ car.capacity_override }} (override)
+            {{ car.capacity_override }}{% if car.car_class %} (override){% endif %}
           {% else %}
             {{ car.car_class.capacity if car.car_class else "-" }}
           {% endif %}
         </p>
         <p><strong>Weight:</strong>
           {% if car.weight_override %}
-            {{ car.weight_override }} (override)
+            {{ car.weight_override }}{% if car.car_class %} (override){% endif %}
           {% else %}
             {{ car.car_class.weight if car.car_class else "-" }}
           {% endif %}
         </p>
         <p><strong>Load Limit:</strong>
           {% if car.load_limit_override %}
-            {{ car.load_limit_override }} (override)
+            {{ car.load_limit_override }}{% if car.car_class %} (override){% endif %}
           {% else %}
             {{ car.car_class.load_limit if car.car_class else "-" }}
           {% endif %}
