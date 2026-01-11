@@ -186,6 +186,7 @@ def car_edit(car_id: int):
         railroads=railroads,
         classes=classes,
         locations=locations,
+        prefill={},
         form_action=url_for("main.car_edit", car_id=car.id),
     )
 
@@ -198,6 +199,15 @@ def car_new():
         db.session.add(car)
         db.session.commit()
         return redirect(url_for("main.car_detail", car_id=car.id))
+    prefill = {
+        "reporting_mark": request.args.get("reporting_mark", "").strip(),
+        "railroad_name": request.args.get("railroad_name", "").strip(),
+        "car_class": request.args.get("car_class", "").strip(),
+        "car_type": request.args.get("car_type", "").strip(),
+        "capacity": request.args.get("capacity", "").strip(),
+        "weight": request.args.get("weight", "").strip(),
+        "load_limit": request.args.get("load_limit", "").strip(),
+    }
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
     classes = CarClass.query.order_by(CarClass.code).all()
     locations = Location.query.order_by(Location.name).all()
@@ -207,6 +217,7 @@ def car_new():
         railroads=railroads,
         classes=classes,
         locations=locations,
+        prefill=prefill,
         form_action=url_for("main.car_new"),
     )
 

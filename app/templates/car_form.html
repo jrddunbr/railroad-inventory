@@ -23,11 +23,11 @@
         <div class="grid">
           <div>
             <label for="reporting_mark">Reporting Mark</label>
-            <input id="reporting_mark" name="reporting_mark" value="{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else '') }}" {% if car and car.railroad %}disabled{% endif %} />
+            <input id="reporting_mark" name="reporting_mark" value="{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else prefill.get('reporting_mark', '')) }}" {% if car and car.railroad %}disabled{% endif %} />
           </div>
           <div>
             <label for="railroad_name">Railroad Name</label>
-            <input id="railroad_name" name="railroad_name" value="{{ car.railroad.name if car and car.railroad else '' }}" {% if car and car.railroad %}disabled{% endif %} />
+            <input id="railroad_name" name="railroad_name" value="{{ car.railroad.name if car and car.railroad else (prefill.get('railroad_name', '') if not car else '') }}" {% if car and car.railroad %}disabled{% endif %} />
           </div>
         </div>
       </div>
@@ -53,7 +53,7 @@
         <div class="grid">
           <div>
             <label for="car_class">Car Class</label>
-            <input list="car_classes" id="car_class" name="car_class" value="{{ car.car_class.code if car and car.car_class else '' }}" />
+            <input list="car_classes" id="car_class" name="car_class" value="{{ car.car_class.code if car and car.car_class else prefill.get('car_class', '') }}" />
             <datalist id="car_classes">
               {% for class in classes %}
                 <option value="{{ class.code }}"></option>
@@ -62,22 +62,22 @@
           </div>
           <div>
             <label for="car_type">Car Type</label>
-            <input id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else '') }}" required data-gray-default="true" />
+            <input id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
           </div>
         </div>
         <h3>Weight Specifications</h3>
         <div class="grid">
           <div>
             <label for="capacity">Capacity</label>
-            <input id="capacity" name="capacity" value="{{ car.capacity_override if car and car.capacity_override else '' }}" data-gray-default="true" />
+            <input id="capacity" name="capacity" value="{{ car.capacity_override if car and car.capacity_override else (prefill.get('capacity', '') if not car else '') }}" data-gray-default="true" />
           </div>
           <div>
             <label for="load_limit">Load Limit</label>
-            <input id="load_limit" name="load_limit" value="{{ car.load_limit_override if car and car.load_limit_override else '' }}" data-gray-default="true" />
+            <input id="load_limit" name="load_limit" value="{{ car.load_limit_override if car and car.load_limit_override else (prefill.get('load_limit', '') if not car else '') }}" data-gray-default="true" />
           </div>
           <div>
             <label for="weight">Weight</label>
-            <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else '' }}" data-gray-default="true" />
+            <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else (prefill.get('weight', '') if not car else '') }}" data-gray-default="true" />
           </div>
         </div>
         <h3>Dates</h3>

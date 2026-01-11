@@ -1,9 +1,25 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="panel">
+    {% set copy_reporting_mark = car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or '') %}
+    {% set copy_railroad_name = car.railroad.name if car.railroad else '' %}
+    {% if car.car_class %}
+      {% set copy_car_class = car.car_class.code or '' %}
+      {% set copy_car_type = car.car_class.car_type or '' %}
+      {% set copy_capacity = car.car_class.capacity or '' %}
+      {% set copy_weight = car.car_class.weight or '' %}
+      {% set copy_load_limit = car.car_class.load_limit or '' %}
+    {% else %}
+      {% set copy_car_class = '' %}
+      {% set copy_car_type = car.car_type_override or '' %}
+      {% set copy_capacity = car.capacity_override or '' %}
+      {% set copy_weight = car.weight_override or '' %}
+      {% set copy_load_limit = car.load_limit_override or '' %}
+    {% endif %}
     <h1>{{ (car.railroad.reporting_mark if car.railroad else car.reporting_mark_override) or "" }} {{ car.car_number or "" }}</h1>
     <div class="actions">
       <a class="tag" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
+      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit) }}">Copy to New Car</a>
       <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" onsubmit="return confirm('Delete this car?');">
         <button type="submit" class="tag">Delete</button>
       </form>
