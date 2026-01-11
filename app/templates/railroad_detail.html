@@ -42,7 +42,7 @@
               -
             {% endif %}
           </td>
-          <td>{{ car.car_type }}</td>
+          <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
           <td>
             {% if car.car_class %}
               <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>

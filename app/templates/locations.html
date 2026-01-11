@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Locations</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Parent</th>
+          <th>Cars</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for location in locations %}
+        <tr>
+          <td><a href="{{ url_for('main.location_detail', location_id=location.id) }}">{{ location.name }}</a></td>
+          <td>{{ location.location_type }}</td>
+          <td>
+            {% if location.parent %}
+              <a href="{{ url_for('main.location_detail', location_id=location.parent.id) }}">{{ location.parent.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ location.cars|length }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No locations yet. Add a car to create one automatically.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

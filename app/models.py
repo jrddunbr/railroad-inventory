@@ -64,13 +64,16 @@ class Car(db.Model):
     car_class_id = db.Column(db.Integer, db.ForeignKey("car_classes.id"))
     location_id = db.Column(db.Integer, db.ForeignKey("locations.id"))
 
-    car_type = db.Column(db.String(64), nullable=False)
     car_number = db.Column(db.String(32))
-    reporting_mark = db.Column(db.String(16))
+    reporting_mark_override = db.Column(db.String(16))
     brand = db.Column(db.String(128))
     upc = db.Column(db.String(32))
     dcc_id = db.Column(db.String(32))
     traction_drivers = db.Column(db.Boolean)
+    car_type_override = db.Column(db.String(64))
+    wheel_arrangement_override = db.Column(db.String(32))
+    tender_axles_override = db.Column(db.String(32))
+    is_locomotive_override = db.Column(db.Boolean)
     capacity_override = db.Column(db.String(64))
     weight_override = db.Column(db.String(64))
     load_limit_override = db.Column(db.String(64))
@@ -84,14 +87,12 @@ class Car(db.Model):
     repairs_required = db.Column(db.String(64))
     notes = db.Column(db.Text)
 
-    is_locomotive = db.Column(db.Boolean, default=False)
-
     railroad = db.relationship("Railroad", back_populates="cars")
     car_class = db.relationship("CarClass", back_populates="cars")
     location = db.relationship("Location", back_populates="cars")
 
     def __repr__(self) -> str:
-        return f"<Car {self.reporting_mark} {self.car_number}>"
+        return f"<Car {self.car_number}>"
 
 
 class SchemaVersion(db.Model):

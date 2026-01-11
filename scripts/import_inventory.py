@@ -92,6 +92,10 @@ def main(path: Path) -> None:
                 capacity_override = None
                 weight_override = None
                 load_limit_override = None
+                car_type_override = None
+                wheel_override = None
+                tender_override = None
+                is_locomotive_override = None
                 if car_class:
                     if class_capacity and car_class.capacity and class_capacity != car_class.capacity:
                         capacity_override = class_capacity
@@ -99,12 +103,30 @@ def main(path: Path) -> None:
                         weight_override = class_weight
                     if class_load_limit and car_class.load_limit and class_load_limit != car_class.load_limit:
                         load_limit_override = class_load_limit
+                    if car_type and car_class.car_type and car_type != car_class.car_type:
+                        car_type_override = car_type
+                    if class_wheel and car_class.wheel_arrangement and class_wheel != car_class.wheel_arrangement:
+                        wheel_override = class_wheel
+                    if class_tender and car_class.tender_axles and class_tender != car_class.tender_axles:
+                        tender_override = class_tender
+                else:
+                    car_type_override = car_type or None
+                    wheel_override = class_wheel or None
+                    tender_override = class_tender or None
+                    capacity_override = class_capacity or None
+                    weight_override = class_weight or None
+                    load_limit_override = class_load_limit or None
+                    if car_type and car_type.lower().find("locomotive") != -1:
+                        is_locomotive_override = True
 
                 car = Car(
                     railroad=railroad,
-                    reporting_mark=reporting_mark,
-                    car_type=car_type,
                     car_class=car_class,
+                    reporting_mark_override=reporting_mark if not railroad else None,
+                    car_type_override=car_type_override,
+                    wheel_arrangement_override=wheel_override,
+                    tender_axles_override=tender_override,
+                    is_locomotive_override=is_locomotive_override,
                     brand=(row.get("Brand") or "").strip(),
                     upc=(row.get("UPC") or "").strip(),
                     car_number=(row.get("Car #") or "").strip(),
@@ -124,10 +146,6 @@ def main(path: Path) -> None:
                     repairs_required=(row.get("Repairs Req’d") or "").strip(),
                     location=location,
                 )
-                if car_class and car_class.is_locomotive is not None:
-                    car.is_locomotive = car_class.is_locomotive
-                elif car_type and car_type.lower().find("locomotive") != -1:
-                    car.is_locomotive = True
                 db.session.add(car)
 
         db.session.commit()

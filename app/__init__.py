@@ -4,9 +4,7 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
-from app.models import SchemaVersion
-
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.2.0"
 
 
 db = SQLAlchemy()
@@ -33,6 +31,8 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
+        from app.models import SchemaVersion
+
         if not SchemaVersion.query.first():
             db.session.add(SchemaVersion(version=SCHEMA_VERSION))
             db.session.commit()

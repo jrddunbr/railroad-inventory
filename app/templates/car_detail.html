@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="panel">
-    <h1>{{ car.reporting_mark or "" }} {{ car.car_number or "" }}</h1>
+    <h1>{{ (car.railroad.reporting_mark if car.railroad else car.reporting_mark_override) or "" }} {{ car.car_number or "" }}</h1>
     <div class="actions">
       <a class="tag" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
       <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" onsubmit="return confirm('Delete this car?');">
@@ -12,7 +12,7 @@
     <div class="grid">
       <div>
         <h3>Identity</h3>
-        <p><strong>Type:</strong> {{ car.car_type }}</p>
+        <p><strong>Type:</strong> {{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</p>
         <p><strong>Class:</strong>
           {% if car.car_class %}
             <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
@@ -29,9 +29,9 @@
         </p>
         <p><strong>Reporting Mark:</strong>
           {% if car.railroad %}
-            <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.reporting_mark or "-" }}</a>
+            <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.reporting_mark or "-" }}</a>
           {% else %}
-            {{ car.reporting_mark or "-" }}
+            {{ car.reporting_mark_override or "-" }}
           {% endif %}
         </p>
       </div>
@@ -47,9 +47,11 @@
       </div>
       <div>
         <h3>Specs</h3>
-        <p><strong>Wheel Arrangement:</strong> {{ car.car_class.wheel_arrangement if car.car_class else "-" }}</p>
+        <p><strong>Wheel Arrangement:</strong> {{ car.wheel_arrangement_override or (car.car_class.wheel_arrangement if car.car_class else "-") }}</p>
         {% if car.car_class and car.car_class.tender_axles %}
-          <p><strong>Tender Axles:</strong> {{ car.car_class.tender_axles }}</p>
+          <p><strong>Tender Axles:</strong> {{ car.tender_axles_override or car.car_class.tender_axles }}</p>
+        {% elif car.tender_axles_override %}
+          <p><strong>Tender Axles:</strong> {{ car.tender_axles_override }}</p>
         {% endif %}
         <p><strong>DCC ID:</strong> {{ car.dcc_id or "-" }}</p>
       </div>

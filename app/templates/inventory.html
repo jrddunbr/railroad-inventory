@@ -21,9 +21,9 @@
           <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
           <td>
             {% if car.railroad %}
-              <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.reporting_mark or "-" }}</a>
+              <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.reporting_mark or "-" }}</a>
             {% else %}
-              {{ car.reporting_mark or "-" }}
+              {{ car.reporting_mark_override or "-" }}
             {% endif %}
           </td>
           <td>
@@ -33,7 +33,7 @@
               -
             {% endif %}
           </td>
-          <td>{{ car.car_type }}</td>
+          <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
           <td>
             {% if car.car_class %}
               <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>

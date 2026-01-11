@@ -49,6 +49,12 @@ def railroads():
     return render_template("railroads.html", railroads=railroads)
 
 
+@main_bp.route("/locations")
+def locations():
+    locations = Location.query.order_by(Location.name).all()
+    return render_template("locations.html", locations=locations)
+
+
 @main_bp.route("/railroads/<int:railroad_id>")
 def railroad_detail(railroad_id: int):
     railroad = Railroad.query.get_or_404(railroad_id)
@@ -187,7 +193,7 @@ def car_edit(car_id: int):
 @main_bp.route("/cars/new", methods=["GET", "POST"])
 def car_new():
     if request.method == "POST":
-        car = Car(car_type=request.form.get("car_type", ""))
+        car = Car()
         apply_car_form(car, request.form)
         db.session.add(car)
         db.session.commit()
@@ -218,8 +224,10 @@ def search():
             .filter(
                 db.or_(
                     Car.car_number.ilike(like),
-                    Car.reporting_mark.ilike(like),
-                    Car.car_type.ilike(like),
+                    Railroad.reporting_mark.ilike(like),
+                    Car.reporting_mark_override.ilike(like),
+                    Car.car_type_override.ilike(like),
+                    CarClass.car_type.ilike(like),
                     Car.load.ilike(like),
                     Car.notes.ilike(like),
                     Location.name.ilike(like),
@@ -295,8 +303,10 @@ def api_search():
         .filter(
             db.or_(
                 Car.car_number.ilike(like),
-                Car.reporting_mark.ilike(like),
-                Car.car_type.ilike(like),
+                Railroad.reporting_mark.ilike(like),
+                Car.reporting_mark_override.ilike(like),
+                Car.car_type_override.ilike(like),
+                CarClass.car_type.ilike(like),
                 Car.load.ilike(like),
                 Car.notes.ilike(like),
                 Location.name.ilike(like),
@@ -310,8 +320,16 @@ def api_search():
 
 
 def apply_car_form(car: Car, form) -> None:
-    reporting_mark = form.get("reporting_mark", car.reporting_mark or "").strip() if "reporting_mark" in form else None
-    railroad_name = form.get("railroad_name", car.railroad.name if car.railroad else "").strip() if "railroad_name" in form else None
+    reporting_mark = (
+        form.get("reporting_mark", car.railroad.reporting_mark if car.railroad else "").strip()
+        if "reporting_mark" in form
+        else None
+    )
+    railroad_name = (
+        form.get("railroad_name", car.railroad.name if car.railroad else "").strip()
+        if "railroad_name" in form
+        else None
+    )
     railroad = None
     if reporting_mark is not None or railroad_name is not None:
         if reporting_mark:
@@ -324,10 +342,13 @@ def apply_car_form(car: Car, form) -> None:
             if not railroad:
                 railroad = Railroad(reporting_mark=None, name=railroad_name)
                 db.session.add(railroad)
-        car.railroad = railroad
-        car.reporting_mark = reporting_mark or (railroad.reporting_mark if railroad else None)
+    car.railroad = railroad
+    if railroad is None:
+        car.reporting_mark_override = reporting_mark or None
+    else:
+        car.reporting_mark_override = None
 
-    car.car_type = form.get("car_type", "").strip()
+    car_type_value = form.get("car_type", "").strip()
     car.car_number = form.get("car_number", "").strip()
     car.brand = form.get("brand", "").strip()
     car.upc = form.get("upc", "").strip()
@@ -345,7 +366,6 @@ def apply_car_form(car: Car, form) -> None:
     car.load = form.get("load", "").strip()
     car.repairs_required = form.get("repairs_required", "").strip()
     car.notes = form.get("notes", "").strip()
-    car.is_locomotive = form.get("is_locomotive") == "on"
 
     class_code = form.get("car_class", "").strip()
     if class_code:
@@ -362,8 +382,8 @@ def apply_car_form(car: Car, form) -> None:
             car_class.wheel_arrangement = class_wheel
         if class_tender and not car_class.tender_axles:
             car_class.tender_axles = class_tender
-        if car.car_type and not car_class.car_type:
-            car_class.car_type = car.car_type
+        if car_type_value and not car_class.car_type:
+            car_class.car_type = car_type_value
         if car_class.is_locomotive is None:
             car_class.is_locomotive = class_is_locomotive
 
@@ -378,6 +398,10 @@ def apply_car_form(car: Car, form) -> None:
             car.capacity_override = None
             car.weight_override = None
             car.load_limit_override = None
+            car.car_type_override = None
+            car.wheel_arrangement_override = None
+            car.tender_axles_override = None
+            car.is_locomotive_override = None
         else:
             car.capacity_override = (
                 capacity_value if capacity_value and car_class.capacity and capacity_value != car_class.capacity else None
@@ -388,16 +412,33 @@ def apply_car_form(car: Car, form) -> None:
             car.load_limit_override = (
                 load_limit_value if load_limit_value and car_class.load_limit and load_limit_value != car_class.load_limit else None
             )
+            car.car_type_override = (
+                car_type_value if car_type_value and car_class.car_type and car_type_value != car_class.car_type else None
+            )
+            car.wheel_arrangement_override = (
+                class_wheel
+                if class_wheel and car_class.wheel_arrangement and class_wheel != car_class.wheel_arrangement
+                else None
+            )
+            car.tender_axles_override = (
+                class_tender
+                if class_tender and car_class.tender_axles and class_tender != car_class.tender_axles
+                else None
+            )
+            if car_class.is_locomotive is not None:
+                car.is_locomotive_override = (
+                    class_is_locomotive if class_is_locomotive != car_class.is_locomotive else None
+                )
         car.car_class = car_class
-        if not car.car_type and car_class.car_type:
-            car.car_type = car_class.car_type
-        if car_class.is_locomotive is not None:
-            car.is_locomotive = car_class.is_locomotive
     else:
         car.car_class = None
         car.capacity_override = capacity_value or None
         car.weight_override = weight_value or None
         car.load_limit_override = load_limit_value or None
+        car.car_type_override = car_type_value or None
+        car.wheel_arrangement_override = form.get("class_wheel_arrangement", "").strip() or None
+        car.tender_axles_override = form.get("class_tender_axles", "").strip() or None
+        car.is_locomotive_override = True if form.get("is_locomotive") == "on" else None
 
     location_name = form.get("location", "").strip()
     if location_name:
@@ -410,19 +451,24 @@ def serialize_car(car: Car) -> dict:
     class_capacity = car.car_class.capacity if car.car_class else None
     class_weight = car.car_class.weight if car.car_class else None
     class_load_limit = car.car_class.load_limit if car.car_class else None
+    class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
+    is_locomotive = (
+        car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
+    )
     return {
         "id": car.id,
-        "car_type": car.car_type,
+        "car_type": car.car_type_override or (car.car_class.car_type if car.car_class else None),
         "car_number": car.car_number,
-        "reporting_mark": car.reporting_mark,
+        "reporting_mark": car.railroad.reporting_mark if car.railroad else car.reporting_mark_override,
         "railroad": car.railroad.name if car.railroad else None,
         "car_class": car.car_class.code if car.car_class else None,
         "location": car.location.name if car.location else None,
         "brand": car.brand,
         "upc": car.upc,
         "dcc_id": car.dcc_id,
-        "wheel_arrangement": car.car_class.wheel_arrangement if car.car_class else None,
-        "tender_axles": car.car_class.tender_axles if car.car_class else None,
+        "wheel_arrangement": car.wheel_arrangement_override
+        or (car.car_class.wheel_arrangement if car.car_class else None),
+        "tender_axles": car.tender_axles_override or (car.car_class.tender_axles if car.car_class else None),
         "traction_drivers": car.traction_drivers,
         "capacity": car.capacity_override or class_capacity,
         "weight": car.weight_override or class_weight,
@@ -436,8 +482,12 @@ def serialize_car(car: Car) -> dict:
         "load": car.load,
         "repairs_required": car.repairs_required,
         "notes": car.notes,
-        "is_locomotive": car.is_locomotive,
         "capacity_override": car.capacity_override,
         "weight_override": car.weight_override,
         "load_limit_override": car.load_limit_override,
+        "car_type_override": car.car_type_override,
+        "wheel_arrangement_override": car.wheel_arrangement_override,
+        "tender_axles_override": car.tender_axles_override,
+        "is_locomotive_override": car.is_locomotive_override,
+        "is_locomotive": is_locomotive,
     }

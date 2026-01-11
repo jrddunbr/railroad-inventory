@@ -17,8 +17,8 @@
         {% for car in cars %}
         <tr>
           <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
-          <td>{{ car.reporting_mark or '-' }}</td>
-          <td>{{ car.car_type }}</td>
+          <td>{{ car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or '-') }}</td>
+          <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
           <td>{{ car.car_class.code if car.car_class else '-' }}</td>
           <td>{{ car.location.name if car.location else '-' }}</td>
         </tr>

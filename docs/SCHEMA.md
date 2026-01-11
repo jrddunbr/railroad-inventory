@@ -41,13 +41,16 @@ This document describes the current database schema and common alternate names u
 - `railroad_id` (integer, FK -> `railroads.id`)
 - `car_class_id` (integer, FK -> `car_classes.id`)
 - `location_id` (integer, FK -> `locations.id`)
-- `car_type` (string)
 - `car_number` (string, optional)
-- `reporting_mark` (string, optional)
+- `reporting_mark_override` (string, optional)
 - `brand` (string, optional)
 - `upc` (string, optional)
 - `dcc_id` (string, optional)
 - `traction_drivers` (boolean, optional)
+- `car_type_override` (string, optional)
+- `wheel_arrangement_override` (string, optional)
+- `tender_axles_override` (string, optional)
+- `is_locomotive_override` (boolean, optional)
 - `capacity_override` (string, optional)
 - `weight_override` (string, optional)
 - `load_limit_override` (string, optional)
@@ -60,7 +63,6 @@ This document describes the current database schema and common alternate names u
 - `load` (string, optional)
 - `repairs_required` (string, optional)
 - `notes` (text, optional)
-- `is_locomotive` (boolean, optional)
 
 ## Alternate Names and Legacy Labels
 - `weight`: also known as "Light Weight" (empty car weight).
@@ -70,5 +72,6 @@ This document describes the current database schema and common alternate names u
 - `built`: from CSV column "Built (Lettering)".
 - `other_lettering`: matches "Other Lettering".
 - `reporting_mark`: may be missing for some railroads (e.g., Amtrak).
-- `car_type`: stored on both car and class; class fills the car when known.
-- `is_locomotive`: stored on both car and class; class determines car when known.
+- `car_type`: stored on car class; cars read it via class.
+- `is_locomotive`: stored on car class; cars read it via class.
+- `*_override` fields: used when no class is assigned or when a specific car must override class defaults.

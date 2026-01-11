@@ -8,7 +8,7 @@
         <div class="grid">
           <div>
             <label for="reporting_mark">Reporting Mark</label>
-            <input id="reporting_mark" name="reporting_mark" value="{{ car.reporting_mark if car else '' }}" {% if car and car.railroad %}disabled{% endif %} />
+            <input id="reporting_mark" name="reporting_mark" value="{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else '') }}" {% if car and car.railroad %}disabled{% endif %} />
           </div>
           <div>
             <label for="railroad_name">Railroad Name</label>
@@ -60,15 +60,15 @@
           </div>
           <div>
             <label for="car_type">Car Type</label>
-            <input id="car_type" name="car_type" value="{{ car.car_type if car else '' }}" required />
+            <input id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else '') }}" required data-gray-default="true" />
           </div>
           <div>
             <label for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>
-            <input id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.car_class.wheel_arrangement if car and car.car_class else '' }}" {% if car and car.car_class and car.car_class.wheel_arrangement %}disabled{% endif %} />
+            <input id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.wheel_arrangement_override if car and car.wheel_arrangement_override else (car.car_class.wheel_arrangement if car and car.car_class else '') }}" data-gray-default="true" />
           </div>
           <div>
             <label for="class_tender_axles">Class Tender Axles</label>
-            <input id="class_tender_axles" name="class_tender_axles" value="{{ car.car_class.tender_axles if car and car.car_class else '' }}" {% if car and car.car_class and car.car_class.tender_axles %}disabled{% endif %} />
+            <input id="class_tender_axles" name="class_tender_axles" value="{{ car.tender_axles_override if car and car.tender_axles_override else (car.car_class.tender_axles if car and car.car_class else '') }}" data-gray-default="true" />
           </div>
           <div>
             <label for="weight">Weight</label>
@@ -108,7 +108,7 @@
           </div>
           <div>
             <label for="is_locomotive">Locomotive</label>
-            <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car and car.is_locomotive %}checked{% endif %} {% if car and car.car_class and car.car_class.is_locomotive is not none %}disabled{% endif %} />
+            <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car and (car.is_locomotive_override if car.is_locomotive_override is not none else (car.car_class.is_locomotive if car.car_class else false)) %}checked{% endif %} />
           </div>
         </div>
       </div>
@@ -197,13 +197,13 @@
 
     const applyClassDetails = (carClass) => {
       if (!carClass) return;
-      if (classFields.wheel && !hasValue(classFields.wheel)) classFields.wheel.value = carClass.wheel_arrangement || '';
-      if (classFields.tender && !hasValue(classFields.tender)) classFields.tender.value = carClass.tender_axles || '';
+      if (classFields.wheel) setGrayDefault(classFields.wheel, carClass.wheel_arrangement);
+      if (classFields.tender) setGrayDefault(classFields.tender, carClass.tender_axles);
       setGrayDefault(classFields.capacity, carClass.capacity);
       setGrayDefault(classFields.weight, carClass.weight);
       setGrayDefault(classFields.loadLimit, carClass.load_limit);
-      if (classFields.carType && !hasValue(classFields.carType) && carClass.car_type) {
-        classFields.carType.value = carClass.car_type;
+      if (classFields.carType) {
+        setGrayDefault(classFields.carType, carClass.car_type);
       }
       if (classFields.locomotive && carClass.is_locomotive !== null && carClass.is_locomotive !== undefined) {
         classFields.locomotive.checked = !!carClass.is_locomotive;
@@ -257,7 +257,7 @@
       });
     }
 
-    [classFields.capacity, classFields.weight, classFields.loadLimit].forEach((input) => {
+    [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.carType, classFields.wheel, classFields.tender].forEach((input) => {
       if (!input) return;
       input.addEventListener('focus', () => clearGrayDefault(input));
       input.addEventListener('input', () => {
