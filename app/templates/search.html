@@ -10,6 +10,7 @@
     </form>
     {% if query %}
       <h3>Results for "{{ query }}"</h3>
+      <p class="keyboard-hint">Results: {{ cars|length }}</p>
       <table>
         <thead>
           <tr>
