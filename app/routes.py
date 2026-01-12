@@ -145,6 +145,56 @@ def location_detail(location_id: int):
     return render_template("location_detail.html", location=location, cars=cars)
 
 
+def get_location_descendant_ids(location: Location) -> set[int]:
+    descendants = set()
+    queue = list(location.children)
+    while queue:
+        current = queue.pop(0)
+        if current.id in descendants:
+            continue
+        descendants.add(current.id)
+        queue.extend(current.children)
+    return descendants
+
+
+@main_bp.route("/locations/<int:location_id>/edit", methods=["GET", "POST"])
+def location_edit(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    descendant_ids = get_location_descendant_ids(location)
+    if request.method == "POST":
+        location.name = request.form.get("name", "").strip()
+        location.location_type = request.form.get("location_type", "").strip()
+        parent_id = request.form.get("parent_id", "").strip()
+        if parent_id and parent_id.isdigit():
+            parent_id_value = int(parent_id)
+            if parent_id_value == location.id or parent_id_value in descendant_ids:
+                return "Invalid parent location selection.", 400
+            location.parent = Location.query.get(parent_id_value)
+        else:
+            location.parent = None
+        db.session.commit()
+        return redirect(url_for("main.location_detail", location_id=location.id))
+    locations = Location.query.order_by(Location.name).all()
+    return render_template(
+        "location_form.html",
+        location=location,
+        locations=locations,
+        descendant_ids=descendant_ids,
+    )
+
+
+@main_bp.route("/locations/<int:location_id>/delete", methods=["POST"])
+def location_delete(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    if Car.query.filter_by(location_id=location.id).count() > 0:
+        return "Cannot delete location with cars assigned.", 400
+    if Location.query.filter_by(parent_id=location.id).count() > 0:
+        return "Cannot delete location with child locations assigned.", 400
+    db.session.delete(location)
+    db.session.commit()
+    return redirect(url_for("main.locations"))
+
+
 @main_bp.route("/cars/<int:car_id>")
 def car_detail(car_id: int):
     car = Car.query.get_or_404(car_id)

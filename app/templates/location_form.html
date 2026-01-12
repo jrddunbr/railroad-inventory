@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Edit Location</h1>
+    <form method="post" action="{{ url_for('main.location_edit', location_id=location.id) }}">
+      <div class="grid">
+        <div>
+          <label for="name">Name</label>
+          <input id="name" name="name" value="{{ location.name }}" required />
+        </div>
+        <div>
+          <label for="location_type">Location Type</label>
+          <select id="location_type" name="location_type" required>
+            {% set types = ["bag", "carrier", "flat", "staging_track", "yard_track"] %}
+            {% for type in types %}
+              <option value="{{ type }}" {% if location.location_type == type %}selected{% endif %}>{{ type }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="parent_id">Parent Location</label>
+          <select id="parent_id" name="parent_id">
+            <option value="">None</option>
+            {% for loc in locations %}
+              {% if loc.id != location.id and loc.id not in descendant_ids %}
+                <option value="{{ loc.id }}" {% if location.parent_id == loc.id %}selected{% endif %}>
+                  {{ loc.name }}
+                </option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="{{ url_for('main.location_detail', location_id=location.id) }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

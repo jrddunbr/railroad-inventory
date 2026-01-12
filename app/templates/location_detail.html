@@ -2,6 +2,13 @@
 {% block content %}
   <div class="panel">
     <h1>Location: {{ location.name }}</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('main.location_delete', location_id=location.id) }}" onsubmit="return confirm('Delete this location?');">
+        <button type="submit" class="tag">Delete</button>
+      </form>
+      <a class="tag" href="{{ url_for('main.locations') }}">Back to Locations</a>
+    </div>
     <p><strong>Type:</strong> {{ location.location_type }}</p>
     {% if location.parent %}
       <p><strong>Parent:</strong> {{ location.parent.name }}</p>
