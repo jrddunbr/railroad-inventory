@@ -1,15 +1,55 @@
 from __future__ import annotations
 
+import csv
+import io
 import re
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
-from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
 
 from app import db
 from app.models import Car, CarClass, Location, Railroad
 
 
 main_bp = Blueprint("main", __name__)
+
+BACKUP_INTERVAL = timedelta(minutes=15)
+BACKUP_MAX_BYTES = 100 * 1024 * 1024
+
+
+def ensure_db_backup() -> None:
+    db_path = current_app.config.get("DB_PATH")
+    if not db_path:
+        return
+    db_file = Path(db_path)
+    if not db_file.exists():
+        return
+
+    backup_dir = db_file.parent
+    backups = sorted(backup_dir.glob("inventory-backup-*.db"), key=lambda path: path.stat().st_mtime)
+    last_backup = backups[-1] if backups else None
+    now = datetime.now()
+    if last_backup:
+        last_backup_time = datetime.fromtimestamp(last_backup.stat().st_mtime)
+        if now - last_backup_time < BACKUP_INTERVAL:
+            return
+        if db_file.stat().st_mtime <= last_backup.stat().st_mtime:
+            return
+
+    backup_name = f"inventory-backup-{now.strftime('%Y%m%d-%H%M%S')}.db"
+    backup_path = backup_dir / backup_name
+    shutil.copy2(db_file, backup_path)
+    backups.append(backup_path)
+
+    total_size = sum(path.stat().st_size for path in backups)
+    while total_size > BACKUP_MAX_BYTES and backups:
+        oldest = backups.pop(0)
+        if oldest.exists():
+            total_size -= oldest.stat().st_size
+            oldest.unlink()
 
 
 def get_or_create_location(name: str) -> Optional[Location]:
@@ -43,6 +83,80 @@ def inventory():
     return render_template("inventory.html", cars=cars)
 
 
+@main_bp.route("/inventory/export")
+def inventory_export():
+    cars = Car.query.order_by(Car.id.asc()).all()
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "Reporting Mark",
+            "Railroad",
+            "Car Class",
+            "Car Type",
+            "Wheel Arrangement",
+            "Tender Axles",
+            "Capacity (Lettering)",
+            "Weight (Lettering)",
+            "Load Limit",
+            "Location",
+            "Brand",
+            "UPC",
+            "Car #",
+            "DCC ID",
+            "Notes",
+            "Traction Drivers",
+            "Built (Lettering)",
+            "Alt Date",
+            "Reweight date",
+            "Other Lettering",
+            "MSRP",
+            "Price",
+            "Load",
+            "Repairs Req’d",
+        ]
+    )
+    for car in cars:
+        class_type = car.car_class.car_type if car.car_class else ""
+        class_wheel = car.car_class.wheel_arrangement if car.car_class else ""
+        class_tender = car.car_class.tender_axles if car.car_class else ""
+        class_capacity = car.car_class.capacity if car.car_class else ""
+        class_weight = car.car_class.weight if car.car_class else ""
+        class_load_limit = car.car_class.load_limit if car.car_class else ""
+        writer.writerow(
+            [
+                car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
+                car.railroad.name if car.railroad else "",
+                car.car_class.code if car.car_class else "",
+                car.car_type_override or class_type or "",
+                car.wheel_arrangement_override or class_wheel or "",
+                car.tender_axles_override or class_tender or "",
+                car.capacity_override or class_capacity or "",
+                car.weight_override or class_weight or "",
+                car.load_limit_override or class_load_limit or "",
+                car.location.name if car.location else "",
+                car.brand or "",
+                car.upc or "",
+                car.car_number or "",
+                car.dcc_id or "",
+                car.notes or "",
+                "Yes" if car.traction_drivers else "",
+                car.built or "",
+                car.alt_date or "",
+                car.reweight_date or "",
+                car.other_lettering or "",
+                car.msrp or "",
+                car.price or "",
+                car.load or "",
+                car.repairs_required or "",
+            ]
+        )
+    response = Response(output.getvalue(), mimetype="text/csv")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    response.headers["Content-Disposition"] = f"attachment; filename=inventory-export-{timestamp}.csv"
+    return response
+
+
 @main_bp.route("/railroads")
 def railroads():
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
@@ -69,6 +183,7 @@ def railroad_delete(railroad_id: int):
         return "Cannot delete railroad with cars assigned.", 400
     db.session.delete(railroad)
     db.session.commit()
+    ensure_db_backup()
     return redirect(url_for("main.railroads"))
 
 
@@ -84,6 +199,7 @@ def railroad_edit(railroad_id: int):
         railroad.merged_from = request.form.get("merged_from", "").strip()
         railroad.notes = request.form.get("notes", "").strip()
         db.session.commit()
+        ensure_db_backup()
         return redirect(url_for("main.railroad_detail", railroad_id=railroad.id))
     return render_template("railroad_form.html", railroad=railroad)
 
@@ -117,6 +233,7 @@ def car_class_delete(class_id: int):
         return "Cannot delete class with cars assigned.", 400
     db.session.delete(car_class)
     db.session.commit()
+    ensure_db_backup()
     return redirect(url_for("main.car_classes"))
 
 
@@ -134,6 +251,7 @@ def car_class_edit(class_id: int):
         car_class.load_limit = request.form.get("load_limit", "").strip()
         car_class.notes = request.form.get("notes", "").strip()
         db.session.commit()
+        ensure_db_backup()
         return redirect(url_for("main.car_class_detail", class_id=car_class.id))
     return render_template("car_class_form.html", car_class=car_class)
 
@@ -173,6 +291,7 @@ def location_edit(location_id: int):
         else:
             location.parent = None
         db.session.commit()
+        ensure_db_backup()
         return redirect(url_for("main.location_detail", location_id=location.id))
     locations = Location.query.order_by(Location.name).all()
     location_types = current_app.config.get("LOCATION_TYPES", [])
@@ -194,6 +313,7 @@ def location_delete(location_id: int):
         return "Cannot delete location with child locations assigned.", 400
     db.session.delete(location)
     db.session.commit()
+    ensure_db_backup()
     return redirect(url_for("main.locations"))
 
 
@@ -208,6 +328,7 @@ def car_delete(car_id: int):
     car = Car.query.get_or_404(car_id)
     db.session.delete(car)
     db.session.commit()
+    ensure_db_backup()
     return redirect(url_for("main.inventory"))
 
 
@@ -228,6 +349,7 @@ def car_edit(car_id: int):
     if request.method == "POST":
         apply_car_form(car, request.form)
         db.session.commit()
+        ensure_db_backup()
         return redirect(url_for("main.car_detail", car_id=car.id))
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
     classes = CarClass.query.order_by(CarClass.code).all()
@@ -250,6 +372,7 @@ def car_new():
         apply_car_form(car, request.form)
         db.session.add(car)
         db.session.commit()
+        ensure_db_backup()
         return redirect(url_for("main.car_detail", car_id=car.id))
     prefill = {
         "reporting_mark": request.args.get("reporting_mark", "").strip(),

@@ -2,6 +2,9 @@
 {% block content %}
   <div class="panel">
     <h1>Inventory</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.inventory_export') }}">Export to CSV</a>
+    </div>
     <p class="keyboard-hint">Results: {{ cars|length }}</p>
     <p class="keyboard-hint">Use arrow keys to move focus, Enter to activate.</p>
     <table>

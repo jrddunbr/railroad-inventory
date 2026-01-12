@@ -22,6 +22,7 @@ def create_app() -> Flask:
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{db_path}",
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
+        DB_PATH=db_path,
     )
 
     db.init_app(app)
