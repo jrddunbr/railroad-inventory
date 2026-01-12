@@ -84,7 +84,7 @@
         <div class="grid">
           <div>
             <label for="built">Built</label>
-            <input id="built" name="built" value="{{ car.built if car else '' }}" />
+            <input id="built" name="built" value="{{ car.built if car else prefill.get('built', '') }}" />
           </div>
           <div>
             <label for="alt_date">Alt Date</label>
@@ -129,15 +129,15 @@
         <div class="grid">
           <div>
             <label for="msrp">MSRP</label>
-            <input id="msrp" name="msrp" value="{{ car.msrp if car else '' }}" />
+            <input id="msrp" name="msrp" value="{{ car.msrp if car else prefill.get('msrp', '') }}" />
           </div>
           <div>
             <label for="price">Purchase Price</label>
-            <input id="price" name="price" value="{{ car.price if car else '' }}" />
+            <input id="price" name="price" value="{{ car.price if car else prefill.get('price', '') }}" />
           </div>
           <div>
             <label for="brand">Brand</label>
-            <input id="brand" name="brand" value="{{ car.brand if car else '' }}" />
+            <input id="brand" name="brand" value="{{ car.brand if car else prefill.get('brand', '') }}" />
           </div>
           <div>
             <label for="upc">UPC</label>

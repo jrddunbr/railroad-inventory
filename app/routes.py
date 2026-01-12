@@ -207,6 +207,10 @@ def car_new():
         "capacity": request.args.get("capacity", "").strip(),
         "weight": request.args.get("weight", "").strip(),
         "load_limit": request.args.get("load_limit", "").strip(),
+        "built": request.args.get("built", "").strip(),
+        "brand": request.args.get("brand", "").strip(),
+        "price": request.args.get("price", "").strip(),
+        "msrp": request.args.get("msrp", "").strip(),
     }
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
     classes = CarClass.query.order_by(CarClass.code).all()
