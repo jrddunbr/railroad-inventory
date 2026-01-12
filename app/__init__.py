@@ -5,6 +5,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 SCHEMA_VERSION = "1.2.0"
+DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
 db = SQLAlchemy()
@@ -31,10 +32,15 @@ def create_app() -> Flask:
 
     with app.app_context():
         db.create_all()
-        from app.models import SchemaVersion
+        from app.models import Location, SchemaVersion
 
         if not SchemaVersion.query.first():
             db.session.add(SchemaVersion(version=SCHEMA_VERSION))
             db.session.commit()
+        db_types = [row[0] for row in db.session.query(Location.location_type).distinct().all()]
+        merged_types = DEFAULT_LOCATION_TYPES + sorted(
+            [location_type for location_type in db_types if location_type and location_type not in DEFAULT_LOCATION_TYPES]
+        )
+        app.config["LOCATION_TYPES"] = merged_types
 
     return app

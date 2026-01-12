@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for
 
 from app import db
 from app.models import Car, CarClass, Location, Railroad
@@ -175,11 +175,13 @@ def location_edit(location_id: int):
         db.session.commit()
         return redirect(url_for("main.location_detail", location_id=location.id))
     locations = Location.query.order_by(Location.name).all()
+    location_types = current_app.config.get("LOCATION_TYPES", [])
     return render_template(
         "location_form.html",
         location=location,
         locations=locations,
         descendant_ids=descendant_ids,
+        location_types=location_types,
     )
 
 

@@ -10,12 +10,12 @@
         </div>
         <div>
           <label for="location_type">Location Type</label>
-          <select id="location_type" name="location_type" required>
-            {% set types = ["bag", "carrier", "flat", "staging_track", "yard_track"] %}
-            {% for type in types %}
-              <option value="{{ type }}" {% if location.location_type == type %}selected{% endif %}>{{ type }}</option>
+          <input list="location_types" id="location_type" name="location_type" value="{{ location.location_type }}" required />
+          <datalist id="location_types">
+            {% for type in location_types %}
+              <option value="{{ type }}"></option>
             {% endfor %}
-          </select>
+          </datalist>
         </div>
         <div>
           <label for="parent_id">Parent Location</label>
