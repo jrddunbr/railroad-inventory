@@ -83,6 +83,11 @@ def inventory():
     return render_template("inventory.html", cars=cars)
 
 
+@main_bp.route("/reports")
+def reports():
+    return render_template("reports.html")
+
+
 @main_bp.route("/inventory/export")
 def inventory_export():
     cars = Car.query.order_by(Car.id.asc()).all()
@@ -154,6 +159,53 @@ def inventory_export():
     response = Response(output.getvalue(), mimetype="text/csv")
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     response.headers["Content-Disposition"] = f"attachment; filename=inventory-export-{timestamp}.csv"
+    return response
+
+
+@main_bp.route("/reports/locomotive-dcc-export")
+def locomotive_dcc_export():
+    cars = Car.query.order_by(Car.id.asc()).all()
+    locomotive_cars = []
+    for car in cars:
+        class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
+        is_locomotive = (
+            car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
+        )
+        if is_locomotive and car.dcc_id:
+            locomotive_cars.append(car)
+    locomotive_cars.sort(
+        key=lambda car: (
+            car.dcc_id or "",
+            car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
+            car.car_number or "",
+        )
+    )
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "DCC ID",
+            "Reporting Mark",
+            "Car #",
+            "Car Class",
+            "Class Era",
+        ]
+    )
+    for car in locomotive_cars:
+        writer.writerow(
+            [
+                car.dcc_id or "",
+                car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
+                car.car_number or "",
+                car.car_class.code if car.car_class else "",
+                "",
+            ]
+        )
+    response = Response(output.getvalue(), mimetype="text/csv")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    response.headers["Content-Disposition"] = (
+        f"attachment; filename=locomotive-dcc-export-{timestamp}.csv"
+    )
     return response
 
 

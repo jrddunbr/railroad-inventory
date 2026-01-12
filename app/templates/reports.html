@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Reports</h1>
+    <p class="keyboard-hint">Download CSV exports for sharing or offline analysis.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Report</th>
+          <th>Description</th>
+          <th>Export</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Inventory Export</td>
+          <td>Full inventory with class, location, and lettering details.</td>
+          <td><a class="tag" href="{{ url_for('main.inventory_export') }}">Download CSV</a></td>
+        </tr>
+        <tr>
+          <td>Locomotive DCC Roster</td>
+          <td>Locomotive DCC IDs with reporting marks, car numbers, and class era to spot conflicts.</td>
+          <td><a class="tag" href="{{ url_for('main.locomotive_dcc_export') }}">Download CSV</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
