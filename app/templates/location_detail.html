@@ -11,7 +11,14 @@
     </div>
     <p><strong>Type:</strong> {{ location.location_type }}</p>
     {% if location.parent %}
-      <p><strong>Parent:</strong> {{ location.parent.name }}</p>
+      <p><strong>Parent:</strong> <a href="{{ url_for('main.location_detail', location_id=location.parent.id) }}">{{ location.parent.name }}</a></p>
+    {% endif %}
+    {% if location.children %}
+      <p><strong>Children:</strong>
+        {% for child in location.children %}
+          <a href="{{ url_for('main.location_detail', location_id=child.id) }}">{{ child.name }}</a>{% if not loop.last %}, {% endif %}
+        {% endfor %}
+      </p>
     {% endif %}
     <h3>Cars</h3>
     <p class="keyboard-hint">Results: {{ cars|length }}</p>

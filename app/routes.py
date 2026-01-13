@@ -384,6 +384,29 @@ def locations():
     return render_template("locations.html", locations=locations)
 
 
+@main_bp.route("/locations/new", methods=["GET", "POST"])
+def location_new():
+    if request.method == "POST":
+        location = Location(name=request.form.get("name", "").strip())
+        location.location_type = request.form.get("location_type", "").strip()
+        parent_id = request.form.get("parent_id", "").strip()
+        if parent_id and parent_id.isdigit():
+            location.parent = Location.query.get(int(parent_id))
+        db.session.add(location)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.location_detail", location_id=location.id))
+    locations = Location.query.order_by(Location.name).all()
+    location_types = current_app.config.get("LOCATION_TYPES", [])
+    return render_template(
+        "location_form.html",
+        location=None,
+        locations=locations,
+        descendant_ids=set(),
+        location_types=location_types,
+    )
+
+
 @main_bp.route("/railroads/<int:railroad_id>")
 def railroad_detail(railroad_id: int):
     railroad = Railroad.query.get_or_404(railroad_id)

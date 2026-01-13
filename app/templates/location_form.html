@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="panel">
-    <h1>Edit Location</h1>
-    <form method="post" action="{{ url_for('main.location_edit', location_id=location.id) }}">
+    <h1>{{ "Edit Location" if location else "New Location" }}</h1>
+    <form method="post" action="{{ url_for('main.location_edit', location_id=location.id) if location else url_for('main.location_new') }}">
       <div class="grid">
         <div>
           <label for="name">Name</label>
@@ -33,7 +33,11 @@
       </div>
       <div class="actions">
         <button type="submit">Save</button>
-        <a href="{{ url_for('main.location_detail', location_id=location.id) }}">Cancel</a>
+        {% if location %}
+          <a href="{{ url_for('main.location_detail', location_id=location.id) }}">Cancel</a>
+        {% else %}
+          <a href="{{ url_for('main.locations') }}">Cancel</a>
+        {% endif %}
       </div>
     </form>
   </div>

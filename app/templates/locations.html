@@ -2,6 +2,9 @@
 {% block content %}
   <div class="panel">
     <h1>Locations</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.location_new') }}">Add Location</a>
+    </div>
     <p class="keyboard-hint">Results: {{ locations|length }}</p>
     <table>
       <thead>
