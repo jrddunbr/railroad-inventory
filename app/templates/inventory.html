@@ -22,6 +22,9 @@
           <td>
             {% if car.railroad %}
               <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.reporting_mark or "-" }}</a>
+              {% if car.railroad.representative_logo and car.railroad.representative_logo.image_path %}
+                <img src="{{ url_for('static', filename=car.railroad.representative_logo.image_path) }}" alt="{{ car.railroad.representative_logo.description or car.railroad.name }}" style="max-height: 20px; max-width: 60px; margin-left: 6px; vertical-align: middle;" />
+              {% endif %}
             {% else %}
               {{ car.reporting_mark_override or "-" }}
             {% endif %}

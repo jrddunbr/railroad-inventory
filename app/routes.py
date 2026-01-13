@@ -362,6 +362,16 @@ def introduction_years():
     )
 
 
+@main_bp.route("/reports/repairs")
+def repairs_report():
+    cars = Car.query.order_by(Car.id.asc()).all()
+    repairs = []
+    for car in cars:
+        if car.repairs_required and car.repairs_required.strip():
+            repairs.append(car)
+    return render_template("repairs_report.html", cars=repairs, total=len(repairs))
+
+
 @main_bp.route("/railroads")
 def railroads():
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
