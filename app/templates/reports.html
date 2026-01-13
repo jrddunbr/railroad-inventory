@@ -22,6 +22,16 @@
           <td>Locomotive DCC IDs with reporting marks, car numbers, and class era to spot conflicts.</td>
           <td><a class="tag" href="{{ url_for('main.locomotive_dcc_export') }}">Download CSV</a></td>
         </tr>
+        <tr>
+          <td>Railroad Era Histogram</td>
+          <td>Histogram of car class eras across the inventory.</td>
+          <td><a class="tag" href="{{ url_for('main.era_histogram') }}">View</a></td>
+        </tr>
+        <tr>
+          <td>Introduction Years</td>
+          <td>Car class introductions and car built dates listed by year.</td>
+          <td><a class="tag" href="{{ url_for('main.introduction_years') }}">View</a></td>
+        </tr>
       </tbody>
     </table>
   </div>

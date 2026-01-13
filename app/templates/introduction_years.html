@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Introduction Years</h1>
+    {% if year_entries %}
+      {% for entry in year_entries %}
+        <h3>{{ entry.year }}</h3>
+        {% if entry.classes %}
+          <p><strong>Car Class Introductions</strong></p>
+          <ul>
+            {% for car_class in entry.classes %}
+              <li>{{ car_class.code }}{% if car_class.car_type %} - {{ car_class.car_type }}{% endif %}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if entry.cars %}
+          <p><strong>Built Dates</strong></p>
+          <ul>
+            {% for car in entry.cars %}
+              <li>
+                {{ (car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "")) or "-" }}
+                {{ car.car_number or "" }}
+                {% if car.car_class %}
+                  ({{ car.car_class.code }})
+                {% elif car.car_type_override %}
+                  ({{ car.car_type_override }})
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <p class="keyboard-hint">No introduction years found yet.</p>
+    {% endif %}
+  </div>
+{% endblock %}

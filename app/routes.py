@@ -252,6 +252,116 @@ def locomotive_dcc_export():
     return response
 
 
+@main_bp.route("/reports/era-histogram")
+def era_histogram():
+    mode = request.args.get("mode", "car").strip().lower()
+    if mode not in {"car", "class"}:
+        mode = "car"
+
+    current_year = datetime.now().year
+    cars = Car.query.order_by(Car.id.asc()).all()
+    decade_counts: dict[int, int] = {}
+    class_seen: dict[int, set[int]] = {}
+    for car in cars:
+        if not car.car_class or not car.car_class.era:
+            continue
+        era_text = car.car_class.era.lower()
+        years = [int(year) for year in re.findall(r"(\d{4})", era_text)]
+        if not years and "present" in era_text:
+            years = [current_year]
+        if not years:
+            continue
+        start_year = min(years)
+        end_year = max(years)
+        if "present" in era_text or "current" in era_text or "today" in era_text:
+            end_year = current_year
+        if end_year < start_year:
+            end_year = start_year
+        start_decade = (start_year // 10) * 10
+        end_decade = (end_year // 10) * 10
+        if mode == "class":
+            if car.car_class_id is None:
+                continue
+            for decade in range(start_decade, end_decade + 1, 10):
+                class_seen.setdefault(decade, set()).add(car.car_class_id)
+        else:
+            for decade in range(start_decade, end_decade + 1, 10):
+                decade_counts[decade] = decade_counts.get(decade, 0) + 1
+
+    if mode == "class":
+        decade_counts = {decade: len(class_ids) for decade, class_ids in class_seen.items()}
+
+    if decade_counts:
+        min_decade = min(decade_counts.keys())
+        max_decade = max(max(decade_counts.keys()), (current_year // 10) * 10)
+        for decade in range(min_decade, max_decade + 1, 10):
+            decade_counts.setdefault(decade, 0)
+
+    sorted_counts = sorted(decade_counts.items(), key=lambda item: item[0])
+    max_count = max((count for _, count in sorted_counts), default=0)
+    return render_template(
+        "era_histogram.html",
+        era_counts=sorted_counts,
+        max_count=max_count,
+        total=sum(decade_counts.values()),
+        mode=mode,
+    )
+
+
+@main_bp.route("/reports/introduction-years")
+def introduction_years():
+    current_year = datetime.now().year
+    classes = CarClass.query.order_by(CarClass.code).all()
+    cars = Car.query.order_by(Car.id.asc()).all()
+
+    class_by_year: dict[int, list[CarClass]] = {}
+    for car_class in classes:
+        if not car_class.era:
+            continue
+        match = re.search(r"(\d{4})", car_class.era)
+        if not match:
+            continue
+        year = int(match.group(1))
+        class_by_year.setdefault(year, []).append(car_class)
+
+    built_by_year: dict[int, list[Car]] = {}
+    for car in cars:
+        if not car.built:
+            continue
+        match = re.search(r"(\d{4})", car.built)
+        if not match:
+            continue
+        year = int(match.group(1))
+        built_by_year.setdefault(year, []).append(car)
+
+    all_years = set(class_by_year.keys()) | set(built_by_year.keys())
+    if not all_years:
+        return render_template("introduction_years.html", year_entries=[], current_year=current_year)
+
+    start_year = min(all_years)
+    year_entries = []
+    for year in range(start_year, current_year + 1):
+        class_entries = class_by_year.get(year, [])
+        built_entries = built_by_year.get(year, [])
+        if not class_entries and not built_entries:
+            continue
+        class_entries = sorted(class_entries, key=lambda item: item.code)
+        built_entries = sorted(built_entries, key=lambda item: item.id)
+        year_entries.append(
+            {
+                "year": year,
+                "classes": class_entries,
+                "cars": built_entries,
+            }
+        )
+
+    return render_template(
+        "introduction_years.html",
+        year_entries=year_entries,
+        current_year=current_year,
+    )
+
+
 @main_bp.route("/railroads")
 def railroads():
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Railroad Era Histogram</h1>
+    <div class="actions" style="margin-top: 8px;">
+      <a class="tag" href="{{ url_for('main.era_histogram', mode='car') }}">By Car Count</a>
+      <a class="tag" href="{{ url_for('main.era_histogram', mode='class') }}">By Class</a>
+    </div>
+    <p class="keyboard-hint">Total: {{ total }}</p>
+    <div style="display: flex; gap: 12px; align-items: flex-end; height: 220px; padding: 12px; border: 1px solid #d6d1c8; border-radius: 12px; background: #ffffff;">
+      {% for decade, count in era_counts %}
+        {% if max_count > 0 %}
+          {% set height = (count / max_count) * 180 %}
+        {% else %}
+          {% set height = 0 %}
+        {% endif %}
+        <div style="flex: 1; text-align: center;">
+          <div title="{{ count }}" style="margin: 0 auto; width: 100%; max-width: 48px; background: #2d5f5d; height: {{ '%.2f' % height }}px; border-radius: 8px 8px 0 0;"></div>
+          <div class="keyboard-hint">{{ decade }}s</div>
+          <div class="keyboard-hint">{{ count }}</div>
+        </div>
+      {% else %}
+        <div class="keyboard-hint">No cars yet.</div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}
