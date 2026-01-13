@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import os
 import re
 import shutil
 from datetime import datetime, timedelta
@@ -9,9 +10,18 @@ from pathlib import Path
 from typing import Optional
 
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
+from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import Car, CarClass, Location, Railroad
+from app.models import (
+    Car,
+    CarClass,
+    Location,
+    Railroad,
+    RailroadColorScheme,
+    RailroadLogo,
+    RailroadSlogan,
+)
 
 
 main_bp = Blueprint("main", __name__)
@@ -72,6 +82,35 @@ def get_or_create_location(name: str) -> Optional[Location]:
     return loc
 
 
+def normalize_color_list(value: str) -> str:
+    if not value:
+        return ""
+    return ",".join([part.strip() for part in value.split(",") if part.strip()])
+
+
+def allowed_logo_extension(filename: str) -> bool:
+    _, ext = os.path.splitext(filename.lower())
+    return ext in {".png", ".jpg", ".jpeg", ".svg"}
+
+
+def save_logo_file(file_storage, railroad_id: int) -> str | None:
+    if not file_storage or not file_storage.filename:
+        return None
+    if not allowed_logo_extension(file_storage.filename):
+        return None
+    filename = secure_filename(file_storage.filename)
+    _, ext = os.path.splitext(filename)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    safe_name = f"railroad-{railroad_id}-logo-{timestamp}{ext.lower()}"
+    upload_dir = current_app.config.get("LOGO_UPLOAD_FOLDER")
+    if not upload_dir:
+        return None
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, safe_name)
+    file_storage.save(file_path)
+    return f"uploads/railroad-logos/{safe_name}"
+
+
 @main_bp.route("/")
 def index():
     return redirect(url_for("main.inventory"))
@@ -114,6 +153,7 @@ def inventory_export():
             "Built (Lettering)",
             "Alt Date",
             "Reweight date",
+            "Repack Bearings Date",
             "Other Lettering",
             "MSRP",
             "Price",
@@ -149,6 +189,7 @@ def inventory_export():
                 car.built or "",
                 car.alt_date or "",
                 car.reweight_date or "",
+                car.repack_bearings_date or "",
                 car.other_lettering or "",
                 car.msrp or "",
                 car.price or "",
@@ -198,7 +239,7 @@ def locomotive_dcc_export():
                 car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
                 car.car_number or "",
                 car.car_class.code if car.car_class else "",
-                "",
+                car.car_class.era if car.car_class and car.car_class.era else "",
             ]
         )
     response = Response(output.getvalue(), mimetype="text/csv")
@@ -250,6 +291,138 @@ def railroad_edit(railroad_id: int):
         railroad.merged_into = request.form.get("merged_into", "").strip()
         railroad.merged_from = request.form.get("merged_from", "").strip()
         railroad.notes = request.form.get("notes", "").strip()
+        scheme_ids = request.form.getlist("color_scheme_id")
+        scheme_descriptions = request.form.getlist("color_scheme_description")
+        scheme_starts = request.form.getlist("color_scheme_start")
+        scheme_ends = request.form.getlist("color_scheme_end")
+        scheme_colors = request.form.getlist("color_scheme_colors")
+        existing_schemes = {str(scheme.id): scheme for scheme in railroad.color_schemes}
+        kept_scheme_ids = set()
+        new_schemes = []
+        for index, description in enumerate(scheme_descriptions):
+            description = description.strip()
+            scheme_id = scheme_ids[index] if index < len(scheme_ids) else ""
+            if not description:
+                continue
+            start_date = scheme_starts[index].strip() if index < len(scheme_starts) else ""
+            end_date = scheme_ends[index].strip() if index < len(scheme_ends) else ""
+            colors = normalize_color_list(scheme_colors[index]) if index < len(scheme_colors) else ""
+            if scheme_id and scheme_id in existing_schemes:
+                scheme = existing_schemes[scheme_id]
+                scheme.description = description
+                scheme.start_date = start_date or None
+                scheme.end_date = end_date or None
+                scheme.colors = colors or None
+                kept_scheme_ids.add(scheme_id)
+            else:
+                new_schemes.append(
+                    RailroadColorScheme(
+                        description=description,
+                        start_date=start_date or None,
+                        end_date=end_date or None,
+                        colors=colors or None,
+                    )
+                )
+        for scheme_id, scheme in existing_schemes.items():
+            if scheme_id not in kept_scheme_ids:
+                db.session.delete(scheme)
+        for scheme in new_schemes:
+            railroad.color_schemes.append(scheme)
+
+        logo_ids = request.form.getlist("logo_id")
+        logo_descriptions = request.form.getlist("logo_description")
+        logo_starts = request.form.getlist("logo_start")
+        logo_ends = request.form.getlist("logo_end")
+        logo_existing_paths = request.form.getlist("logo_existing_path")
+        representative_index = request.form.get("representative_logo_index", "").strip()
+        existing_logos = {str(logo.id): logo for logo in railroad.logos}
+        kept_logo_ids = set()
+        row_logos: list[RailroadLogo | None] = []
+        for index, description in enumerate(logo_descriptions):
+            logo_id = logo_ids[index] if index < len(logo_ids) else ""
+            start_date = logo_starts[index].strip() if index < len(logo_starts) else ""
+            end_date = logo_ends[index].strip() if index < len(logo_ends) else ""
+            existing_path = logo_existing_paths[index].strip() if index < len(logo_existing_paths) else ""
+            file_storage = request.files.get(f"logo_image_{index}")
+            description = description.strip()
+            row_has_data = bool(
+                description
+                or start_date
+                or end_date
+                or existing_path
+                or (file_storage and file_storage.filename)
+            )
+            if not row_has_data:
+                row_logos.append(None)
+                continue
+            new_path = save_logo_file(file_storage, railroad.id)
+            logo = existing_logos.get(logo_id) if logo_id else None
+            if not logo:
+                logo = RailroadLogo()
+                railroad.logos.append(logo)
+            logo.description = description
+            logo.start_date = start_date or None
+            logo.end_date = end_date or None
+            if new_path:
+                if logo.image_path and logo.image_path.startswith("uploads/railroad-logos/"):
+                    old_path = os.path.join(current_app.static_folder or "", logo.image_path)
+                    if os.path.exists(old_path):
+                        os.remove(old_path)
+                logo.image_path = new_path
+            else:
+                logo.image_path = existing_path or None
+            if logo_id:
+                kept_logo_ids.add(logo_id)
+            row_logos.append(logo)
+        for logo_id, logo in existing_logos.items():
+            if logo_id not in kept_logo_ids:
+                db.session.delete(logo)
+
+        slogan_ids = request.form.getlist("slogan_id")
+        slogan_descriptions = request.form.getlist("slogan_description")
+        slogan_texts = request.form.getlist("slogan_text")
+        slogan_starts = request.form.getlist("slogan_start")
+        slogan_ends = request.form.getlist("slogan_end")
+        existing_slogans = {str(slogan.id): slogan for slogan in railroad.slogans}
+        kept_slogan_ids = set()
+        new_slogans = []
+        for index, description in enumerate(slogan_descriptions):
+            description = description.strip()
+            slogan_id = slogan_ids[index] if index < len(slogan_ids) else ""
+            slogan_text = slogan_texts[index].strip() if index < len(slogan_texts) else ""
+            start_date = slogan_starts[index].strip() if index < len(slogan_starts) else ""
+            end_date = slogan_ends[index].strip() if index < len(slogan_ends) else ""
+            if not (description or slogan_text or start_date or end_date):
+                continue
+            if slogan_id and slogan_id in existing_slogans:
+                slogan = existing_slogans[slogan_id]
+                slogan.description = description
+                slogan.slogan_text = slogan_text or None
+                slogan.start_date = start_date or None
+                slogan.end_date = end_date or None
+                kept_slogan_ids.add(slogan_id)
+            else:
+                new_slogans.append(
+                    RailroadSlogan(
+                        description=description,
+                        slogan_text=slogan_text or None,
+                        start_date=start_date or None,
+                        end_date=end_date or None,
+                    )
+                )
+        for slogan_id, slogan in existing_slogans.items():
+            if slogan_id not in kept_slogan_ids:
+                db.session.delete(slogan)
+        for slogan in new_slogans:
+            railroad.slogans.append(slogan)
+
+        db.session.flush()
+        if representative_index.isdigit():
+            rep_index = int(representative_index)
+            representative_logo = row_logos[rep_index] if rep_index < len(row_logos) else None
+            railroad.representative_logo_id = representative_logo.id if representative_logo else None
+        else:
+            railroad.representative_logo_id = None
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.railroad_detail", railroad_id=railroad.id))
@@ -295,6 +468,7 @@ def car_class_edit(class_id: int):
     if request.method == "POST":
         car_class.code = request.form.get("code", "").strip()
         car_class.car_type = request.form.get("car_type", "").strip()
+        car_class.era = request.form.get("era", "").strip()
         car_class.wheel_arrangement = request.form.get("wheel_arrangement", "").strip()
         car_class.tender_axles = request.form.get("tender_axles", "").strip()
         car_class.is_locomotive = request.form.get("is_locomotive") == "on"
@@ -521,6 +695,7 @@ def api_car_classes():
             "code": c.code,
             "car_type": c.car_type,
             "is_locomotive": c.is_locomotive,
+            "era": c.era,
             "wheel_arrangement": c.wheel_arrangement,
             "tender_axles": c.tender_axles,
             "capacity": c.capacity,
@@ -602,6 +777,7 @@ def apply_car_form(car: Car, form) -> None:
     car.built = form.get("built", "").strip()
     car.alt_date = form.get("alt_date", "").strip()
     car.reweight_date = form.get("reweight_date", "").strip()
+    car.repack_bearings_date = form.get("repack_bearings_date", "").strip()
     car.other_lettering = form.get("other_lettering", "").strip()
     car.msrp = form.get("msrp", "").strip()
     car.price = form.get("price", "").strip()
@@ -718,6 +894,7 @@ def serialize_car(car: Car) -> dict:
         "built": car.built,
         "alt_date": car.alt_date,
         "reweight_date": car.reweight_date,
+        "repack_bearings_date": car.repack_bearings_date,
         "other_lettering": car.other_lettering,
         "msrp": car.msrp,
         "price": car.price,

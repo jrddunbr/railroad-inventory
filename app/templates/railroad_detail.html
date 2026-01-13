@@ -2,6 +2,11 @@
 {% block content %}
   <div class="panel">
     <h1>{{ railroad.reporting_mark or "-" }} - {{ railroad.name }}</h1>
+    {% if railroad.representative_logo and railroad.representative_logo.image_path %}
+      <p>
+        <img src="{{ url_for('static', filename=railroad.representative_logo.image_path) }}" alt="{{ railroad.representative_logo.description }}" style="max-height: 72px; max-width: 160px;" />
+      </p>
+    {% endif %}
     <div class="actions">
       <a class="tag" href="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">Edit</a>
       <form method="post" action="{{ url_for('main.railroad_delete', railroad_id=railroad.id) }}" onsubmit="return confirm('Delete this railroad?');">
@@ -20,6 +25,96 @@
         <p><strong>Notes:</strong> {{ railroad.notes or "-" }}</p>
       </div>
     </div>
+    <h3>Paint Schemes</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Scheme</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Colors</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for scheme in railroad.color_schemes %}
+        <tr>
+          <td>{{ scheme.description }}</td>
+          <td>{{ scheme.start_date or "-" }}</td>
+          <td>{{ scheme.end_date or "-" }}</td>
+          <td>
+            {% if scheme.colors %}
+              {% for color in scheme.colors.split(',') %}
+                <span title="{{ color.strip() }}" style="display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: {{ color.strip() }}; border: 1px solid #999; margin-right: 4px;"></span>
+              {% endfor %}
+              <span class="keyboard-hint">{{ scheme.colors }}</span>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No paint schemes recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3>Logos</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Logo</th>
+          <th>Start</th>
+          <th>End</th>
+          <th>Image</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for logo in railroad.logos %}
+        <tr>
+          <td>{{ logo.description }}</td>
+          <td>{{ logo.start_date or "-" }}</td>
+          <td>{{ logo.end_date or "-" }}</td>
+          <td>
+            {% if logo.image_path %}
+              <img src="{{ url_for('static', filename=logo.image_path) }}" alt="{{ logo.description }}" style="max-height: 48px; max-width: 120px;" />
+            {% else %}
+              -
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No logos recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3>Slogans</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Slogan</th>
+          <th>Description</th>
+          <th>Start</th>
+          <th>End</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for slogan in railroad.slogans %}
+        <tr>
+          <td>{{ slogan.slogan_text or "-" }}</td>
+          <td>{{ slogan.description or "-" }}</td>
+          <td>{{ slogan.start_date or "-" }}</td>
+          <td>{{ slogan.end_date or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No slogans recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     <h3>Cars</h3>
     <p class="keyboard-hint">Results: {{ cars|length }}</p>
     <table>

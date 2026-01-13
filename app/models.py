@@ -14,8 +14,30 @@ class Railroad(db.Model):
     merged_into = db.Column(db.String(128))
     merged_from = db.Column(db.String(128))
     notes = db.Column(db.Text)
+    representative_logo_id = db.Column(db.Integer, db.ForeignKey("railroad_logos.id"))
 
     cars = db.relationship("Car", back_populates="railroad")
+    color_schemes = db.relationship(
+        "RailroadColorScheme",
+        back_populates="railroad",
+        cascade="all, delete-orphan",
+    )
+    logos = db.relationship(
+        "RailroadLogo",
+        back_populates="railroad",
+        cascade="all, delete-orphan",
+        foreign_keys="RailroadLogo.railroad_id",
+    )
+    slogans = db.relationship(
+        "RailroadSlogan",
+        back_populates="railroad",
+        cascade="all, delete-orphan",
+    )
+    representative_logo = db.relationship(
+        "RailroadLogo",
+        foreign_keys=[representative_logo_id],
+        uselist=False,
+    )
 
     def __repr__(self) -> str:
         return f"<Railroad {self.reporting_mark}>"
@@ -30,6 +52,7 @@ class CarClass(db.Model):
     wheel_arrangement = db.Column(db.String(32))
     tender_axles = db.Column(db.String(32))
     is_locomotive = db.Column(db.Boolean)
+    era = db.Column(db.String(64))
     load_limit = db.Column(db.String(32))
     capacity = db.Column(db.String(64))
     weight = db.Column(db.String(64))
@@ -80,6 +103,7 @@ class Car(db.Model):
     built = db.Column(db.String(64))
     alt_date = db.Column(db.String(64))
     reweight_date = db.Column(db.String(64))
+    repack_bearings_date = db.Column(db.String(64))
     other_lettering = db.Column(db.String(128))
     msrp = db.Column(db.String(32))
     price = db.Column(db.String(32))
@@ -100,3 +124,51 @@ class SchemaVersion(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     version = db.Column(db.String(32), nullable=False)
+
+
+class RailroadColorScheme(db.Model):
+    __tablename__ = "railroad_color_schemes"
+
+    id = db.Column(db.Integer, primary_key=True)
+    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
+    description = db.Column(db.String(128), nullable=False)
+    start_date = db.Column(db.String(32))
+    end_date = db.Column(db.String(32))
+    colors = db.Column(db.String(256))
+
+    railroad = db.relationship("Railroad", back_populates="color_schemes")
+
+    def __repr__(self) -> str:
+        return f"<RailroadColorScheme {self.description}>"
+
+
+class RailroadLogo(db.Model):
+    __tablename__ = "railroad_logos"
+
+    id = db.Column(db.Integer, primary_key=True)
+    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
+    description = db.Column(db.String(128), nullable=False)
+    start_date = db.Column(db.String(32))
+    end_date = db.Column(db.String(32))
+    image_path = db.Column(db.String(256))
+
+    railroad = db.relationship("Railroad", back_populates="logos", foreign_keys=[railroad_id])
+
+    def __repr__(self) -> str:
+        return f"<RailroadLogo {self.description}>"
+
+
+class RailroadSlogan(db.Model):
+    __tablename__ = "railroad_slogans"
+
+    id = db.Column(db.Integer, primary_key=True)
+    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
+    description = db.Column(db.String(128), nullable=False)
+    slogan_text = db.Column(db.String(256))
+    start_date = db.Column(db.String(32))
+    end_date = db.Column(db.String(32))
+
+    railroad = db.relationship("Railroad", back_populates="slogans")
+
+    def __repr__(self) -> str:
+        return f"<RailroadSlogan {self.description}>"

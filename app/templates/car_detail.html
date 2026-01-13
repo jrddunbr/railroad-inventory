@@ -28,7 +28,12 @@
       {% set copy_override_weight = copy_weight %}
       {% set copy_override_load_limit = copy_load_limit %}
     {% endif %}
-    <h1>{{ (car.railroad.reporting_mark if car.railroad else car.reporting_mark_override) or "" }} {{ car.car_number or "" }}</h1>
+    <h1>
+      {{ (car.railroad.reporting_mark if car.railroad else car.reporting_mark_override) or "" }} {{ car.car_number or "" }}
+      {% if car.railroad and car.railroad.representative_logo and car.railroad.representative_logo.image_path %}
+        <img src="{{ url_for('static', filename=car.railroad.representative_logo.image_path) }}" alt="{{ car.railroad.representative_logo.description or car.railroad.name }}" style="max-height: 32px; max-width: 96px; margin-left: 8px; vertical-align: middle;" />
+      {% endif %}
+    </h1>
     <div class="actions">
       <a class="tag" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit) }}">Copy to New Car</a>
@@ -50,6 +55,7 @@
             -
           {% endif %}
         </p>
+        <p><strong>Class Era:</strong> {{ car.car_class.era if car.car_class and car.car_class.era else "-" }}</p>
         <p><strong>Railroad:</strong>
           {% if car.railroad %}
             <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.name }}</a>
@@ -116,6 +122,7 @@
         <p><strong>Built:</strong> {{ car.built or "-" }}</p>
         <p><strong>Alt Date:</strong> {{ car.alt_date or "-" }}</p>
         <p><strong>Reweigh Date:</strong> {{ car.reweight_date or "-" }}</p>
+        <p><strong>Repack Bearings Date:</strong> {{ car.repack_bearings_date or "-" }}</p>
       </div>
       <div>
         <h3>Maintenance</h3>

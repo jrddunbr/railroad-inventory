@@ -8,6 +8,7 @@
         <tr>
           <th>Reporting Mark</th>
           <th>Name</th>
+          <th>Logo</th>
           <th>Start</th>
           <th>End</th>
           <th>Merged Into</th>
@@ -19,6 +20,13 @@
         <tr>
           <td><a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">{{ railroad.reporting_mark or "-" }}</a></td>
           <td><a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">{{ railroad.name }}</a></td>
+          <td>
+            {% if railroad.representative_logo and railroad.representative_logo.image_path %}
+              <img src="{{ url_for('static', filename=railroad.representative_logo.image_path) }}" alt="{{ railroad.representative_logo.description or railroad.name }}" style="max-height: 32px; max-width: 96px;" />
+            {% else %}
+              -
+            {% endif %}
+          </td>
           <td>{{ railroad.start_date or "-" }}</td>
           <td>{{ railroad.end_date or "-" }}</td>
           <td>{{ railroad.merged_into or "-" }}</td>
@@ -26,7 +34,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6">No railroads yet. Add a car to create one automatically.</td>
+          <td colspan="7">No railroads yet. Add a car to create one automatically.</td>
         </tr>
         {% endfor %}
       </tbody>

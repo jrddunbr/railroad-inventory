@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>Edit Railroad</h1>
-    <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">
+    <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}" enctype="multipart/form-data">
       <div class="grid">
         <div>
           <label for="reporting_mark">Reporting Mark</label>
@@ -33,10 +33,254 @@
           <textarea id="notes" name="notes">{{ railroad.notes or '' }}</textarea>
         </div>
       </div>
+      <h2>Color Schemes</h2>
+      <p class="keyboard-hint">Use the color picker to add hex colors; stored as comma-separated values.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Scheme</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Colors</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for scheme in railroad.color_schemes %}
+          <tr>
+            <td>
+              <input type="hidden" name="color_scheme_id" value="{{ scheme.id }}" />
+              <input name="color_scheme_description" value="{{ scheme.description }}" />
+            </td>
+            <td><input name="color_scheme_start" value="{{ scheme.start_date or '' }}" /></td>
+            <td><input name="color_scheme_end" value="{{ scheme.end_date or '' }}" /></td>
+            <td>
+              <div class="actions" style="margin-top: 0;">
+                <input id="scheme-colors-{{ loop.index0 }}" class="scheme-colors" name="color_scheme_colors" value="{{ scheme.colors or '' }}" />
+                <input type="color" data-target="scheme-colors-{{ loop.index0 }}" title="Add color" />
+              </div>
+            </td>
+            <td><button type="button" class="remove-row">Remove</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="actions">
+        <button type="button" class="add-row" data-section="schemes">Add another scheme</button>
+      </div>
+      <h2>Logos</h2>
+      <p class="keyboard-hint">Upload PNG/JPEG/SVG logos (max 2MB). Select one as the representative logo.</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Representative</th>
+            <th>Description</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Image</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for logo in railroad.logos %}
+          <tr class="logo-row">
+            <td>
+              <input type="radio" name="representative_logo_index" value="{{ loop.index0 }}" {% if railroad.representative_logo_id == logo.id %}checked{% endif %} />
+            </td>
+            <td>
+              <input type="hidden" name="logo_id" value="{{ logo.id }}" />
+              <input type="hidden" name="logo_existing_path" value="{{ logo.image_path or '' }}" />
+              <input name="logo_description" value="{{ logo.description }}" />
+            </td>
+            <td><input name="logo_start" value="{{ logo.start_date or '' }}" /></td>
+            <td><input name="logo_end" value="{{ logo.end_date or '' }}" /></td>
+            <td>
+              {% if logo.image_path %}
+                <img src="{{ url_for('static', filename=logo.image_path) }}" alt="{{ logo.description }}" style="max-height: 48px; max-width: 120px;" />
+              {% endif %}
+              <input type="file" name="logo_image_{{ loop.index0 }}" accept=".png,.jpg,.jpeg,.svg" data-max-bytes="2097152" />
+            </td>
+            <td><button type="button" class="remove-row">Remove</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="actions">
+        <button type="button" class="add-row" data-section="logos">Add another logo</button>
+      </div>
+      <h2>Slogans</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th>Slogan</th>
+            <th>Start</th>
+            <th>End</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for slogan in railroad.slogans %}
+          <tr>
+            <td>
+              <input type="hidden" name="slogan_id" value="{{ slogan.id }}" />
+              <input name="slogan_description" value="{{ slogan.description }}" />
+            </td>
+            <td><input name="slogan_text" value="{{ slogan.slogan_text or '' }}" /></td>
+            <td><input name="slogan_start" value="{{ slogan.start_date or '' }}" /></td>
+            <td><input name="slogan_end" value="{{ slogan.end_date or '' }}" /></td>
+            <td><button type="button" class="remove-row">Remove</button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="actions">
+        <button type="button" class="add-row" data-section="slogans">Add another slogan</button>
+      </div>
       <div class="actions">
         <button type="submit">Save</button>
         <a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">Cancel</a>
       </div>
     </form>
   </div>
+  <script>
+    const form = document.querySelector('form');
+
+    const buildSchemeRow = (index) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>
+          <input type="hidden" name="color_scheme_id" value="" />
+          <input name="color_scheme_description" value="" />
+        </td>
+        <td><input name="color_scheme_start" value="" /></td>
+        <td><input name="color_scheme_end" value="" /></td>
+        <td>
+          <div class="actions" style="margin-top: 0;">
+            <input id="scheme-colors-${index}" class="scheme-colors" name="color_scheme_colors" value="" />
+            <input type="color" data-target="scheme-colors-${index}" title="Add color" />
+          </div>
+        </td>
+        <td><button type="button" class="remove-row">Remove</button></td>
+      `;
+      return row;
+    };
+
+    const buildLogoRow = () => {
+      const row = document.createElement('tr');
+      row.classList.add('logo-row');
+      row.innerHTML = `
+        <td>
+          <input type="radio" name="representative_logo_index" value="" />
+        </td>
+        <td>
+          <input type="hidden" name="logo_id" value="" />
+          <input type="hidden" name="logo_existing_path" value="" />
+          <input name="logo_description" value="" />
+        </td>
+        <td><input name="logo_start" value="" /></td>
+        <td><input name="logo_end" value="" /></td>
+        <td>
+          <input type="file" name="logo_image_" accept=".png,.jpg,.jpeg,.svg" data-max-bytes="2097152" />
+        </td>
+        <td><button type="button" class="remove-row">Remove</button></td>
+      `;
+      return row;
+    };
+
+    const buildSloganRow = () => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>
+          <input type="hidden" name="slogan_id" value="" />
+          <input name="slogan_description" value="" />
+        </td>
+        <td><input name="slogan_text" value="" /></td>
+        <td><input name="slogan_start" value="" /></td>
+        <td><input name="slogan_end" value="" /></td>
+        <td><button type="button" class="remove-row">Remove</button></td>
+      `;
+      return row;
+    };
+
+    const bindColorPicker = (picker) => {
+      picker.addEventListener('input', (event) => {
+        const target = document.getElementById(event.target.dataset.target);
+        if (!target) return;
+        const color = event.target.value.toLowerCase();
+        const existing = target.value.split(',').map((value) => value.trim()).filter(Boolean);
+        if (!existing.includes(color)) {
+          existing.push(color);
+          target.value = existing.join(', ');
+        }
+      });
+    };
+
+    const bindLogoSizeCheck = (input) => {
+      input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const maxBytes = Number(input.dataset.maxBytes || 0);
+        if (maxBytes && file.size > maxBytes) {
+          alert('Logo file is too large. Please select an image under 2MB.');
+          input.value = '';
+        }
+      });
+    };
+
+    const reindexLogoRows = () => {
+      const rows = Array.from(document.querySelectorAll('.logo-row'));
+      rows.forEach((row, index) => {
+        const radio = row.querySelector('input[type="radio"][name="representative_logo_index"]');
+        if (radio) radio.value = String(index);
+        const fileInput = row.querySelector('input[type="file"][name^="logo_image_"]');
+        if (fileInput) fileInput.name = `logo_image_${index}`;
+      });
+    };
+
+    document.querySelectorAll('input[type="color"][data-target]').forEach((picker) => bindColorPicker(picker));
+    document.querySelectorAll('input[type="file"][name^="logo_image_"]').forEach((input) => bindLogoSizeCheck(input));
+
+    document.querySelectorAll('.add-row').forEach((button) => {
+      button.addEventListener('click', () => {
+        const section = button.dataset.section;
+        if (section === 'schemes') {
+          const body = button.closest('div').previousElementSibling.querySelector('tbody');
+          const nextIndex = document.querySelectorAll('.scheme-colors').length;
+          const row = buildSchemeRow(nextIndex);
+          body.appendChild(row);
+          const picker = row.querySelector('input[type="color"][data-target]');
+          if (picker) bindColorPicker(picker);
+        }
+        if (section === 'logos') {
+          const body = button.closest('div').previousElementSibling.querySelector('tbody');
+          const row = buildLogoRow();
+          body.appendChild(row);
+          const logoInput = row.querySelector('input[type="file"][name^="logo_image_"]');
+          if (logoInput) bindLogoSizeCheck(logoInput);
+          reindexLogoRows();
+        }
+        if (section === 'slogans') {
+          const body = button.closest('div').previousElementSibling.querySelector('tbody');
+          const row = buildSloganRow();
+          body.appendChild(row);
+        }
+      });
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!event.target.classList.contains('remove-row')) return;
+      const row = event.target.closest('tr');
+      if (row) row.remove();
+      reindexLogoRows();
+    });
+
+    reindexLogoRows();
+
+    if (form) {
+      form.addEventListener('submit', () => {
+        reindexLogoRows();
+      });
+    }
+  </script>
 {% endblock %}
