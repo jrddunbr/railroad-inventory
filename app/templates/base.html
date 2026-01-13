@@ -147,26 +147,6 @@
     </main>
   </div>
   <script>
-    const focusable = () => Array.from(document.querySelectorAll('a, button, input, select, textarea'))
-      .filter(el => !el.hasAttribute('disabled'));
-
-    document.addEventListener('keydown', (event) => {
-      if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(event.key)) {
-        return;
-      }
-      const items = focusable();
-      if (items.length === 0) return;
-      const current = document.activeElement;
-      let index = items.indexOf(current);
-      if (index === -1) index = 0;
-      if (["ArrowDown", "ArrowRight"].includes(event.key)) {
-        index = (index + 1) % items.length;
-      } else {
-        index = (index - 1 + items.length) % items.length;
-      }
-      items[index].focus();
-      event.preventDefault();
-    });
   </script>
 </body>
 </html>

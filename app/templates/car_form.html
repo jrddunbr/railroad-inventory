@@ -29,6 +29,13 @@
             <label for="railroad_name">Railroad Name</label>
             <input id="railroad_name" name="railroad_name" value="{{ car.railroad.name if car and car.railroad else (prefill.get('railroad_name', '') if not car else '') }}" {% if car and car.railroad %}disabled{% endif %} />
           </div>
+          {% if car and car.railroad %}
+          <div>
+            <label>&nbsp;</label>
+            <input type="hidden" id="clear_railroad" name="clear_railroad" value="0" />
+            <button type="button" class="tag" id="remove-railroad">Remove Railroad</button>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -186,6 +193,14 @@
     </form>
   </div>
   <script>
+    const removeRailroadButton = document.getElementById('remove-railroad');
+    if (removeRailroadButton) {
+      removeRailroadButton.addEventListener('click', () => {
+        const flag = document.getElementById('clear_railroad');
+        if (flag) flag.value = '1';
+        removeRailroadButton.closest('form')?.submit();
+      });
+    }
     const classFields = {
       wheel: document.getElementById('class_wheel_arrangement'),
       tender: document.getElementById('class_tender_axles'),

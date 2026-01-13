@@ -1032,13 +1032,18 @@ def apply_car_form(car: Car, form) -> None:
         if "reporting_mark" in form
         else None
     )
+    if reporting_mark and reporting_mark.lower() in {"none", "null"}:
+        reporting_mark = ""
+    clear_railroad = form.get("clear_railroad") == "1"
     railroad_name = (
         form.get("railroad_name", car.railroad.name if car.railroad else "").strip()
         if "railroad_name" in form
         else None
     )
     railroad = None
-    if reporting_mark is not None or railroad_name is not None:
+    if clear_railroad:
+        railroad = None
+    elif reporting_mark is not None or railroad_name is not None:
         if reporting_mark:
             railroad = Railroad.query.filter_by(reporting_mark=reporting_mark).first()
             if not railroad:
