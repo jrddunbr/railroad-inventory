@@ -41,6 +41,18 @@
           <input id="load_limit" name="load_limit" value="{{ car_class.load_limit or '' }}" />
         </div>
         <div>
+          <label for="internal_length">Internal Length</label>
+          <input id="internal_length" name="internal_length" value="{{ car_class.internal_length or '' }}" />
+        </div>
+        <div>
+          <label for="internal_width">Internal Width</label>
+          <input id="internal_width" name="internal_width" value="{{ car_class.internal_width or '' }}" />
+        </div>
+        <div>
+          <label for="internal_height">Internal Height</label>
+          <input id="internal_height" name="internal_height" value="{{ car_class.internal_height or '' }}" />
+        </div>
+        <div>
           <label for="notes">Notes</label>
           <textarea id="notes" name="notes">{{ car_class.notes or '' }}</textarea>
         </div>

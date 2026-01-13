@@ -80,6 +80,21 @@
             <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else (prefill.get('weight', '') if not car else '') }}" data-gray-default="true" />
           </div>
         </div>
+        <h3>Internal Dimensions</h3>
+        <div class="grid">
+          <div>
+            <label for="internal_length">Internal Length</label>
+            <input id="internal_length" name="internal_length" value="{{ car.internal_length_override if car and car.internal_length_override else (prefill.get('internal_length', '') if not car else '') }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="internal_width">Internal Width</label>
+            <input id="internal_width" name="internal_width" value="{{ car.internal_width_override if car and car.internal_width_override else (prefill.get('internal_width', '') if not car else '') }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="internal_height">Internal Height</label>
+            <input id="internal_height" name="internal_height" value="{{ car.internal_height_override if car and car.internal_height_override else (prefill.get('internal_height', '') if not car else '') }}" data-gray-default="true" />
+          </div>
+        </div>
         <h3>Dates</h3>
         <div class="grid">
           <div>
@@ -177,6 +192,9 @@
       capacity: document.getElementById('capacity'),
       weight: document.getElementById('weight'),
       loadLimit: document.getElementById('load_limit'),
+      internalLength: document.getElementById('internal_length'),
+      internalWidth: document.getElementById('internal_width'),
+      internalHeight: document.getElementById('internal_height'),
       carType: document.getElementById('car_type'),
       locomotive: document.getElementById('is_locomotive'),
     };
@@ -217,6 +235,9 @@
       setGrayDefault(classFields.capacity, carClass.capacity);
       setGrayDefault(classFields.weight, carClass.weight);
       setGrayDefault(classFields.loadLimit, carClass.load_limit);
+      setGrayDefault(classFields.internalLength, carClass.internal_length);
+      setGrayDefault(classFields.internalWidth, carClass.internal_width);
+      setGrayDefault(classFields.internalHeight, carClass.internal_height);
       if (classFields.carType) {
         setGrayDefault(classFields.carType, carClass.car_type);
       }
@@ -292,7 +313,7 @@
       });
     }
 
-    [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.carType, classFields.wheel, classFields.tender].forEach((input) => {
+    [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.internalLength, classFields.internalWidth, classFields.internalHeight, classFields.carType, classFields.wheel, classFields.tender].forEach((input) => {
       if (!input) return;
       input.addEventListener('focus', () => clearGrayDefault(input));
       input.addEventListener('input', () => {
@@ -306,7 +327,7 @@
     const form = document.querySelector('form[data-mode]');
     if (form) {
       form.addEventListener('submit', () => {
-        [classFields.capacity, classFields.weight, classFields.loadLimit].forEach((input) => {
+        [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.internalLength, classFields.internalWidth, classFields.internalHeight].forEach((input) => {
           if (input && input.dataset.isDefault === 'true') {
             input.value = '';
           }

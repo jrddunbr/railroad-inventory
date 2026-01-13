@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Loads</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.load_new') }}">Add Load</a>
+    </div>
+    <p class="keyboard-hint">Results: {{ loads|length }}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Car Class</th>
+          <th>Era</th>
+          <th>Railroad</th>
+          <th>Brand</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for load in loads %}
+        <tr>
+          <td><a href="{{ url_for('main.load_detail', load_id=load.id) }}">{{ load.name }}</a></td>
+          <td>
+            {% if load.car_class %}
+              <a href="{{ url_for('main.car_class_detail', class_id=load.car_class.id) }}">{{ load.car_class.code }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ load.era or "-" }}</td>
+          <td>
+            {% if load.railroad %}
+              <a href="{{ url_for('main.railroad_detail', railroad_id=load.railroad.id) }}">{{ load.railroad.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ load.brand or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No loads yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

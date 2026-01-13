@@ -17,6 +17,8 @@ from app.models import (
     Car,
     CarClass,
     Location,
+    LoadPlacement,
+    LoadType,
     Railroad,
     RailroadColorScheme,
     RailroadLogo,
@@ -444,6 +446,141 @@ def locomotive_classes():
     return render_template("locomotive_classes.html", locomotive_classes=locomotive_classes)
 
 
+@main_bp.route("/loads")
+def loads():
+    loads = LoadType.query.order_by(LoadType.name).all()
+    return render_template("loads.html", loads=loads)
+
+
+@main_bp.route("/loads/new", methods=["GET", "POST"])
+def load_new():
+    classes = CarClass.query.order_by(CarClass.code).all()
+    railroads = Railroad.query.order_by(Railroad.name).all()
+    if request.method == "POST":
+        load = LoadType(name=request.form.get("name", "").strip())
+        apply_load_form(load, request.form)
+        db.session.add(load)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.load_detail", load_id=load.id))
+    return render_template("load_form.html", load=None, classes=classes, railroads=railroads)
+
+
+@main_bp.route("/loads/<int:load_id>")
+def load_detail(load_id: int):
+    load = LoadType.query.get_or_404(load_id)
+    placements = LoadPlacement.query.filter_by(load_id=load.id).all()
+    return render_template("load_detail.html", load=load, placements=placements)
+
+
+@main_bp.route("/loads/<int:load_id>/edit", methods=["GET", "POST"])
+def load_edit(load_id: int):
+    load = LoadType.query.get_or_404(load_id)
+    classes = CarClass.query.order_by(CarClass.code).all()
+    railroads = Railroad.query.order_by(Railroad.name).all()
+    if request.method == "POST":
+        load.name = request.form.get("name", "").strip()
+        apply_load_form(load, request.form)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.load_detail", load_id=load.id))
+    return render_template("load_form.html", load=load, classes=classes, railroads=railroads)
+
+
+@main_bp.route("/loads/<int:load_id>/delete", methods=["POST"])
+def load_delete(load_id: int):
+    load = LoadType.query.get_or_404(load_id)
+    db.session.delete(load)
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.loads"))
+
+
+@main_bp.route("/loads/<int:load_id>/placements/new", methods=["GET", "POST"])
+def load_placement_new(load_id: int):
+    load = LoadType.query.get_or_404(load_id)
+    cars = Car.query.order_by(Car.id.desc()).all()
+    locations = Location.query.order_by(Location.name).all()
+    if request.method == "POST":
+        placement = LoadPlacement(load=load)
+        if not apply_load_placement_form(placement, request.form):
+            return "Select a car or location for this load placement.", 400
+        db.session.add(placement)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.load_detail", load_id=load.id))
+    return render_template(
+        "load_placement_form.html",
+        load=load,
+        placement=None,
+        cars=cars,
+        locations=locations,
+        preset_car_id=request.args.get("car_id", "").strip(),
+        preset_location_id=request.args.get("location_id", "").strip(),
+    )
+
+
+@main_bp.route("/load-placements/new", methods=["GET", "POST"])
+def load_placement_new_generic():
+    loads = LoadType.query.order_by(LoadType.name).all()
+    cars = Car.query.order_by(Car.id.desc()).all()
+    locations = Location.query.order_by(Location.name).all()
+    if request.method == "POST":
+        load_id = request.form.get("load_id", "").strip()
+        if not load_id.isdigit():
+            return "Select a load type for this placement.", 400
+        load = LoadType.query.get_or_404(int(load_id))
+        placement = LoadPlacement(load=load)
+        if not apply_load_placement_form(placement, request.form):
+            return "Select a car or location for this load placement.", 400
+        db.session.add(placement)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.load_detail", load_id=load.id))
+    return render_template(
+        "load_placement_form.html",
+        load=None,
+        placement=None,
+        loads=loads,
+        cars=cars,
+        locations=locations,
+        preset_car_id=request.args.get("car_id", "").strip(),
+        preset_location_id=request.args.get("location_id", "").strip(),
+    )
+
+
+@main_bp.route("/load-placements/<int:placement_id>/edit", methods=["GET", "POST"])
+def load_placement_edit(placement_id: int):
+    placement = LoadPlacement.query.get_or_404(placement_id)
+    cars = Car.query.order_by(Car.id.desc()).all()
+    locations = Location.query.order_by(Location.name).all()
+    if request.method == "POST":
+        if not apply_load_placement_form(placement, request.form):
+            return "Select a car or location for this load placement.", 400
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.load_detail", load_id=placement.load_id))
+    return render_template(
+        "load_placement_form.html",
+        load=placement.load,
+        placement=placement,
+        cars=cars,
+        locations=locations,
+        preset_car_id=str(placement.car_id or ""),
+        preset_location_id=str(placement.location_id or ""),
+    )
+
+
+@main_bp.route("/load-placements/<int:placement_id>/delete", methods=["POST"])
+def load_placement_delete(placement_id: int):
+    placement = LoadPlacement.query.get_or_404(placement_id)
+    load_id = placement.load_id
+    db.session.delete(placement)
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.load_detail", load_id=load_id))
+
+
 @main_bp.route("/car-classes/<int:class_id>")
 def car_class_detail(class_id: int):
     car_class = CarClass.query.get_or_404(class_id)
@@ -475,6 +612,9 @@ def car_class_edit(class_id: int):
         car_class.capacity = request.form.get("capacity", "").strip()
         car_class.weight = request.form.get("weight", "").strip()
         car_class.load_limit = request.form.get("load_limit", "").strip()
+        car_class.internal_length = request.form.get("internal_length", "").strip()
+        car_class.internal_width = request.form.get("internal_width", "").strip()
+        car_class.internal_height = request.form.get("internal_height", "").strip()
         car_class.notes = request.form.get("notes", "").strip()
         db.session.commit()
         ensure_db_backup()
@@ -701,6 +841,9 @@ def api_car_classes():
             "capacity": c.capacity,
             "weight": c.weight,
             "load_limit": c.load_limit,
+            "internal_length": c.internal_length,
+            "internal_width": c.internal_width,
+            "internal_height": c.internal_height,
             "notes": c.notes,
         }
         for c in classes
@@ -734,6 +877,43 @@ def api_search():
         .all()
     )
     return jsonify([serialize_car(car) for car in cars])
+
+
+def apply_load_form(load: LoadType, form) -> None:
+    load.name = form.get("name", "").strip()
+    load.era = form.get("era", "").strip()
+    load.brand = form.get("brand", "").strip()
+    load.lettering = form.get("lettering", "").strip()
+    load.msrp = form.get("msrp", "").strip()
+    load.price = form.get("price", "").strip()
+    load.upc = form.get("upc", "").strip()
+    load.length = form.get("length", "").strip()
+    load.width = form.get("width", "").strip()
+    load.height = form.get("height", "").strip()
+    load.repairs_required = form.get("repairs_required", "").strip()
+    load.notes = form.get("notes", "").strip()
+    class_id = form.get("car_class_id", "").strip()
+    if class_id and class_id.isdigit():
+        load.car_class_id = int(class_id)
+    else:
+        load.car_class_id = None
+    railroad_id = form.get("railroad_id", "").strip()
+    if railroad_id and railroad_id.isdigit():
+        load.railroad_id = int(railroad_id)
+    else:
+        load.railroad_id = None
+
+
+def apply_load_placement_form(placement: LoadPlacement, form) -> bool:
+    quantity = form.get("quantity", "").strip()
+    placement.quantity = int(quantity) if quantity.isdigit() and int(quantity) > 0 else 1
+    car_id = form.get("car_id", "").strip()
+    location_id = form.get("location_id", "").strip()
+    placement.car_id = int(car_id) if car_id.isdigit() else None
+    placement.location_id = int(location_id) if location_id.isdigit() else None
+    if placement.car_id and placement.location_id:
+        placement.location_id = None
+    return bool(placement.car_id or placement.location_id)
 
 
 def apply_car_form(car: Car, form) -> None:
@@ -811,6 +991,15 @@ def apply_car_form(car: Car, form) -> None:
             car_class.weight = weight_value
         if load_limit_value and (created_class or not car_class.load_limit):
             car_class.load_limit = load_limit_value
+        class_internal_length = form.get("internal_length", "").strip()
+        class_internal_width = form.get("internal_width", "").strip()
+        class_internal_height = form.get("internal_height", "").strip()
+        if class_internal_length and not car_class.internal_length:
+            car_class.internal_length = class_internal_length
+        if class_internal_width and not car_class.internal_width:
+            car_class.internal_width = class_internal_width
+        if class_internal_height and not car_class.internal_height:
+            car_class.internal_height = class_internal_height
 
         if created_class:
             car.capacity_override = None
@@ -820,6 +1009,9 @@ def apply_car_form(car: Car, form) -> None:
             car.wheel_arrangement_override = None
             car.tender_axles_override = None
             car.is_locomotive_override = None
+            car.internal_length_override = None
+            car.internal_width_override = None
+            car.internal_height_override = None
         else:
             car.capacity_override = (
                 capacity_value if capacity_value and car_class.capacity and capacity_value != car_class.capacity else None
@@ -829,6 +1021,21 @@ def apply_car_form(car: Car, form) -> None:
             )
             car.load_limit_override = (
                 load_limit_value if load_limit_value and car_class.load_limit and load_limit_value != car_class.load_limit else None
+            )
+            car.internal_length_override = (
+                class_internal_length
+                if class_internal_length and car_class.internal_length and class_internal_length != car_class.internal_length
+                else None
+            )
+            car.internal_width_override = (
+                class_internal_width
+                if class_internal_width and car_class.internal_width and class_internal_width != car_class.internal_width
+                else None
+            )
+            car.internal_height_override = (
+                class_internal_height
+                if class_internal_height and car_class.internal_height and class_internal_height != car_class.internal_height
+                else None
             )
             car.car_type_override = (
                 car_type_value if car_type_value and car_class.car_type and car_type_value != car_class.car_type else None
@@ -857,6 +1064,9 @@ def apply_car_form(car: Car, form) -> None:
         car.wheel_arrangement_override = form.get("class_wheel_arrangement", "").strip() or None
         car.tender_axles_override = form.get("class_tender_axles", "").strip() or None
         car.is_locomotive_override = True if form.get("is_locomotive") == "on" else None
+        car.internal_length_override = form.get("internal_length", "").strip() or None
+        car.internal_width_override = form.get("internal_width", "").strip() or None
+        car.internal_height_override = form.get("internal_height", "").strip() or None
 
     location_name = form.get("location", "").strip()
     if location_name:
@@ -869,6 +1079,9 @@ def serialize_car(car: Car) -> dict:
     class_capacity = car.car_class.capacity if car.car_class else None
     class_weight = car.car_class.weight if car.car_class else None
     class_load_limit = car.car_class.load_limit if car.car_class else None
+    class_internal_length = car.car_class.internal_length if car.car_class else None
+    class_internal_width = car.car_class.internal_width if car.car_class else None
+    class_internal_height = car.car_class.internal_height if car.car_class else None
     class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
     is_locomotive = (
         car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
@@ -891,6 +1104,9 @@ def serialize_car(car: Car) -> dict:
         "capacity": car.capacity_override or class_capacity,
         "weight": car.weight_override or class_weight,
         "load_limit": car.load_limit_override or class_load_limit,
+        "internal_length": car.internal_length_override or class_internal_length,
+        "internal_width": car.internal_width_override or class_internal_width,
+        "internal_height": car.internal_height_override or class_internal_height,
         "built": car.built,
         "alt_date": car.alt_date,
         "reweight_date": car.reweight_date,
@@ -904,6 +1120,9 @@ def serialize_car(car: Car) -> dict:
         "capacity_override": car.capacity_override,
         "weight_override": car.weight_override,
         "load_limit_override": car.load_limit_override,
+        "internal_length_override": car.internal_length_override,
+        "internal_width_override": car.internal_width_override,
+        "internal_height_override": car.internal_height_override,
         "car_type_override": car.car_type_override,
         "wheel_arrangement_override": car.wheel_arrangement_override,
         "tender_axles_override": car.tender_axles_override,

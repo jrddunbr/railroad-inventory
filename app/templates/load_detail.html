@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>{{ load.name }}</h1>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.load_edit', load_id=load.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('main.load_delete', load_id=load.id) }}" onsubmit="return confirm('Delete this load?');">
+        <button type="submit" class="tag">Delete</button>
+      </form>
+      <a class="tag" href="{{ url_for('main.loads') }}">Back to Loads</a>
+    </div>
+    <div class="grid">
+      <div>
+        <p><strong>Car Class:</strong>
+          {% if load.car_class %}
+            <a href="{{ url_for('main.car_class_detail', class_id=load.car_class.id) }}">{{ load.car_class.code }}</a>
+          {% else %}
+            -
+          {% endif %}
+        </p>
+        <p><strong>Era:</strong> {{ load.era or "-" }}</p>
+        <p><strong>Railroad:</strong>
+          {% if load.railroad %}
+            <a href="{{ url_for('main.railroad_detail', railroad_id=load.railroad.id) }}">{{ load.railroad.name }}</a>
+          {% else %}
+            -
+          {% endif %}
+        </p>
+        <p><strong>Brand:</strong> {{ load.brand or "-" }}</p>
+        <p><strong>Lettering:</strong> {{ load.lettering or "-" }}</p>
+      </div>
+      <div>
+        <p><strong>MSRP:</strong> {{ load.msrp or "-" }}</p>
+        <p><strong>Price:</strong> {{ load.price or "-" }}</p>
+        <p><strong>UPC:</strong> {{ load.upc or "-" }}</p>
+      </div>
+      <div>
+        <p><strong>Length:</strong> {{ load.length or "-" }}</p>
+        <p><strong>Width:</strong> {{ load.width or "-" }}</p>
+        <p><strong>Height:</strong> {{ load.height or "-" }}</p>
+      </div>
+      <div>
+        <p><strong>Repairs Required:</strong> {{ load.repairs_required or "None" }}</p>
+        <p><strong>Notes:</strong> {{ load.notes or "-" }}</p>
+      </div>
+    </div>
+    <h3>Placements</h3>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.load_placement_new', load_id=load.id) }}">Add Placement</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Location</th>
+          <th>Car</th>
+          <th>Quantity</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for placement in placements %}
+        <tr>
+          <td>
+            {% if placement.location %}
+              <a href="{{ url_for('main.location_detail', location_id=placement.location.id) }}">{{ placement.location.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if placement.car %}
+              {% set car_label = (placement.car.railroad.reporting_mark if placement.car.railroad else (placement.car.reporting_mark_override or "")) ~ " " ~ (placement.car.car_number or "") %}
+              <a href="{{ url_for('main.car_detail', car_id=placement.car.id) }}">{{ car_label.strip() or ("Car " ~ placement.car.id) }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>{{ placement.quantity }}</td>
+          <td>
+            <a class="tag" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
+            <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" onsubmit="return confirm('Delete this placement?');" style="display: inline;">
+              <button type="submit" class="tag">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No placements yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

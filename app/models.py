@@ -57,8 +57,12 @@ class CarClass(db.Model):
     capacity = db.Column(db.String(64))
     weight = db.Column(db.String(64))
     notes = db.Column(db.Text)
+    internal_length = db.Column(db.String(32))
+    internal_width = db.Column(db.String(32))
+    internal_height = db.Column(db.String(32))
 
     cars = db.relationship("Car", back_populates="car_class")
+    loads = db.relationship("LoadType", back_populates="car_class")
 
     def __repr__(self) -> str:
         return f"<CarClass {self.code}>"
@@ -74,6 +78,11 @@ class Location(db.Model):
 
     parent = db.relationship("Location", remote_side=[id], backref="children")
     cars = db.relationship("Car", back_populates="location")
+    load_placements = db.relationship(
+        "LoadPlacement",
+        back_populates="location",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Location {self.name} ({self.location_type})>"
@@ -110,10 +119,18 @@ class Car(db.Model):
     load = db.Column(db.String(64))
     repairs_required = db.Column(db.String(64))
     notes = db.Column(db.Text)
+    internal_length_override = db.Column(db.String(32))
+    internal_width_override = db.Column(db.String(32))
+    internal_height_override = db.Column(db.String(32))
 
     railroad = db.relationship("Railroad", back_populates="cars")
     car_class = db.relationship("CarClass", back_populates="cars")
     location = db.relationship("Location", back_populates="cars")
+    load_placements = db.relationship(
+        "LoadPlacement",
+        back_populates="car",
+        cascade="all, delete-orphan",
+    )
 
     def __repr__(self) -> str:
         return f"<Car {self.car_number}>"
@@ -147,7 +164,7 @@ class RailroadLogo(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
-    description = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.String(128))
     start_date = db.Column(db.String(32))
     end_date = db.Column(db.String(32))
     image_path = db.Column(db.String(256))
@@ -163,7 +180,7 @@ class RailroadSlogan(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
-    description = db.Column(db.String(128), nullable=False)
+    description = db.Column(db.String(128))
     slogan_text = db.Column(db.String(256))
     start_date = db.Column(db.String(32))
     end_date = db.Column(db.String(32))
@@ -172,3 +189,51 @@ class RailroadSlogan(db.Model):
 
     def __repr__(self) -> str:
         return f"<RailroadSlogan {self.description}>"
+
+
+class LoadType(db.Model):
+    __tablename__ = "loads"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), nullable=False)
+    car_class_id = db.Column(db.Integer, db.ForeignKey("car_classes.id"))
+    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"))
+    era = db.Column(db.String(64))
+    brand = db.Column(db.String(128))
+    lettering = db.Column(db.String(128))
+    msrp = db.Column(db.String(32))
+    price = db.Column(db.String(32))
+    upc = db.Column(db.String(32))
+    length = db.Column(db.String(32))
+    width = db.Column(db.String(32))
+    height = db.Column(db.String(32))
+    repairs_required = db.Column(db.String(64))
+    notes = db.Column(db.Text)
+
+    car_class = db.relationship("CarClass", back_populates="loads")
+    railroad = db.relationship("Railroad")
+    placements = db.relationship(
+        "LoadPlacement",
+        back_populates="load",
+        cascade="all, delete-orphan",
+    )
+
+    def __repr__(self) -> str:
+        return f"<LoadType {self.name}>"
+
+
+class LoadPlacement(db.Model):
+    __tablename__ = "load_placements"
+
+    id = db.Column(db.Integer, primary_key=True)
+    load_id = db.Column(db.Integer, db.ForeignKey("loads.id"), nullable=False)
+    car_id = db.Column(db.Integer, db.ForeignKey("cars.id"))
+    location_id = db.Column(db.Integer, db.ForeignKey("locations.id"))
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+
+    load = db.relationship("LoadType", back_populates="placements")
+    car = db.relationship("Car", back_populates="load_placements")
+    location = db.relationship("Location", back_populates="load_placements")
+
+    def __repr__(self) -> str:
+        return f"<LoadPlacement {self.load_id} qty={self.quantity}>"

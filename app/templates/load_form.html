@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>{{ "Edit Load" if load else "New Load" }}</h1>
+    <form method="post" action="{{ url_for('main.load_edit', load_id=load.id) if load else url_for('main.load_new') }}">
+      <div class="grid">
+        <div>
+          <label for="name">Name</label>
+          <input id="name" name="name" value="{{ load.name if load else '' }}" required />
+        </div>
+      </div>
+      <h2>Dimensions</h2>
+      <div class="grid">
+        <div>
+          <label for="length">Length</label>
+          <input id="length" name="length" value="{{ load.length if load else '' }}" />
+        </div>
+        <div>
+          <label for="width">Width</label>
+          <input id="width" name="width" value="{{ load.width if load else '' }}" />
+        </div>
+        <div>
+          <label for="height">Height</label>
+          <input id="height" name="height" value="{{ load.height if load else '' }}" />
+        </div>
+        <div>
+          <label for="car_class_id">Car Class Match</label>
+          <select id="car_class_id" name="car_class_id">
+            <option value="">-</option>
+            {% for class in classes %}
+              <option value="{{ class.id }}" {% if load and load.car_class_id == class.id %}selected{% endif %}>{{ class.code }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <h2>Model Details</h2>
+      <div class="grid">
+        <div>
+          <label for="lettering">Lettering</label>
+          <input id="lettering" name="lettering" value="{{ load.lettering if load else '' }}" />
+        </div>
+        <div>
+          <label for="era">Era</label>
+          <input id="era" name="era" value="{{ load.era if load else '' }}" />
+        </div>
+        <div>
+          <label for="railroad_id">Railroad</label>
+          <select id="railroad_id" name="railroad_id">
+            <option value="">-</option>
+            {% for railroad in railroads %}
+              <option value="{{ railroad.id }}" {% if load and load.railroad_id == railroad.id %}selected{% endif %}>{{ railroad.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <h2>Asset</h2>
+      <div class="grid">
+        <div>
+          <label for="msrp">MSRP</label>
+          <input id="msrp" name="msrp" value="{{ load.msrp if load else '' }}" />
+        </div>
+        <div>
+          <label for="price">Price</label>
+          <input id="price" name="price" value="{{ load.price if load else '' }}" />
+        </div>
+        <div>
+          <label for="brand">Brand</label>
+          <input id="brand" name="brand" value="{{ load.brand if load else '' }}" />
+        </div>
+        <div>
+          <label for="upc">UPC</label>
+          <input id="upc" name="upc" value="{{ load.upc if load else '' }}" />
+        </div>
+      </div>
+      <h2>Notes</h2>
+      <div class="grid">
+        <div>
+          <label for="repairs_required">Repairs Required</label>
+          <textarea id="repairs_required" name="repairs_required" rows="3">{{ load.repairs_required if load else '' }}</textarea>
+        </div>
+        <div>
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" rows="3">{{ load.notes if load else '' }}</textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        {% if load %}
+          <a href="{{ url_for('main.load_detail', load_id=load.id) }}">Cancel</a>
+        {% else %}
+          <a href="{{ url_for('main.loads') }}">Cancel</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+{% endblock %}

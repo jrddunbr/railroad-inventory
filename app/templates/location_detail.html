@@ -59,5 +59,36 @@
         {% endfor %}
       </tbody>
     </table>
+    <h3>Loads</h3>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Load</th>
+          <th>Quantity</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for placement in location.load_placements %}
+        <tr>
+          <td><a href="{{ url_for('main.load_detail', load_id=placement.load.id) }}">{{ placement.load.name }}</a></td>
+          <td>{{ placement.quantity }}</td>
+          <td>
+            <a class="tag" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
+            <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" onsubmit="return confirm('Delete this placement?');" style="display: inline;">
+              <button type="submit" class="tag">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="3">No loads stored here.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 {% endblock %}

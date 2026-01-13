@@ -8,7 +8,7 @@ from flask import Flask
 from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
 
-SCHEMA_VERSION = "1.4.0"
+SCHEMA_VERSION = "1.7.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
@@ -89,6 +89,18 @@ def create_app() -> Flask:
             db.session.execute(text("ALTER TABLE railroad_logos ADD COLUMN image_path TEXT"))
         if table_exists("railroad_slogans") and not column_exists("railroad_slogans", "slogan_text"):
             db.session.execute(text("ALTER TABLE railroad_slogans ADD COLUMN slogan_text TEXT"))
+        if table_exists("car_classes") and not column_exists("car_classes", "internal_length"):
+            db.session.execute(text("ALTER TABLE car_classes ADD COLUMN internal_length TEXT"))
+        if table_exists("car_classes") and not column_exists("car_classes", "internal_width"):
+            db.session.execute(text("ALTER TABLE car_classes ADD COLUMN internal_width TEXT"))
+        if table_exists("car_classes") and not column_exists("car_classes", "internal_height"):
+            db.session.execute(text("ALTER TABLE car_classes ADD COLUMN internal_height TEXT"))
+        if table_exists("cars") and not column_exists("cars", "internal_length_override"):
+            db.session.execute(text("ALTER TABLE cars ADD COLUMN internal_length_override TEXT"))
+        if table_exists("cars") and not column_exists("cars", "internal_width_override"):
+            db.session.execute(text("ALTER TABLE cars ADD COLUMN internal_width_override TEXT"))
+        if table_exists("cars") and not column_exists("cars", "internal_height_override"):
+            db.session.execute(text("ALTER TABLE cars ADD COLUMN internal_height_override TEXT"))
         db.session.commit()
 
         db_types = [row[0] for row in db.session.query(Location.location_type).distinct().all()]
