@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Conflicts Report</h1>
+    <h2>Car ID Conflicts</h2>
+    {% if car_conflicts %}
+      {% for key, cars in car_conflicts.items() %}
+        <p><strong>{{ key }}</strong></p>
+        <ul>
+          {% for car in cars %}
+            <li>
+              <a href="{{ url_for('main.car_detail', car_id=car.id) }}">Car {{ car.id }}</a>
+              {% if car.car_class %} ({{ car.car_class.code }}){% endif %}
+              {% if car.location %} - <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    {% else %}
+      <p class="keyboard-hint">No car ID conflicts detected.</p>
+    {% endif %}
+
+    <h2>DCC ID Conflicts</h2>
+    {% if dcc_conflicts %}
+      {% for dcc_id, cars in dcc_conflicts.items() %}
+        <p><strong>{{ dcc_id }}</strong></p>
+        <ul>
+          {% for car in cars %}
+            <li>
+              <a href="{{ url_for('main.car_detail', car_id=car.id) }}">Car {{ car.id }}</a>
+              {% if car.car_number %} - {{ car.car_number }}{% endif %}
+              {% if car.car_class %} ({{ car.car_class.code }}){% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    {% else %}
+      <p class="keyboard-hint">No DCC ID conflicts detected.</p>
+    {% endif %}
+  </div>
+{% endblock %}

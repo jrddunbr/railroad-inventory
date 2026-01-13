@@ -372,6 +372,32 @@ def repairs_report():
     return render_template("repairs_report.html", cars=repairs, total=len(repairs))
 
 
+@main_bp.route("/reports/conflicts")
+def conflict_report():
+    cars = Car.query.order_by(Car.id.asc()).all()
+    car_key_map = {}
+    dcc_map = {}
+    for car in cars:
+        reporting_mark = (
+            car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "")
+        )
+        car_number = car.car_number or ""
+        if car_number:
+            key = f"{reporting_mark} {car_number}".strip()
+            car_key_map.setdefault(key, []).append(car)
+        if car.dcc_id:
+            dcc_map.setdefault(car.dcc_id, []).append(car)
+
+    car_conflicts = {key: items for key, items in car_key_map.items() if len(items) > 1}
+    dcc_conflicts = {key: items for key, items in dcc_map.items() if len(items) > 1}
+
+    return render_template(
+        "conflicts_report.html",
+        car_conflicts=car_conflicts,
+        dcc_conflicts=dcc_conflicts,
+    )
+
+
 @main_bp.route("/railroads")
 def railroads():
     railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
