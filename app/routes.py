@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
+from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -598,6 +599,98 @@ def railroad_edit(railroad_id: int):
         ensure_db_backup()
         return redirect(url_for("main.railroad_detail", railroad_id=railroad.id))
     return render_template("railroad_form.html", railroad=railroad)
+
+
+@main_bp.route("/tools")
+def tools():
+    return render_template("tools.html")
+
+
+def draw_wrapped_text(draw, text, x, y, max_width, font, line_height) -> None:
+    if not text:
+        return
+    words = text.split()
+    line = []
+    for word in words:
+        test = " ".join(line + [word]).strip()
+        if not test:
+            continue
+        width = draw.textlength(test, font=font)
+        if width <= max_width or not line:
+            line.append(word)
+        else:
+            draw.text((x, y), " ".join(line), fill="#111111", font=font)
+            y += line_height
+            line = [word]
+    if line:
+        draw.text((x, y), " ".join(line), fill="#111111", font=font)
+
+
+def draw_centered_text(draw, text, x, y, width, font) -> None:
+    if not text:
+        return
+    text_width = draw.textlength(text, font=font)
+    draw.text((x + max((width - text_width) / 2, 0), y), text, fill="#111111", font=font)
+
+
+@main_bp.route("/tools/prr-home-shop-repair", methods=["GET", "POST"])
+def prr_home_shop_repair():
+    if request.method == "POST":
+        via = request.form.get("via", "").strip()
+        from_value = request.form.get("from_value", "").strip()
+        date_value = request.form.get("date_value", "").strip()
+        main_defects = request.form.get("main_defects", "").strip()
+        car_initials = request.form.get("car_initials", "").strip()
+        car_number = request.form.get("car_number", "").strip()
+        inspector = request.form.get("inspector", "").strip()
+        responsibility = request.form.get("responsibility", "").strip()
+
+        template_path = os.path.join(current_app.root_path, "static", "tools", "PRR-home-shop-defect.png")
+        image = Image.open(template_path).convert("RGB")
+        draw = ImageDraw.Draw(image)
+        try:
+            font = ImageFont.truetype("DejaVuSans.ttf", size=48)
+        except OSError:
+            font = ImageFont.load_default()
+
+        draw_centered_text(draw, via, 360, 1040, 2500, font)
+        draw_centered_text(draw, from_value, 460, 1225, 1600, font)
+        draw_centered_text(draw, date_value, 2300, 1225, 600, font)
+        draw_centered_text(draw, main_defects, 700, 1395, 2100, font)
+        draw_centered_text(draw, car_initials, 520, 1575, 1000, font)
+        draw_centered_text(draw, car_number, 1400, 1575, 600, font)
+        draw_centered_text(draw, inspector, 2200, 1575, 700, font)
+        draw_centered_text(draw, responsibility, 1250, 1795, 1200, font)
+
+        output = io.BytesIO()
+        image.save(output, format="PNG")
+        output.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        filename = f"prr-home-shop-{timestamp}.png"
+        generated_dir = os.path.join(current_app.root_path, "static", "tools", "generated")
+        os.makedirs(generated_dir, exist_ok=True)
+        output_path = os.path.join(generated_dir, filename)
+        with open(output_path, "wb") as output_file:
+            output_file.write(output.getvalue())
+
+        return render_template(
+            "prr_home_shop_form.html",
+            image_filename=filename,
+            form_data=request.form,
+        )
+
+    return render_template("prr_home_shop_form.html", image_filename=None, form_data={})
+
+
+@main_bp.route("/tools/prr-home-shop-repair/render")
+def prr_home_shop_render():
+    filename = request.args.get("file", "").strip()
+    if not filename:
+        return redirect(url_for("main.prr_home_shop_repair"))
+    image_path = os.path.join(current_app.root_path, "static", "tools", "generated", filename)
+    if not os.path.exists(image_path):
+        return redirect(url_for("main.prr_home_shop_repair"))
+    return render_template("prr_home_shop_render.html", image_filename=filename)
 
 
 @main_bp.route("/car-classes")
