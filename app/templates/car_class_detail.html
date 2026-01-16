@@ -4,7 +4,7 @@
     <h1>Class {{ car_class.code }}</h1>
     <div class="actions">
       <a class="tag" href="{{ url_for('main.car_class_edit', class_id=car_class.id) }}">Edit</a>
-      <form method="post" action="{{ url_for('main.car_class_delete', class_id=car_class.id) }}" onsubmit="return confirm('Delete this class?');">
+      <form method="post" action="{{ url_for('main.car_class_delete', class_id=car_class.id) }}" data-action="delete" data-table="car_classes" data-id="{{ car_class.id }}" data-id-field="id" data-entity-label="class {{ car_class.code }}">
         <button type="submit" class="tag">Delete</button>
       </form>
       <a class="tag" href="{{ url_for('main.car_classes') }}">Back to Classes</a>

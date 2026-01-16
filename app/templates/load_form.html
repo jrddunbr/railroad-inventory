@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>{{ "Edit Load" if load else "New Load" }}</h1>
-    <form method="post" action="{{ url_for('main.load_edit', load_id=load.id) if load else url_for('main.load_new') }}">
+    <form method="post" action="{{ url_for('main.load_edit', load_id=load.id) if load else url_for('main.load_new') }}" data-table="loads" data-id="{{ load.id if load else '' }}" data-id-field="id">
       <div class="grid">
         <div>
           <label for="name">Name</label>

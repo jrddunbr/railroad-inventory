@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>PRR Home Shop Repair Form</h1>
-    <form method="post" action="{{ url_for('main.prr_home_shop_repair') }}">
+    <form method="post" action="{{ url_for('main.prr_home_shop_repair') }}" data-confirm-skip="true">
       <div style="margin-bottom: 12px;">
         <label for="via">Via</label>
         <input id="via" name="via" value="{{ form_data.get('via', '') }}" placeholder="nearest interchange point or junction with owner" />

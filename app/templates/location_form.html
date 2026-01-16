@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>{{ "Edit Location" if location else "New Location" }}</h1>
-    <form method="post" action="{{ url_for('main.location_edit', location_id=location.id) if location else url_for('main.location_new') }}">
+    <form method="post" action="{{ url_for('main.location_edit', location_id=location.id) if location else url_for('main.location_new') }}" data-table="locations" data-id="{{ location.id if location else '' }}" data-id-field="id">
       <div class="grid">
         <div>
           <label for="name">Name</label>

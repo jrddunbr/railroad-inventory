@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>Edit Railroad</h1>
-    <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}" enctype="multipart/form-data">
+    <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}" enctype="multipart/form-data" data-table="railroads" data-id="{{ railroad.id }}" data-id-field="id" data-related-tables="railroad_color_schemes,railroad_logos,railroad_slogans">
       <div class="grid">
         <div>
           <label for="reporting_mark">Reporting Mark</label>

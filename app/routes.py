@@ -1179,9 +1179,11 @@ def apply_load_placement_form(placement: LoadPlacement, form) -> bool:
 
 
 def apply_car_form(car: Car, form) -> None:
+    has_reporting_mark = "reporting_mark" in form
+    has_railroad_name = "railroad_name" in form
     reporting_mark = (
         form.get("reporting_mark", car.railroad.reporting_mark if car.railroad else "").strip()
-        if "reporting_mark" in form
+        if has_reporting_mark
         else None
     )
     if reporting_mark and reporting_mark.lower() in {"none", "null"}:
@@ -1189,13 +1191,13 @@ def apply_car_form(car: Car, form) -> None:
     clear_railroad = form.get("clear_railroad") == "1"
     railroad_name = (
         form.get("railroad_name", car.railroad.name if car.railroad else "").strip()
-        if "railroad_name" in form
+        if has_railroad_name
         else None
     )
-    railroad = None
+    railroad = car.railroad
     if clear_railroad:
         railroad = None
-    elif reporting_mark is not None or railroad_name is not None:
+    elif has_reporting_mark or has_railroad_name:
         if reporting_mark:
             railroad = Railroad.query.filter_by(reporting_mark=reporting_mark).first()
             if not railroad:
@@ -1207,10 +1209,11 @@ def apply_car_form(car: Car, form) -> None:
                 railroad = Railroad(reporting_mark=None, name=railroad_name)
                 db.session.add(railroad)
     car.railroad = railroad
-    if railroad is None:
-        car.reporting_mark_override = reporting_mark or None
-    else:
-        car.reporting_mark_override = None
+    if clear_railroad or has_reporting_mark or has_railroad_name:
+        if railroad is None:
+            car.reporting_mark_override = reporting_mark or None
+        else:
+            car.reporting_mark_override = None
 
     car_type_value = form.get("car_type", "").strip()
     car.car_number = form.get("car_number", "").strip()

@@ -13,6 +13,7 @@
       --mi-accent: #2d5f5d;
       --mi-panel: #ffffff;
       --mi-border: #d6d1c8;
+      --mi-overlay: rgba(34, 34, 34, 0.45);
     }
     body {
       font-family: "IBM Plex Sans", sans-serif;
@@ -104,6 +105,54 @@
       color: #666666;
       margin-top: 8px;
     }
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--mi-overlay);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+    .confirm-dialog {
+      width: min(720px, 92vw);
+      background: var(--mi-panel);
+      border-radius: 16px;
+      border: 1px solid var(--mi-border);
+      box-shadow: 0 24px 60px rgba(34, 34, 34, 0.25);
+      padding: 20px 24px;
+    }
+    .confirm-dialog h2 {
+      margin-top: 0;
+    }
+    .confirm-dialog ul {
+      padding-left: 18px;
+    }
+    .confirm-dialog pre {
+      background: #f7f3ea;
+      border: 1px solid var(--mi-border);
+      border-radius: 8px;
+      padding: 12px;
+      white-space: pre-wrap;
+    }
+    .confirm-details {
+      margin-top: 12px;
+    }
+    .confirm-toggle {
+      background: none;
+      border: none;
+      color: var(--mi-accent);
+      font-weight: 600;
+      cursor: pointer;
+      padding: 0;
+    }
+    .confirm-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 16px;
+    }
     @media (max-width: 900px) {
       .container {
         grid-template-columns: 1fr;
@@ -147,7 +196,337 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <div id="mi-confirm-modal" class="confirm-overlay" style="display: none;" aria-hidden="true">
+    <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="mi-confirm-title">
+      <h2 id="mi-confirm-title">Confirm database change</h2>
+      <p class="keyboard-hint" id="mi-confirm-hint">Press Enter to confirm or Esc to cancel.</p>
+      <ul id="mi-confirm-summary"></ul>
+      <button type="button" class="confirm-toggle" id="mi-confirm-toggle">More details</button>
+      <div class="confirm-details" id="mi-confirm-details" hidden>
+        <pre id="mi-confirm-sql"></pre>
+      </div>
+      <div class="confirm-actions">
+        <button type="button" id="mi-confirm-cancel">Cancel</button>
+        <button type="button" id="mi-confirm-approve">Confirm</button>
+      </div>
+    </div>
+  </div>
   <script>
+    const confirmModal = document.getElementById('mi-confirm-modal');
+    const confirmSummary = document.getElementById('mi-confirm-summary');
+    const confirmToggle = document.getElementById('mi-confirm-toggle');
+    const confirmDetails = document.getElementById('mi-confirm-details');
+    const confirmSql = document.getElementById('mi-confirm-sql');
+    const confirmApprove = document.getElementById('mi-confirm-approve');
+    const confirmCancel = document.getElementById('mi-confirm-cancel');
+    const confirmTitle = document.getElementById('mi-confirm-title');
+    let activeForm = null;
+
+    const escapeSql = (value) => String(value).replace(/'/g, "''");
+    const formatSqlValue = (value) => {
+      if (value === null || value === undefined || value === '') return 'NULL';
+      const trimmed = String(value).trim();
+      if (trimmed === '') return 'NULL';
+      if (!Number.isNaN(Number(trimmed)) && /^-?\d+(\.\d+)?$/.test(trimmed)) {
+        return trimmed;
+      }
+      return `'${escapeSql(trimmed)}'`;
+    };
+
+    const getLabelText = (input) => {
+      if (input.dataset.confirmLabel) return input.dataset.confirmLabel;
+      if (input.id) {
+        const label = document.querySelector(`label[for="${input.id}"]`);
+        if (label) return label.textContent.trim();
+      }
+      return input.name || input.id || 'Field';
+    };
+
+    const getSelectDefaultValue = (select) => {
+      const option = Array.from(select.options).find((opt) => opt.defaultSelected) || select.options[0];
+      return option ? option.value : '';
+    };
+
+    const getSelectDisplay = (select, value) => {
+      const option = Array.from(select.options).find((opt) => opt.value === value) || select.options[select.selectedIndex];
+      if (!option) return value;
+      const label = option.textContent.trim();
+      if (label && label !== value) {
+        return `${label} (${value || '-'})`;
+      }
+      return value || label || '-';
+    };
+
+    const collectChanges = (form) => {
+      const fields = [];
+      const radiosByName = {};
+      const nameCounts = {};
+      const elements = Array.from(form.elements || []);
+      elements.forEach((input) => {
+        if (!input || !input.name) return;
+        if (input.disabled) return;
+        if (input.type === 'submit' || input.type === 'button') return;
+        if (input.type === 'hidden' && !input.dataset.confirmInclude) return;
+        if (input.type === 'radio') {
+          radiosByName[input.name] = radiosByName[input.name] || [];
+          radiosByName[input.name].push(input);
+          return;
+        }
+        let currentValue = '';
+        let defaultValue = '';
+        let displayValue = '';
+        let displayDefault = '';
+        let hasValue = false;
+        if (input.type === 'checkbox') {
+          currentValue = input.checked ? 'checked' : 'unchecked';
+          defaultValue = input.defaultChecked ? 'checked' : 'unchecked';
+          displayValue = currentValue;
+          displayDefault = defaultValue;
+          hasValue = input.checked;
+        } else if (input.type === 'file') {
+          const file = input.files && input.files[0];
+          currentValue = file ? file.name : '';
+          defaultValue = input.defaultValue || '';
+          displayValue = currentValue || '-';
+          displayDefault = defaultValue || '-';
+          hasValue = !!currentValue;
+        } else if (input.tagName === 'SELECT') {
+          currentValue = input.value || '';
+          defaultValue = getSelectDefaultValue(input);
+          displayValue = getSelectDisplay(input, currentValue);
+          displayDefault = getSelectDisplay(input, defaultValue);
+          hasValue = currentValue !== '';
+        } else {
+          currentValue = (input.value || '').trim();
+          defaultValue = (input.defaultValue || '').trim();
+          displayValue = currentValue || '-';
+          displayDefault = defaultValue || '-';
+          hasValue = currentValue !== '';
+        }
+        if (input.dataset.isDefault === 'true' && !currentValue) {
+          return;
+        }
+        const label = getLabelText(input);
+        nameCounts[label] = (nameCounts[label] || 0) + 1;
+        const numberedLabel = nameCounts[label] > 1 ? `${label} (#${nameCounts[label]})` : label;
+        fields.push({
+          name: input.name,
+          label: numberedLabel,
+          currentValue,
+          defaultValue,
+          displayValue,
+          displayDefault,
+          hasValue,
+        });
+      });
+
+      Object.entries(radiosByName).forEach(([name, group]) => {
+        const current = group.find((radio) => radio.checked);
+        const defaults = group.find((radio) => radio.defaultChecked);
+        const currentValue = current ? current.value : '';
+        const defaultValue = defaults ? defaults.value : '';
+        const label = getLabelText(current || group[0]);
+        nameCounts[label] = (nameCounts[label] || 0) + 1;
+        const numberedLabel = nameCounts[label] > 1 ? `${label} (#${nameCounts[label]})` : label;
+        fields.push({
+          name,
+          label: numberedLabel,
+          currentValue,
+          defaultValue,
+          displayValue: currentValue || '-',
+          displayDefault: defaultValue || '-',
+          hasValue: currentValue !== '',
+        });
+      });
+
+      return fields;
+    };
+
+    const buildSqlPreview = (form, action, changes) => {
+      const table = form.dataset.table;
+      if (!table) return '';
+      const idField = form.dataset.idField || 'id';
+      const idValue = form.dataset.id || '';
+      if (action === 'delete') {
+        if (!idValue) return `DELETE FROM ${table} WHERE ${idField} = ?;`;
+        return `DELETE FROM ${table} WHERE ${idField} = ${formatSqlValue(idValue)};`;
+      }
+      const fieldsByName = {};
+      changes.forEach((field) => {
+        fieldsByName[field.name] = field.currentValue;
+      });
+      const updates = Object.entries(fieldsByName)
+        .map(([name, value]) => `${name} = ${formatSqlValue(value)}`)
+        .join(', ');
+      let mainQuery = '';
+      if (action === 'insert') {
+        const columns = Object.keys(fieldsByName);
+        const values = Object.values(fieldsByName).map((value) => formatSqlValue(value));
+        mainQuery = columns.length
+          ? `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});`
+          : `INSERT INTO ${table} (...) VALUES (...);`;
+      } else {
+        if (!idValue) {
+          mainQuery = updates
+            ? `UPDATE ${table} SET ${updates} WHERE ${idField} = ?;`
+            : `UPDATE ${table} SET ... WHERE ${idField} = ?;`;
+        } else {
+          mainQuery = updates
+            ? `UPDATE ${table} SET ${updates} WHERE ${idField} = ${formatSqlValue(idValue)};`
+            : `UPDATE ${table} SET ... WHERE ${idField} = ${formatSqlValue(idValue)};`;
+        }
+      }
+      const relatedTables = (form.dataset.relatedTables || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+      if (!relatedTables.length) return mainQuery;
+      const formData = new FormData(form);
+      const relatedConfig = {
+        railroad_color_schemes: {
+          columns: {
+            description: 'color_scheme_description',
+            start_date: 'color_scheme_start',
+            end_date: 'color_scheme_end',
+            colors: 'color_scheme_colors',
+          },
+        },
+        railroad_logos: {
+          columns: {
+            description: 'logo_description',
+            start_date: 'logo_start',
+            end_date: 'logo_end',
+            image_path: 'logo_existing_path',
+          },
+        },
+        railroad_slogans: {
+          columns: {
+            description: 'slogan_description',
+            slogan_text: 'slogan_text',
+            start_date: 'slogan_start',
+            end_date: 'slogan_end',
+          },
+        },
+      };
+      const relatedQueries = relatedTables.flatMap((related) => {
+        const config = relatedConfig[related];
+        if (!config) return [`UPSERT INTO ${related} (...);`];
+        const columns = Object.keys(config.columns);
+        const fieldNames = Object.values(config.columns);
+        const valuesByField = fieldNames.map((name) =>
+          formData.getAll(name).map((value) => {
+            if (value instanceof File) {
+              return value.name || '';
+            }
+            return String(value || '').trim();
+          })
+        );
+        const rowCount = Math.max(0, ...valuesByField.map((list) => list.length));
+        const rows = [];
+        for (let index = 0; index < rowCount; index += 1) {
+          const rowValues = valuesByField.map((list) => list[index] || '');
+          if (rowValues.every((value) => value === '')) {
+            continue;
+          }
+          rows.push(rowValues);
+        }
+        if (!rows.length) {
+          return [`UPSERT INTO ${related} (${columns.join(', ')}) VALUES (...);`];
+        }
+        const sample = rows[0].map((value) => formatSqlValue(value));
+        const summary = `UPSERT INTO ${related} (${columns.join(', ')}) VALUES (${sample.join(', ')});`;
+        if (rows.length > 1) {
+          return [summary, `-- ${rows.length} row(s) total`];
+        }
+        return [summary];
+      });
+      return [mainQuery, ...relatedQueries].join('\n');
+    };
+
+    const openConfirm = (form) => {
+      const action = form.dataset.action || (form.dataset.mode === 'edit' || form.dataset.id ? 'update' : 'insert');
+      const fields = collectChanges(form);
+      const changes = action === 'update'
+        ? fields.filter((field) => field.currentValue !== field.defaultValue)
+        : fields.filter((field) => field.hasValue);
+      confirmSummary.innerHTML = '';
+      if (action === 'delete') {
+        const label = form.dataset.entityLabel || 'this record';
+        const item = document.createElement('li');
+        item.textContent = `Delete ${label}.`;
+        confirmSummary.appendChild(item);
+      } else if (changes.length) {
+        changes.forEach((change) => {
+          const item = document.createElement('li');
+          if (action === 'insert') {
+            item.textContent = `${change.label}: ${change.displayValue}`;
+          } else {
+            item.textContent = `${change.label}: ${change.displayDefault} -> ${change.displayValue}`;
+          }
+          confirmSummary.appendChild(item);
+        });
+      } else {
+        const item = document.createElement('li');
+        item.textContent = 'No field changes detected.';
+        confirmSummary.appendChild(item);
+      }
+      confirmTitle.textContent = action === 'delete' ? 'Confirm deletion' : 'Confirm database change';
+      confirmDetails.hidden = true;
+      confirmToggle.textContent = 'More details';
+      confirmSql.textContent = buildSqlPreview(form, action, changes);
+      confirmModal.style.display = 'flex';
+      confirmModal.setAttribute('aria-hidden', 'false');
+      confirmApprove.focus();
+    };
+
+    const closeConfirm = (clearActive = true) => {
+      confirmModal.style.display = 'none';
+      confirmModal.setAttribute('aria-hidden', 'true');
+      if (clearActive) {
+        activeForm = null;
+      }
+    };
+
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.tagName !== 'FORM') return;
+      if (form.dataset.confirmSkip) return;
+      const method = (form.method || '').toLowerCase();
+      if (method !== 'post') return;
+      if (form.dataset.confirmed === 'true') return;
+      event.preventDefault();
+      activeForm = form;
+      openConfirm(form);
+    });
+
+    confirmToggle?.addEventListener('click', () => {
+      const nextState = confirmDetails.hidden;
+      confirmDetails.hidden = !nextState;
+      confirmToggle.textContent = nextState ? 'Hide details' : 'More details';
+    });
+
+    confirmApprove?.addEventListener('click', () => {
+      if (!activeForm) return;
+      const formToSubmit = activeForm;
+      formToSubmit.dataset.confirmed = 'true';
+      closeConfirm(false);
+      formToSubmit.submit();
+      activeForm = null;
+    });
+
+    confirmCancel?.addEventListener('click', closeConfirm);
+
+    document.addEventListener('keydown', (event) => {
+      if (!activeForm || confirmModal.getAttribute('aria-hidden') === 'true') return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeConfirm();
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        confirmApprove.click();
+      }
+    });
   </script>
 </body>
 </html>

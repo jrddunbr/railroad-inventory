@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>{{ 'Edit Car' if car else 'Add New Car' }}</h1>
-    <form method="post" action="{{ form_action }}" data-mode="{{ 'edit' if car else 'new' }}">
+    <form method="post" action="{{ form_action }}" data-mode="{{ 'edit' if car else 'new' }}" data-table="cars" data-id="{{ car.id if car else '' }}" data-id-field="id">
       <div class="panel" style="margin-bottom: 16px;">
         <h2>Location</h2>
         <div class="grid">
@@ -32,7 +32,7 @@
           {% if car and car.railroad %}
           <div>
             <label>&nbsp;</label>
-            <input type="hidden" id="clear_railroad" name="clear_railroad" value="0" />
+            <input type="hidden" id="clear_railroad" name="clear_railroad" value="0" data-confirm-include="true" data-confirm-label="Remove Railroad" />
             <button type="button" class="tag" id="remove-railroad">Remove Railroad</button>
           </div>
           {% endif %}
@@ -198,7 +198,13 @@
       removeRailroadButton.addEventListener('click', () => {
         const flag = document.getElementById('clear_railroad');
         if (flag) flag.value = '1';
-        removeRailroadButton.closest('form')?.submit();
+        const form = removeRailroadButton.closest('form');
+        if (!form) return;
+        if (form.requestSubmit) {
+          form.requestSubmit();
+        } else {
+          form.submit();
+        }
       });
     }
     const classFields = {
