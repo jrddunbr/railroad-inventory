@@ -3,9 +3,9 @@
 This document describes the current database schema and common alternate names used in the project or source data.
 
 ## Schema Version
-- Table: `schema_version`
+- Document: `_id` `schema_version`
 - Fields:
-  - `id` (integer, primary key)
+  - `type` = `schema_version`
   - `version` (string)
 
 ## Railroads (`railroads`)

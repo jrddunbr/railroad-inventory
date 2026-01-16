@@ -1,239 +1,362 @@
 from __future__ import annotations
 
-from app import db
+from dataclasses import dataclass, field
+
+from app.storage import BaseModel, QueryDescriptor
 
 
-class Railroad(db.Model):
-    __tablename__ = "railroads"
+@dataclass
+class Railroad(BaseModel):
+    doc_type = "railroad"
+    counter_key = "railroads"
+    query = QueryDescriptor()
 
-    id = db.Column(db.Integer, primary_key=True)
-    reporting_mark = db.Column(db.String(16), unique=True)
-    name = db.Column(db.String(128), nullable=False)
-    start_date = db.Column(db.String(32))
-    end_date = db.Column(db.String(32))
-    merged_into = db.Column(db.String(128))
-    merged_from = db.Column(db.String(128))
-    notes = db.Column(db.Text)
-    representative_logo_id = db.Column(db.Integer, db.ForeignKey("railroad_logos.id"))
+    reporting_mark: str | None = None
+    name: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    merged_into: str | None = None
+    merged_from: str | None = None
+    notes: str | None = None
+    representative_logo_id: int | None = None
 
-    cars = db.relationship("Car", back_populates="railroad")
-    color_schemes = db.relationship(
-        "RailroadColorScheme",
-        back_populates="railroad",
-        cascade="all, delete-orphan",
-    )
-    logos = db.relationship(
-        "RailroadLogo",
-        back_populates="railroad",
-        cascade="all, delete-orphan",
-        foreign_keys="RailroadLogo.railroad_id",
-    )
-    slogans = db.relationship(
-        "RailroadSlogan",
-        back_populates="railroad",
-        cascade="all, delete-orphan",
-    )
-    representative_logo = db.relationship(
-        "RailroadLogo",
-        foreign_keys=[representative_logo_id],
-        uselist=False,
-    )
+    @property
+    def cars(self) -> list[Car]:
+        if not self._store:
+            return []
+        return self._store.filter_by(Car, railroad_id=self.id)
 
-    def __repr__(self) -> str:
-        return f"<Railroad {self.reporting_mark}>"
+    @property
+    def color_schemes(self) -> list[RailroadColorScheme]:
+        if not self._store:
+            return []
+        return self._store.filter_by(RailroadColorScheme, railroad_id=self.id)
 
+    @property
+    def logos(self) -> list[RailroadLogo]:
+        if not self._store:
+            return []
+        return self._store.filter_by(RailroadLogo, railroad_id=self.id)
 
-class CarClass(db.Model):
-    __tablename__ = "car_classes"
+    @property
+    def slogans(self) -> list[RailroadSlogan]:
+        if not self._store:
+            return []
+        return self._store.filter_by(RailroadSlogan, railroad_id=self.id)
 
-    id = db.Column(db.Integer, primary_key=True)
-    code = db.Column(db.String(32), unique=True, nullable=False)
-    car_type = db.Column(db.String(64))
-    wheel_arrangement = db.Column(db.String(32))
-    tender_axles = db.Column(db.String(32))
-    is_locomotive = db.Column(db.Boolean)
-    era = db.Column(db.String(64))
-    load_limit = db.Column(db.String(32))
-    capacity = db.Column(db.String(64))
-    weight = db.Column(db.String(64))
-    notes = db.Column(db.Text)
-    internal_length = db.Column(db.String(32))
-    internal_width = db.Column(db.String(32))
-    internal_height = db.Column(db.String(32))
-
-    cars = db.relationship("Car", back_populates="car_class")
-    loads = db.relationship("LoadType", back_populates="car_class")
-
-    def __repr__(self) -> str:
-        return f"<CarClass {self.code}>"
+    @property
+    def representative_logo(self) -> RailroadLogo | None:
+        if not self._store or not self.representative_logo_id:
+            return None
+        return self._store.get(RailroadLogo, self.representative_logo_id)
 
 
-class Location(db.Model):
-    __tablename__ = "locations"
+@dataclass
+class CarClass(BaseModel):
+    doc_type = "car_class"
+    counter_key = "car_classes"
+    query = QueryDescriptor()
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64), unique=True, nullable=False)
-    location_type = db.Column(db.String(16), nullable=False)
-    parent_id = db.Column(db.Integer, db.ForeignKey("locations.id"))
+    code: str | None = None
+    car_type: str | None = None
+    wheel_arrangement: str | None = None
+    tender_axles: str | None = None
+    is_locomotive: bool | None = None
+    era: str | None = None
+    load_limit: str | None = None
+    capacity: str | None = None
+    weight: str | None = None
+    notes: str | None = None
+    internal_length: str | None = None
+    internal_width: str | None = None
+    internal_height: str | None = None
 
-    parent = db.relationship("Location", remote_side=[id], backref="children")
-    cars = db.relationship("Car", back_populates="location")
-    load_placements = db.relationship(
-        "LoadPlacement",
-        back_populates="location",
-        cascade="all, delete-orphan",
-    )
+    @property
+    def cars(self) -> list[Car]:
+        if not self._store:
+            return []
+        return self._store.filter_by(Car, car_class_id=self.id)
 
-    def __repr__(self) -> str:
-        return f"<Location {self.name} ({self.location_type})>"
-
-
-class Car(db.Model):
-    __tablename__ = "cars"
-
-    id = db.Column(db.Integer, primary_key=True)
-    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"))
-    car_class_id = db.Column(db.Integer, db.ForeignKey("car_classes.id"))
-    location_id = db.Column(db.Integer, db.ForeignKey("locations.id"))
-
-    car_number = db.Column(db.String(32))
-    reporting_mark_override = db.Column(db.String(16))
-    brand = db.Column(db.String(128))
-    upc = db.Column(db.String(32))
-    dcc_id = db.Column(db.String(32))
-    traction_drivers = db.Column(db.Boolean)
-    car_type_override = db.Column(db.String(64))
-    wheel_arrangement_override = db.Column(db.String(32))
-    tender_axles_override = db.Column(db.String(32))
-    is_locomotive_override = db.Column(db.Boolean)
-    capacity_override = db.Column(db.String(64))
-    weight_override = db.Column(db.String(64))
-    load_limit_override = db.Column(db.String(64))
-    built = db.Column(db.String(64))
-    alt_date = db.Column(db.String(64))
-    reweight_date = db.Column(db.String(64))
-    repack_bearings_date = db.Column(db.String(64))
-    other_lettering = db.Column(db.String(128))
-    msrp = db.Column(db.String(32))
-    price = db.Column(db.String(32))
-    load = db.Column(db.String(64))
-    repairs_required = db.Column(db.String(64))
-    notes = db.Column(db.Text)
-    internal_length_override = db.Column(db.String(32))
-    internal_width_override = db.Column(db.String(32))
-    internal_height_override = db.Column(db.String(32))
-
-    railroad = db.relationship("Railroad", back_populates="cars")
-    car_class = db.relationship("CarClass", back_populates="cars")
-    location = db.relationship("Location", back_populates="cars")
-    load_placements = db.relationship(
-        "LoadPlacement",
-        back_populates="car",
-        cascade="all, delete-orphan",
-    )
-
-    def __repr__(self) -> str:
-        return f"<Car {self.car_number}>"
+    @property
+    def loads(self) -> list[LoadType]:
+        if not self._store:
+            return []
+        return self._store.filter_by(LoadType, car_class_id=self.id)
 
 
-class SchemaVersion(db.Model):
-    __tablename__ = "schema_version"
+@dataclass
+class Location(BaseModel):
+    doc_type = "location"
+    counter_key = "locations"
+    query = QueryDescriptor()
 
-    id = db.Column(db.Integer, primary_key=True)
-    version = db.Column(db.String(32), nullable=False)
+    name: str | None = None
+    location_type: str | None = None
+    parent_id: int | None = None
+    _parent_ref: Location | None = field(default=None, repr=False, compare=False)
 
+    @property
+    def parent(self) -> Location | None:
+        if self._parent_ref is not None:
+            return self._parent_ref
+        if not self._store or not self.parent_id:
+            return None
+        return self._store.get(Location, self.parent_id)
 
-class RailroadColorScheme(db.Model):
-    __tablename__ = "railroad_color_schemes"
+    @parent.setter
+    def parent(self, value: Location | None) -> None:
+        self._parent_ref = value
+        self.parent_id = value.id if value else None
 
-    id = db.Column(db.Integer, primary_key=True)
-    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
-    description = db.Column(db.String(128), nullable=False)
-    start_date = db.Column(db.String(32))
-    end_date = db.Column(db.String(32))
-    colors = db.Column(db.String(256))
+    @property
+    def children(self) -> list[Location]:
+        if not self._store:
+            return []
+        return self._store.filter_by(Location, parent_id=self.id)
 
-    railroad = db.relationship("Railroad", back_populates="color_schemes")
+    @property
+    def cars(self) -> list[Car]:
+        if not self._store:
+            return []
+        return self._store.filter_by(Car, location_id=self.id)
 
-    def __repr__(self) -> str:
-        return f"<RailroadColorScheme {self.description}>"
-
-
-class RailroadLogo(db.Model):
-    __tablename__ = "railroad_logos"
-
-    id = db.Column(db.Integer, primary_key=True)
-    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
-    description = db.Column(db.String(128))
-    start_date = db.Column(db.String(32))
-    end_date = db.Column(db.String(32))
-    image_path = db.Column(db.String(256))
-
-    railroad = db.relationship("Railroad", back_populates="logos", foreign_keys=[railroad_id])
-
-    def __repr__(self) -> str:
-        return f"<RailroadLogo {self.description}>"
-
-
-class RailroadSlogan(db.Model):
-    __tablename__ = "railroad_slogans"
-
-    id = db.Column(db.Integer, primary_key=True)
-    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"), nullable=False)
-    description = db.Column(db.String(128))
-    slogan_text = db.Column(db.String(256))
-    start_date = db.Column(db.String(32))
-    end_date = db.Column(db.String(32))
-
-    railroad = db.relationship("Railroad", back_populates="slogans")
-
-    def __repr__(self) -> str:
-        return f"<RailroadSlogan {self.description}>"
+    @property
+    def load_placements(self) -> list[LoadPlacement]:
+        if not self._store:
+            return []
+        return self._store.filter_by(LoadPlacement, location_id=self.id)
 
 
-class LoadType(db.Model):
-    __tablename__ = "loads"
+@dataclass
+class Car(BaseModel):
+    doc_type = "car"
+    counter_key = "cars"
+    query = QueryDescriptor()
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(128), nullable=False)
-    car_class_id = db.Column(db.Integer, db.ForeignKey("car_classes.id"))
-    railroad_id = db.Column(db.Integer, db.ForeignKey("railroads.id"))
-    era = db.Column(db.String(64))
-    brand = db.Column(db.String(128))
-    lettering = db.Column(db.String(128))
-    msrp = db.Column(db.String(32))
-    price = db.Column(db.String(32))
-    upc = db.Column(db.String(32))
-    length = db.Column(db.String(32))
-    width = db.Column(db.String(32))
-    height = db.Column(db.String(32))
-    repairs_required = db.Column(db.String(64))
-    notes = db.Column(db.Text)
+    railroad_id: int | None = None
+    car_class_id: int | None = None
+    location_id: int | None = None
 
-    car_class = db.relationship("CarClass", back_populates="loads")
-    railroad = db.relationship("Railroad")
-    placements = db.relationship(
-        "LoadPlacement",
-        back_populates="load",
-        cascade="all, delete-orphan",
-    )
+    car_number: str | None = None
+    reporting_mark_override: str | None = None
+    brand: str | None = None
+    upc: str | None = None
+    dcc_id: str | None = None
+    traction_drivers: bool | None = None
+    car_type_override: str | None = None
+    wheel_arrangement_override: str | None = None
+    tender_axles_override: str | None = None
+    is_locomotive_override: bool | None = None
+    capacity_override: str | None = None
+    weight_override: str | None = None
+    load_limit_override: str | None = None
+    built: str | None = None
+    alt_date: str | None = None
+    reweight_date: str | None = None
+    repack_bearings_date: str | None = None
+    other_lettering: str | None = None
+    msrp: str | None = None
+    price: str | None = None
+    load: str | None = None
+    repairs_required: str | None = None
+    notes: str | None = None
+    internal_length_override: str | None = None
+    internal_width_override: str | None = None
+    internal_height_override: str | None = None
 
-    def __repr__(self) -> str:
-        return f"<LoadType {self.name}>"
+    _railroad_ref: Railroad | None = field(default=None, repr=False, compare=False)
+    _car_class_ref: CarClass | None = field(default=None, repr=False, compare=False)
+    _location_ref: Location | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def railroad(self) -> Railroad | None:
+        if self._railroad_ref is not None:
+            return self._railroad_ref
+        if not self._store or not self.railroad_id:
+            return None
+        return self._store.get(Railroad, self.railroad_id)
+
+    @railroad.setter
+    def railroad(self, value: Railroad | None) -> None:
+        self._railroad_ref = value
+        self.railroad_id = value.id if value else None
+
+    @property
+    def car_class(self) -> CarClass | None:
+        if self._car_class_ref is not None:
+            return self._car_class_ref
+        if not self._store or not self.car_class_id:
+            return None
+        return self._store.get(CarClass, self.car_class_id)
+
+    @car_class.setter
+    def car_class(self, value: CarClass | None) -> None:
+        self._car_class_ref = value
+        self.car_class_id = value.id if value else None
+
+    @property
+    def location(self) -> Location | None:
+        if self._location_ref is not None:
+            return self._location_ref
+        if not self._store or not self.location_id:
+            return None
+        return self._store.get(Location, self.location_id)
+
+    @location.setter
+    def location(self, value: Location | None) -> None:
+        self._location_ref = value
+        self.location_id = value.id if value else None
+
+    @property
+    def load_placements(self) -> list[LoadPlacement]:
+        if not self._store:
+            return []
+        return self._store.filter_by(LoadPlacement, car_id=self.id)
+
+    def prepare_save(self) -> None:
+        if self._railroad_ref and not self.railroad_id and self._railroad_ref.id:
+            self.railroad_id = self._railroad_ref.id
+        if self._car_class_ref and not self.car_class_id and self._car_class_ref.id:
+            self.car_class_id = self._car_class_ref.id
+        if self._location_ref and not self.location_id and self._location_ref.id:
+            self.location_id = self._location_ref.id
 
 
-class LoadPlacement(db.Model):
-    __tablename__ = "load_placements"
+@dataclass
+class RailroadColorScheme(BaseModel):
+    doc_type = "railroad_color_scheme"
+    counter_key = "railroad_color_schemes"
+    query = QueryDescriptor()
 
-    id = db.Column(db.Integer, primary_key=True)
-    load_id = db.Column(db.Integer, db.ForeignKey("loads.id"), nullable=False)
-    car_id = db.Column(db.Integer, db.ForeignKey("cars.id"))
-    location_id = db.Column(db.Integer, db.ForeignKey("locations.id"))
-    quantity = db.Column(db.Integer, nullable=False, default=1)
+    railroad_id: int | None = None
+    description: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    colors: str | None = None
 
-    load = db.relationship("LoadType", back_populates="placements")
-    car = db.relationship("Car", back_populates="load_placements")
-    location = db.relationship("Location", back_populates="load_placements")
+    @property
+    def railroad(self) -> Railroad | None:
+        if not self._store or not self.railroad_id:
+            return None
+        return self._store.get(Railroad, self.railroad_id)
 
-    def __repr__(self) -> str:
-        return f"<LoadPlacement {self.load_id} qty={self.quantity}>"
+
+@dataclass
+class RailroadLogo(BaseModel):
+    doc_type = "railroad_logo"
+    counter_key = "railroad_logos"
+    query = QueryDescriptor()
+
+    railroad_id: int | None = None
+    description: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    image_path: str | None = None
+
+    @property
+    def railroad(self) -> Railroad | None:
+        if not self._store or not self.railroad_id:
+            return None
+        return self._store.get(Railroad, self.railroad_id)
+
+
+@dataclass
+class RailroadSlogan(BaseModel):
+    doc_type = "railroad_slogan"
+    counter_key = "railroad_slogans"
+    query = QueryDescriptor()
+
+    railroad_id: int | None = None
+    description: str | None = None
+    slogan_text: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+
+    @property
+    def railroad(self) -> Railroad | None:
+        if not self._store or not self.railroad_id:
+            return None
+        return self._store.get(Railroad, self.railroad_id)
+
+
+@dataclass
+class LoadType(BaseModel):
+    doc_type = "load"
+    counter_key = "loads"
+    query = QueryDescriptor()
+
+    name: str | None = None
+    car_class_id: int | None = None
+    railroad_id: int | None = None
+    era: str | None = None
+    brand: str | None = None
+    lettering: str | None = None
+    msrp: str | None = None
+    price: str | None = None
+    upc: str | None = None
+    length: str | None = None
+    width: str | None = None
+    height: str | None = None
+    repairs_required: str | None = None
+    notes: str | None = None
+
+    @property
+    def car_class(self) -> CarClass | None:
+        if not self._store or not self.car_class_id:
+            return None
+        return self._store.get(CarClass, self.car_class_id)
+
+    @property
+    def railroad(self) -> Railroad | None:
+        if not self._store or not self.railroad_id:
+            return None
+        return self._store.get(Railroad, self.railroad_id)
+
+    @property
+    def placements(self) -> list[LoadPlacement]:
+        if not self._store:
+            return []
+        return self._store.filter_by(LoadPlacement, load_id=self.id)
+
+
+@dataclass
+class LoadPlacement(BaseModel):
+    doc_type = "load_placement"
+    counter_key = "load_placements"
+    query = QueryDescriptor()
+
+    load_id: int | None = None
+    car_id: int | None = None
+    location_id: int | None = None
+    quantity: int = 1
+
+    @property
+    def load(self) -> LoadType | None:
+        if not self._store or not self.load_id:
+            return None
+        return self._store.get(LoadType, self.load_id)
+
+    @property
+    def car(self) -> Car | None:
+        if not self._store or not self.car_id:
+            return None
+        return self._store.get(Car, self.car_id)
+
+    @property
+    def location(self) -> Location | None:
+        if not self._store or not self.location_id:
+            return None
+        return self._store.get(Location, self.location_id)
+
+
+__all__ = [
+    "Car",
+    "CarClass",
+    "LoadPlacement",
+    "LoadType",
+    "Location",
+    "Railroad",
+    "RailroadColorScheme",
+    "RailroadLogo",
+    "RailroadSlogan",
+]

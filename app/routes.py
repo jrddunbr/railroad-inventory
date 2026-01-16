@@ -4,9 +4,7 @@ import csv
 import io
 import os
 import re
-import shutil
-from datetime import datetime, timedelta
-from pathlib import Path
+from datetime import datetime
 from typing import Optional
 
 from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
@@ -29,40 +27,10 @@ from app.models import (
 
 main_bp = Blueprint("main", __name__)
 
-BACKUP_INTERVAL = timedelta(minutes=15)
-BACKUP_MAX_BYTES = 100 * 1024 * 1024
 
 
 def ensure_db_backup() -> None:
-    db_path = current_app.config.get("DB_PATH")
-    if not db_path:
-        return
-    db_file = Path(db_path)
-    if not db_file.exists():
-        return
-
-    backup_dir = db_file.parent
-    backups = sorted(backup_dir.glob("inventory-backup-*.db"), key=lambda path: path.stat().st_mtime)
-    last_backup = backups[-1] if backups else None
-    now = datetime.now()
-    if last_backup:
-        last_backup_time = datetime.fromtimestamp(last_backup.stat().st_mtime)
-        if now - last_backup_time < BACKUP_INTERVAL:
-            return
-        if db_file.stat().st_mtime <= last_backup.stat().st_mtime:
-            return
-
-    backup_name = f"inventory-backup-{now.strftime('%Y%m%d-%H%M%S')}.db"
-    backup_path = backup_dir / backup_name
-    shutil.copy2(db_file, backup_path)
-    backups.append(backup_path)
-
-    total_size = sum(path.stat().st_size for path in backups)
-    while total_size > BACKUP_MAX_BYTES and backups:
-        oldest = backups.pop(0)
-        if oldest.exists():
-            total_size -= oldest.stat().st_size
-            oldest.unlink()
+    return
 
 
 def get_or_create_location(name: str) -> Optional[Location]:
@@ -121,7 +89,7 @@ def index():
 
 @main_bp.route("/inventory")
 def inventory():
-    cars = Car.query.order_by(Car.id.desc()).all()
+    cars = Car.query.order_by("id", reverse=True).all()
     return render_template("inventory.html", cars=cars)
 
 
@@ -132,7 +100,7 @@ def reports():
 
 @main_bp.route("/inventory/export")
 def inventory_export():
-    cars = Car.query.order_by(Car.id.asc()).all()
+    cars = Car.query.order_by("id").all()
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(
@@ -208,7 +176,7 @@ def inventory_export():
 
 @main_bp.route("/reports/locomotive-dcc-export")
 def locomotive_dcc_export():
-    cars = Car.query.order_by(Car.id.asc()).all()
+    cars = Car.query.order_by("id").all()
     locomotive_cars = []
     for car in cars:
         class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
@@ -260,7 +228,7 @@ def era_histogram():
         mode = "car"
 
     current_year = datetime.now().year
-    cars = Car.query.order_by(Car.id.asc()).all()
+    cars = Car.query.order_by("id").all()
     decade_counts: dict[int, int] = {}
     class_seen: dict[int, set[int]] = {}
     for car in cars:
@@ -312,8 +280,8 @@ def era_histogram():
 @main_bp.route("/reports/introduction-years")
 def introduction_years():
     current_year = datetime.now().year
-    classes = CarClass.query.order_by(CarClass.code).all()
-    cars = Car.query.order_by(Car.id.asc()).all()
+    classes = CarClass.query.order_by("code").all()
+    cars = Car.query.order_by("id").all()
 
     class_by_year: dict[int, list[CarClass]] = {}
     for car_class in classes:
@@ -365,7 +333,7 @@ def introduction_years():
 
 @main_bp.route("/reports/repairs")
 def repairs_report():
-    cars = Car.query.order_by(Car.id.asc()).all()
+    cars = Car.query.order_by("id").all()
     repairs = []
     for car in cars:
         if car.repairs_required and car.repairs_required.strip():
@@ -375,7 +343,7 @@ def repairs_report():
 
 @main_bp.route("/reports/conflicts")
 def conflict_report():
-    cars = Car.query.order_by(Car.id.asc()).all()
+    cars = Car.query.order_by("id").all()
     car_key_map = {}
     dcc_map = {}
     for car in cars:
@@ -401,13 +369,13 @@ def conflict_report():
 
 @main_bp.route("/railroads")
 def railroads():
-    railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
+    railroads = Railroad.query.order_by("reporting_mark").all()
     return render_template("railroads.html", railroads=railroads)
 
 
 @main_bp.route("/locations")
 def locations():
-    locations = Location.query.order_by(Location.name).all()
+    locations = Location.query.order_by("name").all()
     return render_template("locations.html", locations=locations)
 
 
@@ -423,7 +391,7 @@ def location_new():
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.location_detail", location_id=location.id))
-    locations = Location.query.order_by(Location.name).all()
+    locations = Location.query.order_by("name").all()
     location_types = current_app.config.get("LOCATION_TYPES", [])
     return render_template(
         "location_form.html",
@@ -437,7 +405,7 @@ def location_new():
 @main_bp.route("/railroads/<int:railroad_id>")
 def railroad_detail(railroad_id: int):
     railroad = Railroad.query.get_or_404(railroad_id)
-    cars = Car.query.filter_by(railroad_id=railroad.id).order_by(Car.id.desc()).all()
+    cars = Car.query.filter_by(railroad_id=railroad.id).order_by("id", reverse=True).all()
     return render_template("railroad_detail.html", railroad=railroad, cars=cars)
 
 
@@ -499,7 +467,8 @@ def railroad_edit(railroad_id: int):
             if scheme_id not in kept_scheme_ids:
                 db.session.delete(scheme)
         for scheme in new_schemes:
-            railroad.color_schemes.append(scheme)
+            scheme.railroad_id = railroad.id
+            db.session.add(scheme)
 
         logo_ids = request.form.getlist("logo_id")
         logo_descriptions = request.form.getlist("logo_description")
@@ -530,8 +499,8 @@ def railroad_edit(railroad_id: int):
             new_path = save_logo_file(file_storage, railroad.id)
             logo = existing_logos.get(logo_id) if logo_id else None
             if not logo:
-                logo = RailroadLogo()
-                railroad.logos.append(logo)
+                logo = RailroadLogo(railroad_id=railroad.id)
+                db.session.add(logo)
             logo.description = description
             logo.start_date = start_date or None
             logo.end_date = end_date or None
@@ -586,7 +555,8 @@ def railroad_edit(railroad_id: int):
             if slogan_id not in kept_slogan_ids:
                 db.session.delete(slogan)
         for slogan in new_slogans:
-            railroad.slogans.append(slogan)
+            slogan.railroad_id = railroad.id
+            db.session.add(slogan)
 
         db.session.flush()
         if representative_index.isdigit():
@@ -695,7 +665,7 @@ def prr_home_shop_render():
 
 @main_bp.route("/car-classes")
 def car_classes():
-    classes = CarClass.query.order_by(CarClass.code).all()
+    classes = CarClass.query.order_by("code").all()
     car_classes = [c for c in classes if not c.is_locomotive]
     locomotive_classes = [c for c in classes if c.is_locomotive]
     return render_template("car_classes.html", car_classes=car_classes)
@@ -703,21 +673,21 @@ def car_classes():
 
 @main_bp.route("/locomotive-classes")
 def locomotive_classes():
-    classes = CarClass.query.order_by(CarClass.code).all()
+    classes = CarClass.query.order_by("code").all()
     locomotive_classes = [c for c in classes if c.is_locomotive]
     return render_template("locomotive_classes.html", locomotive_classes=locomotive_classes)
 
 
 @main_bp.route("/loads")
 def loads():
-    loads = LoadType.query.order_by(LoadType.name).all()
+    loads = LoadType.query.order_by("name").all()
     return render_template("loads.html", loads=loads)
 
 
 @main_bp.route("/loads/new", methods=["GET", "POST"])
 def load_new():
-    classes = CarClass.query.order_by(CarClass.code).all()
-    railroads = Railroad.query.order_by(Railroad.name).all()
+    classes = CarClass.query.order_by("code").all()
+    railroads = Railroad.query.order_by("name").all()
     if request.method == "POST":
         load = LoadType(name=request.form.get("name", "").strip())
         apply_load_form(load, request.form)
@@ -738,8 +708,8 @@ def load_detail(load_id: int):
 @main_bp.route("/loads/<int:load_id>/edit", methods=["GET", "POST"])
 def load_edit(load_id: int):
     load = LoadType.query.get_or_404(load_id)
-    classes = CarClass.query.order_by(CarClass.code).all()
-    railroads = Railroad.query.order_by(Railroad.name).all()
+    classes = CarClass.query.order_by("code").all()
+    railroads = Railroad.query.order_by("name").all()
     if request.method == "POST":
         load.name = request.form.get("name", "").strip()
         apply_load_form(load, request.form)
@@ -761,8 +731,8 @@ def load_delete(load_id: int):
 @main_bp.route("/loads/<int:load_id>/placements/new", methods=["GET", "POST"])
 def load_placement_new(load_id: int):
     load = LoadType.query.get_or_404(load_id)
-    cars = Car.query.order_by(Car.id.desc()).all()
-    locations = Location.query.order_by(Location.name).all()
+    cars = Car.query.order_by("id", reverse=True).all()
+    locations = Location.query.order_by("name").all()
     if request.method == "POST":
         placement = LoadPlacement(load=load)
         if not apply_load_placement_form(placement, request.form):
@@ -784,9 +754,9 @@ def load_placement_new(load_id: int):
 
 @main_bp.route("/load-placements/new", methods=["GET", "POST"])
 def load_placement_new_generic():
-    loads = LoadType.query.order_by(LoadType.name).all()
-    cars = Car.query.order_by(Car.id.desc()).all()
-    locations = Location.query.order_by(Location.name).all()
+    loads = LoadType.query.order_by("name").all()
+    cars = Car.query.order_by("id", reverse=True).all()
+    locations = Location.query.order_by("name").all()
     if request.method == "POST":
         load_id = request.form.get("load_id", "").strip()
         if not load_id.isdigit():
@@ -814,8 +784,8 @@ def load_placement_new_generic():
 @main_bp.route("/load-placements/<int:placement_id>/edit", methods=["GET", "POST"])
 def load_placement_edit(placement_id: int):
     placement = LoadPlacement.query.get_or_404(placement_id)
-    cars = Car.query.order_by(Car.id.desc()).all()
-    locations = Location.query.order_by(Location.name).all()
+    cars = Car.query.order_by("id", reverse=True).all()
+    locations = Location.query.order_by("name").all()
     if request.method == "POST":
         if not apply_load_placement_form(placement, request.form):
             return "Select a car or location for this load placement.", 400
@@ -846,7 +816,7 @@ def load_placement_delete(placement_id: int):
 @main_bp.route("/car-classes/<int:class_id>")
 def car_class_detail(class_id: int):
     car_class = CarClass.query.get_or_404(class_id)
-    cars = Car.query.filter_by(car_class_id=car_class.id).order_by(Car.id.desc()).all()
+    cars = Car.query.filter_by(car_class_id=car_class.id).order_by("id", reverse=True).all()
     return render_template("car_class_detail.html", car_class=car_class, cars=cars)
 
 
@@ -887,7 +857,7 @@ def car_class_edit(class_id: int):
 @main_bp.route("/locations/<int:location_id>")
 def location_detail(location_id: int):
     location = Location.query.get_or_404(location_id)
-    cars = Car.query.filter_by(location_id=location.id).order_by(Car.id.desc()).all()
+    cars = Car.query.filter_by(location_id=location.id).order_by("id", reverse=True).all()
     return render_template("location_detail.html", location=location, cars=cars)
 
 
@@ -921,7 +891,7 @@ def location_edit(location_id: int):
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.location_detail", location_id=location.id))
-    locations = Location.query.order_by(Location.name).all()
+    locations = Location.query.order_by("name").all()
     location_types = current_app.config.get("LOCATION_TYPES", [])
     return render_template(
         "location_form.html",
@@ -965,7 +935,7 @@ def car_by_number():
     number = request.args.get("number", "").strip()
     if not number:
         return redirect(url_for("main.inventory"))
-    cars = Car.query.filter_by(car_number=number).order_by(Car.id.desc()).all()
+    cars = Car.query.filter_by(car_number=number).order_by("id", reverse=True).all()
     if len(cars) == 1:
         return redirect(url_for("main.car_detail", car_id=cars[0].id))
     return render_template("car_number_list.html", number=number, cars=cars)
@@ -979,9 +949,9 @@ def car_edit(car_id: int):
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.car_detail", car_id=car.id))
-    railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
-    classes = CarClass.query.order_by(CarClass.code).all()
-    locations = Location.query.order_by(Location.name).all()
+    railroads = Railroad.query.order_by("reporting_mark").all()
+    classes = CarClass.query.order_by("code").all()
+    locations = Location.query.order_by("name").all()
     return render_template(
         "car_form.html",
         car=car,
@@ -1015,9 +985,9 @@ def car_new():
         "price": request.args.get("price", "").strip(),
         "msrp": request.args.get("msrp", "").strip(),
     }
-    railroads = Railroad.query.order_by(Railroad.reporting_mark).all()
-    classes = CarClass.query.order_by(CarClass.code).all()
-    locations = Location.query.order_by(Location.name).all()
+    railroads = Railroad.query.order_by("reporting_mark").all()
+    classes = CarClass.query.order_by("code").all()
+    locations = Location.query.order_by("name").all()
     return render_template(
         "car_form.html",
         car=None,
@@ -1032,29 +1002,7 @@ def car_new():
 @main_bp.route("/search")
 def search():
     query = request.args.get("q", "").strip()
-    cars = []
-    if query:
-        like = f"%{query}%"
-        cars = (
-            Car.query.join(Location, isouter=True)
-            .join(Railroad, isouter=True)
-            .join(CarClass, isouter=True)
-            .filter(
-                db.or_(
-                    Car.car_number.ilike(like),
-                    Railroad.reporting_mark.ilike(like),
-                    Car.reporting_mark_override.ilike(like),
-                    Car.car_type_override.ilike(like),
-                    CarClass.car_type.ilike(like),
-                    Car.load.ilike(like),
-                    Car.notes.ilike(like),
-                    Location.name.ilike(like),
-                    Railroad.name.ilike(like),
-                    CarClass.code.ilike(like),
-                )
-            )
-            .all()
-        )
+    cars = search_cars(query)
     return render_template("search.html", cars=cars, query=query)
 
 
@@ -1117,28 +1065,36 @@ def api_search():
     query = request.args.get("q", "").strip()
     if not query:
         return jsonify([])
-    like = f"%{query}%"
-    cars = (
-        Car.query.join(Location, isouter=True)
-        .join(Railroad, isouter=True)
-        .join(CarClass, isouter=True)
-        .filter(
-            db.or_(
-                Car.car_number.ilike(like),
-                Railroad.reporting_mark.ilike(like),
-                Car.reporting_mark_override.ilike(like),
-                Car.car_type_override.ilike(like),
-                CarClass.car_type.ilike(like),
-                Car.load.ilike(like),
-                Car.notes.ilike(like),
-                Location.name.ilike(like),
-                Railroad.name.ilike(like),
-                CarClass.code.ilike(like),
-            )
-        )
-        .all()
-    )
+    cars = search_cars(query)
     return jsonify([serialize_car(car) for car in cars])
+
+
+def search_cars(query: str) -> list[Car]:
+    if not query:
+        return []
+    needle = query.lower()
+
+    def matches(value: str | None) -> bool:
+        return bool(value) and needle in value.lower()
+
+    results = []
+    for car in Car.query.all():
+        values = [
+            car.car_number,
+            car.reporting_mark_override,
+            car.car_type_override,
+            car.load,
+            car.notes,
+        ]
+        if car.car_class:
+            values.extend([car.car_class.code, car.car_class.car_type])
+        if car.railroad:
+            values.extend([car.railroad.reporting_mark, car.railroad.name])
+        if car.location:
+            values.append(car.location.name)
+        if any(matches(value) for value in values):
+            results.append(car)
+    return results
 
 
 def apply_load_form(load: LoadType, form) -> None:

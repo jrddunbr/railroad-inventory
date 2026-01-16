@@ -4,7 +4,7 @@
 - `app/`: Flask application package (routes, templates, static assets).
 - `app/templates/`: HTML/Jinja templates for Cloudscape UI pages.
 - `app/static/`: CSS, JS, and Cloudscape assets.
-- `data/`: SQLite database and seed CSVs (e.g., `Railroad Inventory.csv`).
+- `data/`: CouchDB data volume and seed CSVs (e.g., `Railroad Inventory.csv`).
 - `migrations/`: Database migration scripts (if using Alembic).
 - `tests/`: Unit/integration tests.
 - `scripts/`: One-off importers or maintenance tasks.
@@ -18,12 +18,12 @@ Adjust paths as modules are added; keep domain logic (models, services) in `app/
 - `flask --app app run --debug`: run the dev server locally.
 - `pytest`: run the test suite.
 - `python scripts/import_inventory.py "Railroad Inventory.csv"`: import seed inventory data (example).
-- `rm -f data/inventory.db`: delete the database before reseeding after schema changes.
+- `rm -rf data/couchdb`: delete the CouchDB data volume before reseeding after schema changes.
 
 ## Coding Style & Naming Conventions
 - Python: 4-space indentation, PEP 8 naming (`snake_case` for functions/vars, `PascalCase` for classes).
 - Templates: keep UI logic minimal; prefer view helpers in `app/`.
-- SQLAlchemy models: table names in plural (`railroads`, `cars`, `car_classes`, `locations`).
+- CouchDB document types use singular prefixes (`railroad`, `car`, `car_class`, `location`).
 - Format/lint: use `black` and `ruff` if configured.
 
 ## Testing Guidelines

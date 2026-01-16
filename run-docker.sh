@@ -24,8 +24,9 @@ set -a
 source "$ENV_FILE"
 set +a
 
+DOCKER_CMD=${DOCKER_CMD:-docker}
 COUCHDB_CONTAINER_NAME=${COUCHDB_CONTAINER_NAME:-modelinventory-couchdb}
-COUCHDB_IMAGE=${COUCHDB_IMAGE:-docker.io/library/couchdb:3}
+COUCHDB_IMAGE=${COUCHDB_IMAGE:-couchdb:3}
 COUCHDB_USER=${COUCHDB_USER:-admin}
 COUCHDB_PASSWORD=${COUCHDB_PASSWORD:-}
 COUCHDB_PORT=${COUCHDB_PORT:-5984}
@@ -33,22 +34,22 @@ COUCHDB_HOST=${COUCHDB_HOST:-127.0.0.1}
 
 mkdir -p data/couchdb
 
-if ! command -v podman >/dev/null 2>&1; then
-  echo "podman is required to run CouchDB." >&2
+if ! command -v "$DOCKER_CMD" >/dev/null 2>&1; then
+  echo "docker is required to run CouchDB." >&2
   exit 1
 fi
 
-if podman container exists "$COUCHDB_CONTAINER_NAME"; then
-  if ! podman ps --format "{{.Names}}" | grep -q "^${COUCHDB_CONTAINER_NAME}$"; then
-    podman start "$COUCHDB_CONTAINER_NAME" >/dev/null
+if $DOCKER_CMD ps -a --format "{{.Names}}" | grep -q "^${COUCHDB_CONTAINER_NAME}$"; then
+  if ! $DOCKER_CMD ps --format "{{.Names}}" | grep -q "^${COUCHDB_CONTAINER_NAME}$"; then
+    $DOCKER_CMD start "$COUCHDB_CONTAINER_NAME" >/dev/null
   fi
 else
-  podman run -d \
+  $DOCKER_CMD run -d \
     --name "$COUCHDB_CONTAINER_NAME" \
     -p "${COUCHDB_PORT}:5984" \
     -e "COUCHDB_USER=${COUCHDB_USER}" \
     -e "COUCHDB_PASSWORD=${COUCHDB_PASSWORD}" \
-    -v "${PWD}/data/couchdb:/opt/couchdb/data:Z" \
+    -v "${PWD}/data/couchdb:/opt/couchdb/data" \
     "$COUCHDB_IMAGE" >/dev/null
 fi
 
@@ -80,7 +81,7 @@ PY
 done
 if [ "${ready:-0}" -ne 1 ]; then
   echo "CouchDB did not become ready. Showing container logs:" >&2
-  podman logs "$COUCHDB_CONTAINER_NAME" >&2 || true
+  $DOCKER_CMD logs "$COUCHDB_CONTAINER_NAME" >&2 || true
   exit 1
 fi
 

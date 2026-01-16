@@ -24,6 +24,7 @@ set -a
 source "$ENV_FILE"
 set +a
 
+PODMAN_CMD=${PODMAN_CMD:-"sudo podman"}
 COUCHDB_CONTAINER_NAME=${COUCHDB_CONTAINER_NAME:-modelinventory-couchdb}
 COUCHDB_IMAGE=${COUCHDB_IMAGE:-docker.io/library/couchdb:3}
 COUCHDB_USER=${COUCHDB_USER:-admin}
@@ -33,17 +34,22 @@ COUCHDB_HOST=${COUCHDB_HOST:-127.0.0.1}
 
 mkdir -p data/couchdb
 
+if ! command -v sudo >/dev/null 2>&1; then
+  echo "sudo is required for rootful podman." >&2
+  exit 1
+fi
+
 if ! command -v podman >/dev/null 2>&1; then
   echo "podman is required to run CouchDB." >&2
   exit 1
 fi
 
-if podman container exists "$COUCHDB_CONTAINER_NAME"; then
-  if ! podman ps --format "{{.Names}}" | grep -q "^${COUCHDB_CONTAINER_NAME}$"; then
-    podman start "$COUCHDB_CONTAINER_NAME" >/dev/null
+if $PODMAN_CMD container exists "$COUCHDB_CONTAINER_NAME"; then
+  if ! $PODMAN_CMD ps --format "{{.Names}}" | grep -q "^${COUCHDB_CONTAINER_NAME}$"; then
+    $PODMAN_CMD start "$COUCHDB_CONTAINER_NAME" >/dev/null
   fi
 else
-  podman run -d \
+  $PODMAN_CMD run -d \
     --name "$COUCHDB_CONTAINER_NAME" \
     -p "${COUCHDB_PORT}:5984" \
     -e "COUCHDB_USER=${COUCHDB_USER}" \
@@ -80,7 +86,7 @@ PY
 done
 if [ "${ready:-0}" -ne 1 ]; then
   echo "CouchDB did not become ready. Showing container logs:" >&2
-  podman logs "$COUCHDB_CONTAINER_NAME" >&2 || true
+  $PODMAN_CMD logs "$COUCHDB_CONTAINER_NAME" >&2 || true
   exit 1
 fi
 

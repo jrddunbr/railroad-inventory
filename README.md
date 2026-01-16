@@ -1,6 +1,6 @@
 # Model Inventory
 
-Model Inventory is a Python + Flask + SQLite app for tracking HO scale train inventory over a local network.
+Model Inventory is a Python + Flask + CouchDB app for tracking HO scale train inventory over a local network.
 It stores railroads, car classes, and individual cars with detailed metadata and location tracking.
 
 ## Features
@@ -12,18 +12,23 @@ It stores railroads, car classes, and individual cars with detailed metadata and
 
 ## Quick Start
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python scripts/import_inventory.py "Railroad Inventory.csv"
-flask --app app run --debug
+./run.sh
 ```
+
+Rootless Podman not available?
+- Rootful Podman: `./run-rootful.sh`
+- Docker: `./run-docker.sh`
+
+Configuration
+- `./run.sh` generates `.env` with a random CouchDB password on first run.
+- Copy `.env.example` to `.env` to customize credentials before starting.
 
 Then open `http://127.0.0.1:5000/inventory`.
 
 ## Notes
-- The database lives at `data/inventory.db`.
-- If you change the schema, delete the database and re-import the CSV.
+- CouchDB runs in a Podman container named `modelinventory-couchdb`.
+- The CouchDB data volume lives at `data/couchdb`.
+- To migrate an existing SQLite database, run `python scripts/convert_sqlite_to_couchdb.py data/inventory.db`.
 
 ## Documentation
 - Schema details are in `docs/SCHEMA.md`.

@@ -120,8 +120,6 @@ def main(path: Path) -> None:
                         is_locomotive_override = True
 
                 car = Car(
-                    railroad=railroad,
-                    car_class=car_class,
                     reporting_mark_override=reporting_mark if not railroad else None,
                     car_type_override=car_type_override,
                     wheel_arrangement_override=wheel_override,
@@ -144,8 +142,10 @@ def main(path: Path) -> None:
                     price=(row.get("Price") or "").strip(),
                     load=(row.get("Load") or "").strip(),
                     repairs_required=(row.get("Repairs Req’d") or "").strip(),
-                    location=location,
                 )
+                car.railroad = railroad
+                car.car_class = car_class
+                car.location = location
                 db.session.add(car)
 
         db.session.commit()

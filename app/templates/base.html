@@ -203,7 +203,7 @@
       <ul id="mi-confirm-summary"></ul>
       <button type="button" class="confirm-toggle" id="mi-confirm-toggle">More details</button>
       <div class="confirm-details" id="mi-confirm-details" hidden>
-        <pre id="mi-confirm-sql"></pre>
+        <pre id="mi-confirm-payload"></pre>
       </div>
       <div class="confirm-actions">
         <button type="button" id="mi-confirm-cancel">Cancel</button>
@@ -216,21 +216,22 @@
     const confirmSummary = document.getElementById('mi-confirm-summary');
     const confirmToggle = document.getElementById('mi-confirm-toggle');
     const confirmDetails = document.getElementById('mi-confirm-details');
-    const confirmSql = document.getElementById('mi-confirm-sql');
+    const confirmPayload = document.getElementById('mi-confirm-payload');
     const confirmApprove = document.getElementById('mi-confirm-approve');
     const confirmCancel = document.getElementById('mi-confirm-cancel');
     const confirmTitle = document.getElementById('mi-confirm-title');
     let activeForm = null;
 
-    const escapeSql = (value) => String(value).replace(/'/g, "''");
-    const formatSqlValue = (value) => {
-      if (value === null || value === undefined || value === '') return 'NULL';
-      const trimmed = String(value).trim();
-      if (trimmed === '') return 'NULL';
-      if (!Number.isNaN(Number(trimmed)) && /^-?\d+(\.\d+)?$/.test(trimmed)) {
-        return trimmed;
-      }
-      return `'${escapeSql(trimmed)}'`;
+    const docTypeMap = {
+      railroads: 'railroad',
+      car_classes: 'car_class',
+      locations: 'location',
+      cars: 'car',
+      loads: 'load',
+      load_placements: 'load_placement',
+      railroad_color_schemes: 'railroad_color_scheme',
+      railroad_logos: 'railroad_logo',
+      railroad_slogans: 'railroad_slogan',
     };
 
     const getLabelText = (input) => {
@@ -342,48 +343,48 @@
       return fields;
     };
 
-    const buildSqlPreview = (form, action, changes) => {
+    const buildCouchPreview = (form, action, changes) => {
       const table = form.dataset.table;
       if (!table) return '';
-      const idField = form.dataset.idField || 'id';
+      const docType = docTypeMap[table] || table;
       const idValue = form.dataset.id || '';
-      if (action === 'delete') {
-        if (!idValue) return `DELETE FROM ${table} WHERE ${idField} = ?;`;
-        return `DELETE FROM ${table} WHERE ${idField} = ${formatSqlValue(idValue)};`;
-      }
       const fieldsByName = {};
       changes.forEach((field) => {
         fieldsByName[field.name] = field.currentValue;
       });
-      const updates = Object.entries(fieldsByName)
-        .map(([name, value]) => `${name} = ${formatSqlValue(value)}`)
-        .join(', ');
-      let mainQuery = '';
-      if (action === 'insert') {
-        const columns = Object.keys(fieldsByName);
-        const values = Object.values(fieldsByName).map((value) => formatSqlValue(value));
-        mainQuery = columns.length
-          ? `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${values.join(', ')});`
-          : `INSERT INTO ${table} (...) VALUES (...);`;
-      } else {
-        if (!idValue) {
-          mainQuery = updates
-            ? `UPDATE ${table} SET ${updates} WHERE ${idField} = ?;`
-            : `UPDATE ${table} SET ... WHERE ${idField} = ?;`;
-        } else {
-          mainQuery = updates
-            ? `UPDATE ${table} SET ${updates} WHERE ${idField} = ${formatSqlValue(idValue)};`
-            : `UPDATE ${table} SET ... WHERE ${idField} = ${formatSqlValue(idValue)};`;
-        }
-      }
       const relatedTables = (form.dataset.relatedTables || '')
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean);
-      if (!relatedTables.length) return mainQuery;
+      const payload = {
+        operation: action,
+        doc_type: docType,
+      };
+      if (idValue) {
+        payload.doc_id = `${docType}:${idValue}`;
+      } else if (action !== 'delete') {
+        payload.doc_id = '(auto)';
+      }
+      if (action === 'delete') {
+        payload.body = {
+          _id: idValue ? `${docType}:${idValue}` : '(auto)',
+          _deleted: true,
+        };
+        return JSON.stringify(payload, null, 2);
+      }
+
+      payload.body = {
+        type: docType,
+        ...fieldsByName,
+      };
+      if (idValue) {
+        payload.body.id = idValue;
+      }
+      if (!relatedTables.length) return JSON.stringify(payload, null, 2);
       const formData = new FormData(form);
       const relatedConfig = {
         railroad_color_schemes: {
+          idField: 'color_scheme_id',
           columns: {
             description: 'color_scheme_description',
             start_date: 'color_scheme_start',
@@ -392,6 +393,7 @@
           },
         },
         railroad_logos: {
+          idField: 'logo_id',
           columns: {
             description: 'logo_description',
             start_date: 'logo_start',
@@ -400,6 +402,7 @@
           },
         },
         railroad_slogans: {
+          idField: 'slogan_id',
           columns: {
             description: 'slogan_description',
             slogan_text: 'slogan_text',
@@ -408,10 +411,14 @@
           },
         },
       };
-      const relatedQueries = relatedTables.flatMap((related) => {
+      const relatedPayloads = {};
+      relatedTables.forEach((related) => {
+        const relatedType = docTypeMap[related] || related;
         const config = relatedConfig[related];
-        if (!config) return [`UPSERT INTO ${related} (...);`];
-        const columns = Object.keys(config.columns);
+        if (!config) {
+          relatedPayloads[relatedType] = ['(unmapped form fields)'];
+          return;
+        }
         const fieldNames = Object.values(config.columns);
         const valuesByField = fieldNames.map((name) =>
           formData.getAll(name).map((value) => {
@@ -421,6 +428,9 @@
             return String(value || '').trim();
           })
         );
+        const idValues = config.idField
+          ? formData.getAll(config.idField).map((value) => String(value || '').trim())
+          : [];
         const rowCount = Math.max(0, ...valuesByField.map((list) => list.length));
         const rows = [];
         for (let index = 0; index < rowCount; index += 1) {
@@ -428,19 +438,27 @@
           if (rowValues.every((value) => value === '')) {
             continue;
           }
-          rows.push(rowValues);
+          const row = {};
+          Object.keys(config.columns).forEach((column, idx) => {
+            row[column] = rowValues[idx];
+          });
+          const idValue = idValues[index];
+          if (idValue) {
+            row.id = idValue;
+          }
+          rows.push(row);
         }
-        if (!rows.length) {
-          return [`UPSERT INTO ${related} (${columns.join(', ')}) VALUES (...);`];
+        if (rows.length) {
+          relatedPayloads[relatedType] = rows.map((row) => ({
+            type: relatedType,
+            ...row,
+          }));
         }
-        const sample = rows[0].map((value) => formatSqlValue(value));
-        const summary = `UPSERT INTO ${related} (${columns.join(', ')}) VALUES (${sample.join(', ')});`;
-        if (rows.length > 1) {
-          return [summary, `-- ${rows.length} row(s) total`];
-        }
-        return [summary];
       });
-      return [mainQuery, ...relatedQueries].join('\n');
+      if (Object.keys(relatedPayloads).length) {
+        payload.related = relatedPayloads;
+      }
+      return JSON.stringify(payload, null, 2);
     };
 
     const openConfirm = (form) => {
@@ -473,7 +491,7 @@
       confirmTitle.textContent = action === 'delete' ? 'Confirm deletion' : 'Confirm database change';
       confirmDetails.hidden = true;
       confirmToggle.textContent = 'More details';
-      confirmSql.textContent = buildSqlPreview(form, action, changes);
+      confirmPayload.textContent = buildCouchPreview(form, action, changes);
       confirmModal.style.display = 'flex';
       confirmModal.setAttribute('aria-hidden', 'false');
       confirmApprove.focus();
