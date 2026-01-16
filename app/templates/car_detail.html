@@ -36,6 +36,7 @@
     </h1>
     <div class="actions">
       <a class="tag" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
+      <a class="tag" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit) }}">Copy to New Car</a>
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit) }}">Copy to New Car (Overrides)</a>
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
@@ -129,10 +130,44 @@
       </div>
       <div>
         <h3>Maintenance</h3>
+        <p><strong>Last Inspection Date:</strong> {{ car.last_inspection_date or "-" }}</p>
         <p><strong>Repairs Required:</strong> {{ car.repairs_required or "None" }}</p>
         <p><strong>Notes:</strong> {{ car.notes or "-" }}</p>
       </div>
     </div>
+    <h3>Inspections</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Result</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inspection in car.inspections %}
+        <tr>
+          <td>{{ inspection.inspection_date or "-" }}</td>
+          <td>{{ inspection.inspection_type.name if inspection.inspection_type else "-" }}</td>
+          <td>
+            {% if inspection.passed is none %}
+              -
+            {% elif inspection.passed %}
+              Passed
+            {% else %}
+              Failed
+            {% endif %}
+          </td>
+          <td>{{ inspection.details or "-" }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="4">No inspections recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     <h3>Loads</h3>
     <div class="actions">
       <a class="tag" href="{{ url_for('main.load_placement_new_generic', car_id=car.id) }}">Add Load</a>

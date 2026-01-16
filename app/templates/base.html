@@ -191,6 +191,7 @@
       <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Tools</a>
       <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
       <a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>
+      <a href="{{ url_for('main.settings') }}" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
     </nav>
     <main>
       {% block content %}{% endblock %}
@@ -232,6 +233,8 @@
       railroad_color_schemes: 'railroad_color_scheme',
       railroad_logos: 'railroad_logo',
       railroad_slogans: 'railroad_slogan',
+      car_inspections: 'car_inspection',
+      inspection_types: 'inspection_type',
     };
 
     const getLabelText = (input) => {

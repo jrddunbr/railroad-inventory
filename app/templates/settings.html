@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Settings</h1>
+    <h2>Inspection Types</h2>
+    <p class="keyboard-hint">Types: {{ inspection_types|length }}</p>
+    <div class="actions">
+      <a class="tag" href="{{ url_for('main.inspection_type_new') }}">Add Inspection Type</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Parent</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in inspection_types %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td>{{ row.type.parent.name if row.type.parent else "-" }}</td>
+          <td>
+            <a class="tag" href="{{ url_for('main.inspection_type_edit', type_id=row.type.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('main.inspection_type_delete', type_id=row.type.id) }}" data-action="delete" data-table="inspection_types" data-id="{{ row.type.id }}" data-id-field="id" data-entity-label="inspection type {{ row.type.id }}" style="display: inline;">
+              <button type="submit" class="tag">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="3">No inspection types yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

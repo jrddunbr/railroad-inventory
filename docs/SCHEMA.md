@@ -63,6 +63,7 @@ This document describes the current database schema and common alternate names u
 - `alt_date` (string, optional)
 - `reweight_date` (string, optional)
 - `repack_bearings_date` (string, optional)
+- `last_inspection_date` (string, optional)
 - `other_lettering` (string, optional)
 - `msrp` (string, optional)
 - `price` (string, optional)
@@ -96,6 +97,19 @@ This document describes the current database schema and common alternate names u
 - `car_id` (integer, FK -> `cars.id`, optional)
 - `location_id` (integer, FK -> `locations.id`, optional)
 - `quantity` (integer)
+
+## Car Inspections (`car_inspections`)
+- `id` (integer, primary key)
+- `car_id` (integer, FK -> `cars.id`)
+- `inspection_type_id` (integer, FK -> `inspection_types.id`, optional)
+- `inspection_date` (string, optional)
+- `details` (text, optional)
+- `passed` (boolean, optional)
+
+## Inspection Types (`inspection_types`)
+- `id` (integer, primary key)
+- `name` (string)
+- `parent_id` (integer, self-reference, optional)
 
 ## Railroad Color Schemes (`railroad_color_schemes`)
 - `id` (integer, primary key)

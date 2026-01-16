@@ -154,6 +154,7 @@ class Car(BaseModel):
     alt_date: str | None = None
     reweight_date: str | None = None
     repack_bearings_date: str | None = None
+    last_inspection_date: str | None = None
     other_lettering: str | None = None
     msrp: str | None = None
     price: str | None = None
@@ -213,6 +214,12 @@ class Car(BaseModel):
             return []
         return self._store.filter_by(LoadPlacement, car_id=self.id)
 
+    @property
+    def inspections(self) -> list[CarInspection]:
+        if not self._store:
+            return []
+        return CarInspection.query.filter_by(car_id=self.id).order_by("inspection_date", reverse=True).all()
+
     def prepare_save(self) -> None:
         if self._railroad_ref and not self.railroad_id and self._railroad_ref.id:
             self.railroad_id = self._railroad_ref.id
@@ -220,6 +227,53 @@ class Car(BaseModel):
             self.car_class_id = self._car_class_ref.id
         if self._location_ref and not self.location_id and self._location_ref.id:
             self.location_id = self._location_ref.id
+
+
+@dataclass
+class CarInspection(BaseModel):
+    doc_type = "car_inspection"
+    counter_key = "car_inspections"
+    query = QueryDescriptor()
+
+    car_id: int | None = None
+    inspection_type_id: int | None = None
+    inspection_date: str | None = None
+    details: str | None = None
+    passed: bool | None = None
+
+    @property
+    def car(self) -> Car | None:
+        if not self._store or not self.car_id:
+            return None
+        return self._store.get(Car, self.car_id)
+
+    @property
+    def inspection_type(self) -> InspectionType | None:
+        if not self._store or not self.inspection_type_id:
+            return None
+        return self._store.get(InspectionType, self.inspection_type_id)
+
+
+@dataclass
+class InspectionType(BaseModel):
+    doc_type = "inspection_type"
+    counter_key = "inspection_types"
+    query = QueryDescriptor()
+
+    name: str | None = None
+    parent_id: int | None = None
+
+    @property
+    def parent(self) -> InspectionType | None:
+        if not self._store or not self.parent_id:
+            return None
+        return self._store.get(InspectionType, self.parent_id)
+
+    @property
+    def children(self) -> list[InspectionType]:
+        if not self._store:
+            return []
+        return InspectionType.query.filter_by(parent_id=self.id).order_by("name").all()
 
 
 @dataclass
@@ -351,7 +405,9 @@ class LoadPlacement(BaseModel):
 
 __all__ = [
     "Car",
+    "CarInspection",
     "CarClass",
+    "InspectionType",
     "LoadPlacement",
     "LoadType",
     "Location",

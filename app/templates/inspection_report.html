@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Inspection Status Report</h1>
+    <p class="keyboard-hint">Pick an inspection type and result to see the latest inspection for each car.</p>
+    <form method="get" action="{{ url_for('main.inspections_report') }}" class="panel" style="margin-bottom: 16px;">
+      <div class="grid">
+        <div>
+          <label for="inspection_type_id">Inspection Type</label>
+          <select id="inspection_type_id" name="inspection_type_id" required>
+            <option value="">Select...</option>
+            {% for row in inspection_types %}
+              <option value="{{ row.type.id }}" {% if selected_type_id|int == row.type.id %}selected{% endif %}>{{ row.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="result">Result</label>
+          <select id="result" name="result" required>
+            <option value="">Select...</option>
+            <option value="passed" {% if selected_result == 'passed' %}selected{% endif %}>Passed</option>
+            <option value="failed" {% if selected_result == 'failed' %}selected{% endif %}>Failed</option>
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Run Report</button>
+        <a href="{{ url_for('main.reports') }}">Back to Reports</a>
+      </div>
+    </form>
+    <p class="keyboard-hint">Results: {{ inspections|length }}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Car</th>
+          <th>Reporting Mark</th>
+          <th>Car #</th>
+          <th>Inspection Date</th>
+          <th>Type</th>
+          <th>Result</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inspection in inspections %}
+        {% set car = inspection.car %}
+        <tr>
+          <td><a href="{{ url_for('main.car_detail', car_id=inspection.car_id) }}">Car {{ inspection.car_id }}</a></td>
+          <td>{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else '-') }}</td>
+          <td>{{ car.car_number if car else '-' }}</td>
+          <td>{{ inspection.inspection_date or '-' }}</td>
+          <td>{{ inspection.inspection_type.name if inspection.inspection_type else '-' }}</td>
+          <td>
+            {% if inspection.passed %}
+              Passed
+            {% else %}
+              Failed
+            {% endif %}
+          </td>
+          <td>{{ inspection.details or '-' }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">No inspections match the selected filters.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

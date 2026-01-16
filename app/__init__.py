@@ -5,7 +5,7 @@ from flask import Flask
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.0.0"
+SCHEMA_VERSION = "2.2.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
@@ -32,6 +32,8 @@ def create_app() -> Flask:
             "cars",
             "loads",
             "load_placements",
+            "car_inspections",
+            "inspection_types",
             "railroad_color_schemes",
             "railroad_logos",
             "railroad_slogans",

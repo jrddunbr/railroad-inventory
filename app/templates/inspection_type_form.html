@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>{{ 'Edit' if inspection_type else 'Add' }} Inspection Type</h1>
+    <form method="post" action="{{ url_for('main.inspection_type_edit', type_id=inspection_type.id) if inspection_type else url_for('main.inspection_type_new') }}" data-table="inspection_types" data-id="{{ inspection_type.id if inspection_type else '' }}" data-id-field="id">
+      <div class="grid">
+        <div>
+          <label for="name">Name</label>
+          <input id="name" name="name" value="{{ inspection_type.name if inspection_type else '' }}" required />
+        </div>
+        <div>
+          <label for="parent_id">Parent Type</label>
+          <select id="parent_id" name="parent_id">
+            <option value="">None</option>
+            {% for row in inspection_types %}
+              <option value="{{ row.type.id }}" {% if inspection_type and inspection_type.parent_id == row.type.id %}selected{% endif %}>
+                {{ row.label }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <a href="{{ url_for('main.settings') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

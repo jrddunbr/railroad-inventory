@@ -14,7 +14,9 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models import (
     Car,
+    CarInspection,
     CarClass,
+    InspectionType,
     Location,
     LoadPlacement,
     LoadType,
@@ -98,6 +100,67 @@ def reports():
     return render_template("reports.html")
 
 
+def inspection_type_tree(types: list[InspectionType], excluded_id: int | None = None) -> list[dict]:
+    by_parent: dict[int | None, list[InspectionType]] = {}
+    for inspection_type in types:
+        if excluded_id and inspection_type.id == excluded_id:
+            continue
+        by_parent.setdefault(inspection_type.parent_id, []).append(inspection_type)
+    for group in by_parent.values():
+        group.sort(key=lambda item: (item.name or "").lower())
+
+    results: list[dict] = []
+
+    def walk(parent_id: int | None, depth: int) -> None:
+        for inspection_type in by_parent.get(parent_id, []):
+            label = f"{'-- ' * depth}{inspection_type.name or ''}"
+            results.append({"type": inspection_type, "label": label, "depth": depth})
+            walk(inspection_type.id, depth + 1)
+
+    walk(None, 0)
+    return results
+
+
+@main_bp.route("/reports/inspections")
+def inspections_report():
+    inspection_types = InspectionType.query.all()
+    type_rows = inspection_type_tree(inspection_types)
+    selected_type_id = request.args.get("inspection_type_id", "").strip()
+    selected_result = request.args.get("result", "").strip()
+    inspections: list[CarInspection] = []
+    if selected_type_id.isdigit() and selected_result in {"passed", "failed"}:
+        type_id = int(selected_type_id)
+        all_inspections = CarInspection.query.filter_by(inspection_type_id=type_id).all()
+        all_inspections.sort(
+            key=lambda inspection: (inspection.inspection_date is None, inspection.inspection_date or ""),
+            reverse=True,
+        )
+        latest_by_car: dict[int, CarInspection] = {}
+        for inspection in all_inspections:
+            if inspection.car_id is None:
+                continue
+            if inspection.car_id in latest_by_car:
+                continue
+            latest_by_car[inspection.car_id] = inspection
+        passed_flag = selected_result == "passed"
+        inspections = [
+            inspection
+            for inspection in latest_by_car.values()
+            if inspection.passed is not None and inspection.passed == passed_flag
+        ]
+        inspections.sort(
+            key=lambda inspection: (inspection.inspection_date is None, inspection.inspection_date or ""),
+            reverse=True,
+        )
+    return render_template(
+        "inspection_report.html",
+        inspection_types=type_rows,
+        selected_type_id=selected_type_id,
+        selected_result=selected_result,
+        inspections=inspections,
+    )
+
+
 @main_bp.route("/inventory/export")
 def inventory_export():
     cars = Car.query.order_by("id").all()
@@ -125,6 +188,7 @@ def inventory_export():
             "Alt Date",
             "Reweight date",
             "Repack Bearings Date",
+            "Last Inspection Date",
             "Other Lettering",
             "MSRP",
             "Price",
@@ -161,6 +225,7 @@ def inventory_export():
                 car.alt_date or "",
                 car.reweight_date or "",
                 car.repack_bearings_date or "",
+                car.last_inspection_date or "",
                 car.other_lettering or "",
                 car.msrp or "",
                 car.price or "",
@@ -921,6 +986,37 @@ def car_detail(car_id: int):
     return render_template("car_detail.html", car=car)
 
 
+@main_bp.route("/cars/<int:car_id>/inspect", methods=["GET", "POST"])
+def car_inspect(car_id: int):
+    car = Car.query.get_or_404(car_id)
+    inspection_types = InspectionType.query.all()
+    type_rows = inspection_type_tree(inspection_types)
+    if request.method == "POST":
+        inspection_date = request.form.get("inspection_date", "").strip()
+        inspection_details = request.form.get("inspection_details", "").strip()
+        inspection_type_id = request.form.get("inspection_type_id", "").strip()
+        inspection_passed = request.form.get("inspection_passed", "").strip()
+        if not inspection_date:
+            return "Inspection date is required.", 400
+        if not inspection_type_id.isdigit():
+            return "Inspection type is required.", 400
+        if inspection_passed not in {"passed", "failed"}:
+            return "Inspection result is required.", 400
+        inspection = CarInspection(
+            car_id=car.id,
+            inspection_date=inspection_date,
+            details=inspection_details or None,
+            inspection_type_id=int(inspection_type_id),
+            passed=inspection_passed == "passed",
+        )
+        db.session.add(inspection)
+        car.last_inspection_date = inspection_date
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.car_detail", car_id=car.id))
+    return render_template("car_inspection_form.html", car=car, inspection_types=type_rows)
+
+
 @main_bp.route("/cars/<int:car_id>/delete", methods=["POST"])
 def car_delete(car_id: int):
     car = Car.query.get_or_404(car_id)
@@ -1301,6 +1397,69 @@ def apply_car_form(car: Car, form) -> None:
         car.location = None
 
 
+@main_bp.route("/settings")
+def settings():
+    inspection_types = InspectionType.query.all()
+    type_rows = inspection_type_tree(inspection_types)
+    return render_template("settings.html", inspection_types=type_rows)
+
+
+@main_bp.route("/settings/inspection-types/new", methods=["GET", "POST"])
+def inspection_type_new():
+    inspection_types = InspectionType.query.all()
+    type_rows = inspection_type_tree(inspection_types)
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        parent_id = request.form.get("parent_id", "").strip()
+        if not name:
+            return "Inspection type name is required.", 400
+        inspection_type = InspectionType(name=name)
+        if parent_id.isdigit():
+            inspection_type.parent_id = int(parent_id)
+        db.session.add(inspection_type)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.settings"))
+    return render_template("inspection_type_form.html", inspection_type=None, inspection_types=type_rows)
+
+
+@main_bp.route("/settings/inspection-types/<int:type_id>/edit", methods=["GET", "POST"])
+def inspection_type_edit(type_id: int):
+    inspection_type = InspectionType.query.get_or_404(type_id)
+    inspection_types = InspectionType.query.all()
+    type_rows = inspection_type_tree(inspection_types, excluded_id=inspection_type.id)
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        parent_id = request.form.get("parent_id", "").strip()
+        if not name:
+            return "Inspection type name is required.", 400
+        if parent_id.isdigit() and int(parent_id) == inspection_type.id:
+            return "Inspection type cannot parent itself.", 400
+        inspection_type.name = name
+        inspection_type.parent_id = int(parent_id) if parent_id.isdigit() else None
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.settings"))
+    return render_template(
+        "inspection_type_form.html",
+        inspection_type=inspection_type,
+        inspection_types=type_rows,
+    )
+
+
+@main_bp.route("/settings/inspection-types/<int:type_id>/delete", methods=["POST"])
+def inspection_type_delete(type_id: int):
+    inspection_type = InspectionType.query.get_or_404(type_id)
+    if InspectionType.query.filter_by(parent_id=inspection_type.id).count() > 0:
+        return "Cannot delete an inspection type with children.", 400
+    if CarInspection.query.filter_by(inspection_type_id=inspection_type.id).count() > 0:
+        return "Cannot delete an inspection type used in inspections.", 400
+    db.session.delete(inspection_type)
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.settings"))
+
+
 def serialize_car(car: Car) -> dict:
     class_capacity = car.car_class.capacity if car.car_class else None
     class_weight = car.car_class.weight if car.car_class else None
@@ -1337,6 +1496,7 @@ def serialize_car(car: Car) -> dict:
         "alt_date": car.alt_date,
         "reweight_date": car.reweight_date,
         "repack_bearings_date": car.repack_bearings_date,
+        "last_inspection_date": car.last_inspection_date,
         "other_lettering": car.other_lettering,
         "msrp": car.msrp,
         "price": car.price,
