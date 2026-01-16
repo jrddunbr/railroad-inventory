@@ -7,6 +7,8 @@ import couchdb
 from couchdb import http
 from flask import abort
 
+from app.backup import ensure_schema_backup
+
 T = TypeVar("T", bound="BaseModel")
 
 
@@ -40,6 +42,7 @@ class CouchStore:
         if doc.get("version") != version:
             doc["version"] = version
             self.db.save(doc)
+            ensure_schema_backup(self.db, version)
 
     def ensure_counters(self, counter_keys: Iterable[str]) -> None:
         if not self.db:

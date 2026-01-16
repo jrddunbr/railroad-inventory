@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
 
 from app import db
+from app.backup import ensure_periodic_backup
 from app.models import (
     Car,
     CarInspection,
@@ -32,7 +33,7 @@ main_bp = Blueprint("main", __name__)
 
 
 def ensure_db_backup() -> None:
-    return
+    ensure_periodic_backup(db.store.db)
 
 
 def get_or_create_location(name: str) -> Optional[Location]:
