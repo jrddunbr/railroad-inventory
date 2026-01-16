@@ -1,7 +1,9 @@
-# Model Inventory
+# Railroad Inventory
 
-Model Inventory is a Python + Flask + CouchDB app for tracking HO scale train inventory over a local network.
+Railroad Inventory is a Python + Flask + CouchDB app for tracking HO scale train inventory over a local network.
 It stores railroads, car classes, and individual cars with detailed metadata and location tracking.
+
+Repository: https://github.com/jrddunbr/railroad-inventory
 
 ## Features
 - Inventory list, railroad list, car class list, and search views.

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Model Inventory</title>
+  <title>Railroad Inventory</title>
   <link rel="stylesheet" href="https://unpkg.com/@cloudscape-design/components@3.0.0/styles.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
   <style>
@@ -55,6 +55,20 @@
     }
     main {
       padding: 24px;
+    }
+    footer {
+      border-top: 1px solid var(--mi-border);
+      color: #6b7280;
+      font-size: 0.85rem;
+      padding: 16px 24px;
+      text-align: center;
+    }
+    footer a {
+      color: inherit;
+      text-decoration: none;
+    }
+    footer a:hover {
+      text-decoration: underline;
     }
     .panel {
       background: var(--mi-panel);
@@ -172,7 +186,7 @@
 </head>
 <body>
   <header>
-    <div class="brand">Model Inventory</div>
+    <div class="brand">Railroad Inventory</div>
     <div class="actions" style="margin-top: 0;">
       <form method="get" action="{{ url_for('main.search') }}">
         <input name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
@@ -197,6 +211,10 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <footer>
+    Copyright Jared Dunbar 2026 ·
+    <a href="https://github.com/jrddunbr/railroad-inventory" target="_blank" rel="noopener">GitHub</a>
+  </footer>
   <div id="mi-confirm-modal" class="confirm-overlay" style="display: none;" aria-hidden="true">
     <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="mi-confirm-title">
       <h2 id="mi-confirm-title">Confirm database change</h2>
