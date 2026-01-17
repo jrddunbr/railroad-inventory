@@ -12,6 +12,7 @@
           <th>Capacity</th>
           <th>Weight</th>
           <th>Load Limit</th>
+          <th>AAR Plate</th>
         </tr>
       </thead>
       <tbody>
@@ -23,10 +24,11 @@
           <td>{{ car_class.capacity or "-" }}</td>
           <td>{{ car_class.weight or "-" }}</td>
           <td>{{ car_class.load_limit or "-" }}</td>
+          <td>{{ car_class.aar_plate or "-" }}</td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6">No car classes yet. Add a car to create one automatically.</td>
+          <td colspan="7">No car classes yet. Add a car to create one automatically.</td>
         </tr>
         {% endfor %}
       </tbody>

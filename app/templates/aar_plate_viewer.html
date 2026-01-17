@@ -1,0 +1,472 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Scale AAR Plate Viewer</h1>
+    <p class="keyboard-hint">Enter a scale name (HO, N, Z, S, O, OO, TT, G) or ratio like 1:87.</p>
+    <div class="grid">
+      <div>
+        <label for="plate">AAR Plate</label>
+        <select id="plate" name="plate">
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="E">E</option>
+          <option value="F">F</option>
+          <option value="H">H</option>
+          <option value="J">J</option>
+          <option value="K">K</option>
+          <option value="L">L</option>
+          <option value="M">M</option>
+        </select>
+      </div>
+      <div>
+        <label for="scale_input">Scale</label>
+        <input id="scale_input" name="scale_input" value="HO" />
+      </div>
+    </div>
+    <p class="keyboard-hint">Plates are based on gabarit diagrams and AAR Appendix A breakpoint data.</p>
+    <div class="panel" style="margin-top: 16px;">
+      <h2>Result</h2>
+      <p id="scale_summary">Enter a scale and plate to view the size.</p>
+      <div class="actions">
+        <button type="button" class="tag" id="export_dxf">Download DXF</button>
+      </div>
+      <div id="plate_viewer"></div>
+      <div id="plate_legend"></div>
+    </div>
+  </div>
+  <script>
+    const plateData = {
+      B: {
+        label: "Plate B",
+        points: [
+          { h: 2.5, w: 96 },
+          { h: 9, w: 108 },
+          { h: 15, w: 112 },
+          { h: 40, w: 128 },
+          { h: 165, w: 128 },
+          { h: 173, w: 120 },
+          { h: 181, w: 84 },
+        ],
+      },
+      C: {
+        label: "Plate C",
+        points: [
+          { h: 2.5, w: 96 },
+          { h: 9, w: 108 },
+          { h: 15, w: 112 },
+          { h: 40, w: 128 },
+          { h: 170, w: 128 },
+          { h: 176, w: 120 },
+          { h: 186, w: 84 },
+        ],
+      },
+      E: {
+        label: "Plate E",
+        points: [
+          { h: 2.5, w: 96 },
+          { h: 9, w: 108 },
+          { h: 15, w: 112 },
+          { h: 40, w: 128 },
+          { h: 181, w: 128 },
+          { h: 183, w: 123 },
+          { h: 189, w: 65 },
+        ],
+      },
+      F: {
+        label: "Plate F",
+        points: [
+          { h: 2.5, w: 96 },
+          { h: 9, w: 108 },
+          { h: 15, w: 112 },
+          { h: 40, w: 128 },
+          { h: 194, w: 128 },
+          { h: 198, w: 126 },
+          { h: 204, w: 106 },
+        ],
+      },
+      H: {
+        label: "Plate H",
+        points: [
+          { h: 2.5, w: 101 },
+          { h: 13, w: 111 },
+          { h: 28, w: 119 },
+          { h: 170, w: 121 },
+          { h: 242, w: 102.375 },
+        ],
+      },
+      J: {
+        label: "Plate J",
+        type: "freight",
+        truck_centers: "55-1",
+        points: [
+          { h: 0, w: 128 },
+          { h: 88, w: 128 },
+          { h: 120, w: 120 },
+          { h: 162, w: 110 },
+          { h: 186, w: 96 },
+        ],
+      },
+      K: {
+        label: "Plate K",
+        type: "freight",
+        truck_centers: "65-0",
+        points: [
+          { h: 0, w: 120 },
+          { h: 88, w: 120 },
+          { h: 114, w: 108 },
+          { h: 156, w: 98 },
+          { h: 186, w: 92 },
+        ],
+      },
+      L: {
+        label: "Plate L",
+        type: "locomotive",
+        truck_centers: "51-5.5",
+        points: [
+          { h: 0, w: 104 },
+          { h: 21.5, w: 112 },
+          { h: 94, w: 128 },
+          { h: 124.5, w: 128 },
+          { h: 175.875, w: 114 },
+          { h: 195, w: 102 },
+        ],
+      },
+      M: {
+        label: "Plate M",
+        type: "locomotive",
+        truck_centers: "51-5.5",
+        points: [
+          { h: 13, w: 116 },
+          { h: 31, w: 108 },
+          { h: 67.25, w: 120 },
+          { h: 88, w: 122 },
+          { h: 96, w: 128 },
+          { h: 120, w: 128 },
+          { h: 195, w: 102 },
+        ],
+      },
+    };
+
+    const scaleAliases = {
+      HO: 87,
+      H0: 87,
+      N: 160,
+      Z: 220,
+      S: 64,
+      O: 48,
+      OO: 76,
+      TT: 120,
+      G: 22.5,
+    };
+
+    const parseScale = (value) => {
+      if (!value) return null;
+      const trimmed = value.trim().toUpperCase();
+      const ratioMatch = trimmed.match(/^1\s*[:/]\s*(\d+(?:\.\d+)?)$/);
+      if (ratioMatch) {
+        return parseFloat(ratioMatch[1]);
+      }
+      const numericMatch = trimmed.match(/^\d+(?:\.\d+)?$/);
+      if (numericMatch) {
+        return parseFloat(trimmed);
+      }
+      const key = trimmed.replace(/\s+/g, "");
+      if (scaleAliases[key]) {
+        return scaleAliases[key];
+      }
+      return null;
+    };
+
+    const formatFeetInches = (inches) => {
+      const whole = Math.round(inches * 1000) / 1000;
+      const feet = Math.floor(whole / 12);
+      const inch = whole - feet * 12;
+      if (Math.abs(inch - Math.round(inch)) < 0.001) {
+        return `${feet}' ${Math.round(inch)}"`;
+      }
+      return `${feet}' ${inch.toFixed(3)}"`;
+    };
+
+    const formatInches = (inches) => `${inches.toFixed(2)} in`;
+    const formatMm = (inches) => `${(inches * 25.4).toFixed(1)} mm`;
+
+    const buildPlateData = () => {
+      const plateSelect = document.getElementById("plate");
+      const scaleInput = document.getElementById("scale_input");
+      const summary = document.getElementById("scale_summary");
+      const plateKey = plateSelect ? plateSelect.value : "";
+      const plate = plateData[plateKey];
+      const scale = parseScale(scaleInput ? scaleInput.value : "");
+      if (!plate) {
+        if (summary) summary.textContent = "Select an AAR plate.";
+        return null;
+      }
+      if (!scale || Number.isNaN(scale) || scale <= 0) {
+        if (summary) summary.textContent = "Enter a valid scale (HO, N, 1:87).";
+        return null;
+      }
+      return { plateKey, plate, scale };
+    };
+
+    const renderPlate = () => {
+      const plateSelect = document.getElementById("plate");
+      const scaleInput = document.getElementById("scale_input");
+      const summary = document.getElementById("scale_summary");
+      const container = document.getElementById("plate_viewer");
+      const base = buildPlateData();
+      if (!plateSelect || !scaleInput || !summary || !container) return;
+      const legend = document.getElementById("plate_legend");
+      if (legend) legend.innerHTML = "";
+
+      if (!base) {
+        container.innerHTML = "";
+        return;
+      }
+      const { plate, scale } = base;
+
+      const heights = plate.points.map((point) => point.h);
+      const widths = plate.points.map((point) => point.w);
+      const heightMax = Math.max(...heights);
+      const widthMax = Math.max(...widths);
+      const scaledWidth = widthMax / scale;
+      const scaledHeight = heightMax / scale;
+      const maxPx = 480;
+      const pxPerInch = 80;
+      let svgWidth = scaledWidth * pxPerInch;
+      let svgHeight = scaledHeight * pxPerInch;
+      const scaleFactor = Math.min(1, maxPx / Math.max(svgWidth, svgHeight));
+      svgWidth *= scaleFactor;
+      svgHeight *= scaleFactor;
+
+      const extraMeta = [];
+      if (plate.type) extraMeta.push(plate.type);
+      if (plate.truck_centers) extraMeta.push(`truck centers ${plate.truck_centers}`);
+      const metaText = extraMeta.length ? ` (${extraMeta.join(", ")})` : "";
+      summary.textContent = `${plate.label}${metaText} at 1:${scale} — Prototype ${formatFeetInches(widthMax)} x ${formatFeetInches(heightMax)} | Scale ${formatInches(scaledWidth)} x ${formatInches(scaledHeight)} (${formatMm(scaledWidth)} x ${formatMm(scaledHeight)})`;
+
+      const rightPoints = plate.points.map((point) => ({
+        x: point.w / 2 / scale,
+        y: (heightMax - point.h) / scale,
+        h: point.h,
+        w: point.w,
+      }));
+      const leftPoints = [...rightPoints].reverse().map((point) => ({
+        x: -point.x,
+        y: point.y,
+        h: point.h,
+        w: point.w,
+      }));
+      const allPoints = rightPoints.concat(leftPoints);
+      const pathD = allPoints
+        .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+        .join(" ")
+        .concat(" Z");
+
+      const padX = scaledWidth * 0.5;
+      const padY = scaledHeight * 0.2;
+      const dimOffset = scaledWidth * 0.12;
+      const dimTick = scaledWidth * 0.02;
+      const dimTextSize = scaledWidth / 45;
+      const labelTextSize = dimTextSize * 1.35;
+      const heightLabelOffset = dimTextSize * 1.6;
+      const outlineStroke = scaledWidth / 220;
+      const dimStroke = scaledWidth / 300;
+      const dimColor = "#b6ada1";
+      const labelColor = "#2f2a23";
+      const dimStack = Math.min(scaledHeight * 0.06, padY / 4);
+
+      const topThreshold = heightMax * 0.7;
+      const bottomThreshold = heightMax * 0.35;
+      const topDims = plate.points.filter((point) => point.h >= topThreshold);
+      const bottomDims = plate.points.filter((point) => point.h <= bottomThreshold);
+      const heightDims = [...plate.points].sort((a, b) => a.h - b.h);
+
+      container.innerHTML = `
+        <svg viewBox="${-scaledWidth / 2 - padX} ${-padY} ${scaledWidth + padX * 2} ${scaledHeight + padY * 2}" width="100%" height="70vh" preserveAspectRatio="xMidYMid meet" aria-label="${plate.label} scaled outline">
+          <rect x="${-scaledWidth / 2 - padX}" y="${-padY}" width="${scaledWidth + padX * 2}" height="${scaledHeight + padY * 2}" fill="#faf6f0" stroke="#d4c9ba" stroke-width="${dimStroke}" />
+          <path d="${pathD}" fill="#f4f1ea" stroke="#2f2a23" stroke-width="${outlineStroke}" />
+          ${topDims
+            .map((point, index) => {
+              const w = point.w / scale;
+              const yPoint = (heightMax - point.h) / scale;
+              const dimY = -padY + dimStack * (index + 1);
+              const label = `W${index + 1}`;
+              return `
+                <line x1="${-w / 2}" y1="${dimY}" x2="${w / 2}" y2="${dimY}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${-w / 2}" y1="${dimY - dimTick}" x2="${-w / 2}" y2="${dimY + dimTick}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${w / 2}" y1="${dimY - dimTick}" x2="${w / 2}" y2="${dimY + dimTick}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${-w / 2}" y1="${dimY}" x2="${-w / 2}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${w / 2}" y1="${dimY}" x2="${w / 2}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <text x="${w / 2 + dimTick * 1.2}" y="${dimY + labelTextSize * 0.35}" font-size="${labelTextSize}" fill="${labelColor}">${label}</text>
+              `;
+            })
+            .join("")}
+          ${bottomDims
+            .map((point, index) => {
+              const w = point.w / scale;
+              const yPoint = (heightMax - point.h) / scale;
+              const dimY = scaledHeight + padY - dimStack * (index + 1);
+              const label = `W${topDims.length + index + 1}`;
+              return `
+                <line x1="${-w / 2}" y1="${dimY}" x2="${w / 2}" y2="${dimY}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${-w / 2}" y1="${dimY - dimTick}" x2="${-w / 2}" y2="${dimY + dimTick}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${w / 2}" y1="${dimY - dimTick}" x2="${w / 2}" y2="${dimY + dimTick}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${-w / 2}" y1="${dimY}" x2="${-w / 2}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${w / 2}" y1="${dimY}" x2="${w / 2}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <text x="${w / 2 + dimTick * 1.2}" y="${dimY + labelTextSize * 0.35}" font-size="${labelTextSize}" fill="${labelColor}">${label}</text>
+              `;
+            })
+            .join("")}
+          ${heightDims
+            .map((point, index) => {
+              const yPoint = (heightMax - point.h) / scale;
+              const dimX = scaledWidth / 2 + dimOffset + index * dimStack * 0.6;
+              const label = `H${index + 1}`;
+              return `
+                <line x1="${dimX}" y1="${scaledHeight}" x2="${dimX}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${dimX - dimTick}" y1="${scaledHeight}" x2="${dimX + dimTick}" y2="${scaledHeight}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${dimX - dimTick}" y1="${yPoint}" x2="${dimX + dimTick}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <line x1="${scaledWidth / 2}" y1="${yPoint}" x2="${dimX}" y2="${yPoint}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+                <text x="${dimX + dimTick * 1.2}" y="${(scaledHeight + yPoint) / 2 - heightLabelOffset}" font-size="${labelTextSize}" fill="${labelColor}">${label}</text>
+              `;
+            })
+            .join("")}
+          <line x1="${-scaledWidth / 2 - dimOffset}" y1="${0}" x2="${-scaledWidth / 2 - dimOffset}" y2="${scaledHeight}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+          <line x1="${-scaledWidth / 2 - dimOffset - dimTick}" y1="${0}" x2="${-scaledWidth / 2 - dimOffset + dimTick}" y2="${0}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+          <line x1="${-scaledWidth / 2 - dimOffset - dimTick}" y1="${scaledHeight}" x2="${-scaledWidth / 2 - dimOffset + dimTick}" y2="${scaledHeight}" stroke="${dimColor}" stroke-width="${dimStroke}" />
+          <text x="${-scaledWidth / 2 - dimOffset - dimTick * 3}" y="${scaledHeight / 2}" font-size="${labelTextSize}" fill="${labelColor}" transform="rotate(-90 ${-scaledWidth / 2 - dimOffset - dimTick * 3} ${scaledHeight / 2})">H</text>
+        </svg>
+      `;
+
+      if (legend) {
+        const widthRows = [...topDims, ...bottomDims]
+          .map((point, index) => {
+            const label = `W${index + 1}`;
+            const scaleWidth = point.w / scale;
+            const scaleHeight = point.h / scale;
+            return `
+              <tr>
+                <td>${label}</td>
+                <td>${formatFeetInches(point.h)}</td>
+                <td>${formatFeetInches(point.w)}</td>
+                <td>${formatInches(scaleHeight)} (${formatMm(scaleHeight)})</td>
+                <td>${formatInches(scaleWidth)} (${formatMm(scaleWidth)})</td>
+              </tr>
+            `;
+          })
+          .join("");
+        const heightRows = heightDims
+          .map((point, index) => {
+            const label = `H${index + 1}`;
+            const scaleWidth = point.w / scale;
+            const scaleHeight = point.h / scale;
+            return `
+              <tr>
+                <td>${label}</td>
+                <td>${formatFeetInches(point.h)}</td>
+                <td>${formatFeetInches(point.w)}</td>
+                <td>${formatInches(scaleHeight)} (${formatMm(scaleHeight)})</td>
+                <td>${formatInches(scaleWidth)} (${formatMm(scaleWidth)})</td>
+              </tr>
+            `;
+          })
+          .join("");
+        const overallHeightScaled = heightMax / scale;
+        legend.innerHTML = `
+          <h3>Dimension Legend</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Label</th>
+                <th>Height (proto)</th>
+                <th>Width (proto)</th>
+                <th>Height (scale)</th>
+                <th>Width (scale)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${widthRows}
+              ${heightRows}
+              <tr>
+                <td>H</td>
+                <td>${formatFeetInches(heightMax)}</td>
+                <td>-</td>
+                <td>${formatInches(overallHeightScaled)} (${formatMm(overallHeightScaled)})</td>
+                <td>-</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      }
+    };
+
+    const plateSelect = document.getElementById("plate");
+    const scaleInput = document.getElementById("scale_input");
+    if (plateSelect) plateSelect.addEventListener("change", renderPlate);
+    if (scaleInput) scaleInput.addEventListener("input", renderPlate);
+    renderPlate();
+
+    const buildDxf = (plate, scale) => {
+      const heights = plate.points.map((point) => point.h);
+      const widths = plate.points.map((point) => point.w);
+
+      const rightPoints = plate.points.map((point) => ({
+        x: point.w / 2 / scale,
+        y: point.h / scale,
+        h: point.h,
+        w: point.w,
+      }));
+      const leftPoints = [...rightPoints].reverse().map((point) => ({
+        x: -point.x,
+        y: point.y,
+        h: point.h,
+        w: point.w,
+      }));
+      const outlinePoints = rightPoints.concat(leftPoints);
+
+      const dxf = [];
+      const push = (...pairs) => {
+        for (const [code, value] of pairs) {
+          dxf.push(String(code));
+          dxf.push(String(value));
+        }
+      };
+      const addPolyline = (points, layer = "OUTLINE") => {
+        push([0, "LWPOLYLINE"], [8, layer], [90, points.length], [70, 1]);
+        for (const point of points) {
+          push([10, point.x], [20, point.y]);
+        }
+      };
+
+      push([0, "SECTION"], [2, "HEADER"], [9, "$INSUNITS"], [70, 1], [0, "ENDSEC"]);
+      push([0, "SECTION"], [2, "TABLES"]);
+      push([0, "TABLE"], [2, "LAYER"], [70, 1]);
+      push([0, "LAYER"], [2, "OUTLINE"], [70, 0], [62, 7], [6, "CONTINUOUS"]);
+      push([0, "ENDTAB"], [0, "ENDSEC"]);
+      push([0, "SECTION"], [2, "ENTITIES"]);
+
+      addPolyline(outlinePoints, "OUTLINE");
+
+      push([0, "ENDSEC"], [0, "EOF"]);
+      return dxf.join("\n");
+    };
+
+    const exportButton = document.getElementById("export_dxf");
+    if (exportButton) {
+      exportButton.addEventListener("click", () => {
+        const base = buildPlateData();
+        if (!base) return;
+        const dxf = buildDxf(base.plate, base.scale);
+        const blob = new Blob([dxf], { type: "application/dxf" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `aar_plate_${base.plateKey}_1-${base.scale}.dxf`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      });
+    }
+  </script>
+{% endblock %}

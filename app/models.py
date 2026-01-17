@@ -64,6 +64,7 @@ class CarClass(BaseModel):
     is_locomotive: bool | None = None
     era: str | None = None
     load_limit: str | None = None
+    aar_plate: str | None = None
     capacity: str | None = None
     weight: str | None = None
     notes: str | None = None
@@ -150,6 +151,7 @@ class Car(BaseModel):
     capacity_override: str | None = None
     weight_override: str | None = None
     load_limit_override: str | None = None
+    aar_plate_override: str | None = None
     built: str | None = None
     alt_date: str | None = None
     reweight_date: str | None = None

@@ -41,6 +41,21 @@
           <input id="load_limit" name="load_limit" value="{{ car_class.load_limit or '' }}" />
         </div>
         <div>
+          <label for="aar_plate">AAR Plate</label>
+          <select id="aar_plate" name="aar_plate">
+            <option value="" {% if not car_class.aar_plate %}selected{% endif %}>Unset</option>
+            <option value="B" {% if car_class.aar_plate == 'B' %}selected{% endif %}>B</option>
+            <option value="C" {% if car_class.aar_plate == 'C' %}selected{% endif %}>C</option>
+            <option value="E" {% if car_class.aar_plate == 'E' %}selected{% endif %}>E</option>
+            <option value="F" {% if car_class.aar_plate == 'F' %}selected{% endif %}>F</option>
+            <option value="H" {% if car_class.aar_plate == 'H' %}selected{% endif %}>H</option>
+            <option value="J" {% if car_class.aar_plate == 'J' %}selected{% endif %}>J</option>
+            <option value="K" {% if car_class.aar_plate == 'K' %}selected{% endif %}>K</option>
+            <option value="L" {% if car_class.aar_plate == 'L' %}selected{% endif %}>L</option>
+            <option value="M" {% if car_class.aar_plate == 'M' %}selected{% endif %}>M</option>
+          </select>
+        </div>
+        <div>
           <label for="internal_length">Internal Length</label>
           <input id="internal_length" name="internal_length" value="{{ car_class.internal_length or '' }}" />
         </div>

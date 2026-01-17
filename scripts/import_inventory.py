@@ -66,6 +66,7 @@ def main(path: Path) -> None:
                 class_capacity = (row.get("Capacity (Lettering)") or "").strip()
                 class_weight = (row.get("Weight (Lettering)") or "").strip()
                 class_load_limit = (row.get("Load Limit") or "").strip()
+                class_aar_plate = (row.get("AAR Plate") or "").strip()
                 location_name = (row.get("Location") or "").strip()
 
                 railroad = None
@@ -87,11 +88,14 @@ def main(path: Path) -> None:
                         car_class.weight = class_weight
                     if class_load_limit and not car_class.load_limit:
                         car_class.load_limit = class_load_limit
+                    if class_aar_plate and not car_class.aar_plate:
+                        car_class.aar_plate = class_aar_plate
                 location = get_or_create_location(location_name) if location_name else None
 
                 capacity_override = None
                 weight_override = None
                 load_limit_override = None
+                aar_plate_override = None
                 car_type_override = None
                 wheel_override = None
                 tender_override = None
@@ -103,6 +107,8 @@ def main(path: Path) -> None:
                         weight_override = class_weight
                     if class_load_limit and car_class.load_limit and class_load_limit != car_class.load_limit:
                         load_limit_override = class_load_limit
+                    if class_aar_plate and car_class.aar_plate and class_aar_plate != car_class.aar_plate:
+                        aar_plate_override = class_aar_plate
                     if car_type and car_class.car_type and car_type != car_class.car_type:
                         car_type_override = car_type
                     if class_wheel and car_class.wheel_arrangement and class_wheel != car_class.wheel_arrangement:
@@ -116,6 +122,7 @@ def main(path: Path) -> None:
                     capacity_override = class_capacity or None
                     weight_override = class_weight or None
                     load_limit_override = class_load_limit or None
+                    aar_plate_override = class_aar_plate or None
                     if car_type and car_type.lower().find("locomotive") != -1:
                         is_locomotive_override = True
 
@@ -134,6 +141,7 @@ def main(path: Path) -> None:
                     capacity_override=capacity_override,
                     weight_override=weight_override,
                     load_limit_override=load_limit_override,
+                    aar_plate_override=aar_plate_override,
                     built=(row.get("Built (Lettering)") or "").strip(),
                     alt_date=(row.get("Alt Date") or "").strip(),
                     reweight_date=(row.get("Reweight date") or "").strip(),

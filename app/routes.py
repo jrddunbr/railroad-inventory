@@ -178,6 +178,7 @@ def inventory_export():
             "Capacity (Lettering)",
             "Weight (Lettering)",
             "Load Limit",
+            "AAR Plate",
             "Location",
             "Brand",
             "UPC",
@@ -204,6 +205,7 @@ def inventory_export():
         class_capacity = car.car_class.capacity if car.car_class else ""
         class_weight = car.car_class.weight if car.car_class else ""
         class_load_limit = car.car_class.load_limit if car.car_class else ""
+        class_aar_plate = car.car_class.aar_plate if car.car_class else ""
         writer.writerow(
             [
                 car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
@@ -215,6 +217,7 @@ def inventory_export():
                 car.capacity_override or class_capacity or "",
                 car.weight_override or class_weight or "",
                 car.load_limit_override or class_load_limit or "",
+                car.aar_plate_override or class_aar_plate or "",
                 car.location.name if car.location else "",
                 car.brand or "",
                 car.upc or "",
@@ -642,6 +645,11 @@ def tools():
     return render_template("tools.html")
 
 
+@main_bp.route("/tools/aar-plate-viewer")
+def aar_plate_viewer():
+    return render_template("aar_plate_viewer.html")
+
+
 def draw_wrapped_text(draw, text, x, y, max_width, font, line_height) -> None:
     if not text:
         return
@@ -910,6 +918,7 @@ def car_class_edit(class_id: int):
         car_class.capacity = request.form.get("capacity", "").strip()
         car_class.weight = request.form.get("weight", "").strip()
         car_class.load_limit = request.form.get("load_limit", "").strip()
+        car_class.aar_plate = request.form.get("aar_plate", "").strip()
         car_class.internal_length = request.form.get("internal_length", "").strip()
         car_class.internal_width = request.form.get("internal_width", "").strip()
         car_class.internal_height = request.form.get("internal_height", "").strip()
@@ -1074,6 +1083,7 @@ def car_new():
         "railroad_name": request.args.get("railroad_name", "").strip(),
         "car_class": request.args.get("car_class", "").strip(),
         "car_type": request.args.get("car_type", "").strip(),
+        "aar_plate": request.args.get("aar_plate", "").strip(),
         "capacity": request.args.get("capacity", "").strip(),
         "weight": request.args.get("weight", "").strip(),
         "load_limit": request.args.get("load_limit", "").strip(),
@@ -1148,6 +1158,7 @@ def api_car_classes():
             "capacity": c.capacity,
             "weight": c.weight,
             "load_limit": c.load_limit,
+            "aar_plate": c.aar_plate,
             "internal_length": c.internal_length,
             "internal_width": c.internal_width,
             "internal_height": c.internal_height,
@@ -1277,6 +1288,7 @@ def apply_car_form(car: Car, form) -> None:
     capacity_value = form.get("capacity", "").strip()
     weight_value = form.get("weight", "").strip()
     load_limit_value = form.get("load_limit", "").strip()
+    aar_plate_value = form.get("aar_plate", "").strip()
     car.built = form.get("built", "").strip()
     car.alt_date = form.get("alt_date", "").strip()
     car.reweight_date = form.get("reweight_date", "").strip()
@@ -1314,6 +1326,8 @@ def apply_car_form(car: Car, form) -> None:
             car_class.weight = weight_value
         if load_limit_value and (created_class or not car_class.load_limit):
             car_class.load_limit = load_limit_value
+        if aar_plate_value and not car_class.aar_plate:
+            car_class.aar_plate = aar_plate_value
         class_internal_length = form.get("internal_length", "").strip()
         class_internal_width = form.get("internal_width", "").strip()
         class_internal_height = form.get("internal_height", "").strip()
@@ -1328,6 +1342,7 @@ def apply_car_form(car: Car, form) -> None:
             car.capacity_override = None
             car.weight_override = None
             car.load_limit_override = None
+            car.aar_plate_override = None
             car.car_type_override = None
             car.wheel_arrangement_override = None
             car.tender_axles_override = None
@@ -1344,6 +1359,9 @@ def apply_car_form(car: Car, form) -> None:
             )
             car.load_limit_override = (
                 load_limit_value if load_limit_value and car_class.load_limit and load_limit_value != car_class.load_limit else None
+            )
+            car.aar_plate_override = (
+                aar_plate_value if aar_plate_value and car_class.aar_plate and aar_plate_value != car_class.aar_plate else None
             )
             car.internal_length_override = (
                 class_internal_length
@@ -1383,6 +1401,7 @@ def apply_car_form(car: Car, form) -> None:
         car.capacity_override = capacity_value or None
         car.weight_override = weight_value or None
         car.load_limit_override = load_limit_value or None
+        car.aar_plate_override = aar_plate_value or None
         car.car_type_override = car_type_value or None
         car.wheel_arrangement_override = form.get("class_wheel_arrangement", "").strip() or None
         car.tender_axles_override = form.get("class_tender_axles", "").strip() or None
@@ -1465,6 +1484,7 @@ def serialize_car(car: Car) -> dict:
     class_capacity = car.car_class.capacity if car.car_class else None
     class_weight = car.car_class.weight if car.car_class else None
     class_load_limit = car.car_class.load_limit if car.car_class else None
+    class_aar_plate = car.car_class.aar_plate if car.car_class else None
     class_internal_length = car.car_class.internal_length if car.car_class else None
     class_internal_width = car.car_class.internal_width if car.car_class else None
     class_internal_height = car.car_class.internal_height if car.car_class else None
@@ -1490,6 +1510,7 @@ def serialize_car(car: Car) -> dict:
         "capacity": car.capacity_override or class_capacity,
         "weight": car.weight_override or class_weight,
         "load_limit": car.load_limit_override or class_load_limit,
+        "aar_plate": car.aar_plate_override or class_aar_plate,
         "internal_length": car.internal_length_override or class_internal_length,
         "internal_width": car.internal_width_override or class_internal_width,
         "internal_height": car.internal_height_override or class_internal_height,
@@ -1507,6 +1528,7 @@ def serialize_car(car: Car) -> dict:
         "capacity_override": car.capacity_override,
         "weight_override": car.weight_override,
         "load_limit_override": car.load_limit_override,
+        "aar_plate_override": car.aar_plate_override,
         "internal_length_override": car.internal_length_override,
         "internal_width_override": car.internal_width_override,
         "internal_height_override": car.internal_height_override,

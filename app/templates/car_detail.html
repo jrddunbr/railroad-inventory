@@ -13,20 +13,24 @@
       {% set copy_capacity = car.car_class.capacity or '' %}
       {% set copy_weight = car.car_class.weight or '' %}
       {% set copy_load_limit = car.car_class.load_limit or '' %}
+      {% set copy_aar_plate = car.car_class.aar_plate or '' %}
       {% set copy_override_car_type = car.car_type_override or '' %}
       {% set copy_override_capacity = car.capacity_override or '' %}
       {% set copy_override_weight = car.weight_override or '' %}
       {% set copy_override_load_limit = car.load_limit_override or '' %}
+      {% set copy_override_aar_plate = car.aar_plate_override or '' %}
     {% else %}
       {% set copy_car_class = '' %}
       {% set copy_car_type = car.car_type_override or '' %}
       {% set copy_capacity = car.capacity_override or '' %}
       {% set copy_weight = car.weight_override or '' %}
       {% set copy_load_limit = car.load_limit_override or '' %}
+      {% set copy_aar_plate = car.aar_plate_override or '' %}
       {% set copy_override_car_type = copy_car_type %}
       {% set copy_override_capacity = copy_capacity %}
       {% set copy_override_weight = copy_weight %}
       {% set copy_override_load_limit = copy_load_limit %}
+      {% set copy_override_aar_plate = copy_aar_plate %}
     {% endif %}
     <h1>
       {{ (car.railroad.reporting_mark if car.railroad else car.reporting_mark_override) or "" }} {{ car.car_number or "" }}
@@ -37,9 +41,9 @@
     <div class="actions">
       <a class="tag" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
       <a class="tag" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
-      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit) }}">Copy to New Car</a>
-      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit) }}">Copy to New Car (Overrides)</a>
-      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
+      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate) }}">Copy to New Car</a>
+      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate) }}">Copy to New Car (Overrides)</a>
+      <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
       <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" data-action="delete" data-table="cars" data-id="{{ car.id }}" data-id-field="id" data-entity-label="car {{ car.id }}">
         <button type="submit" class="tag">Delete</button>
       </form>
@@ -118,6 +122,13 @@
             {{ car.load_limit_override }}{% if car.car_class %} (override){% endif %}
           {% else %}
             {{ car.car_class.load_limit if car.car_class else "-" }}
+          {% endif %}
+        </p>
+        <p><strong>AAR Plate:</strong>
+          {% if car.aar_plate_override %}
+            {{ car.aar_plate_override }}{% if car.car_class %} (override){% endif %}
+          {% else %}
+            {{ car.car_class.aar_plate if car.car_class else "-" }}
           {% endif %}
         </p>
         <p><strong>Internal Length:</strong> {{ car.internal_length_override or (car.car_class.internal_length if car.car_class else "-") }}</p>

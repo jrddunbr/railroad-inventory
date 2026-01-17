@@ -74,6 +74,7 @@
         </div>
         <h3>Weight Specifications</h3>
         <div class="grid">
+          {% set aar_plate_value = car.aar_plate_override if car and car.aar_plate_override else (prefill.get('aar_plate', '') if not car else '') %}
           <div>
             <label for="capacity">Capacity</label>
             <input id="capacity" name="capacity" value="{{ car.capacity_override if car and car.capacity_override else (prefill.get('capacity', '') if not car else '') }}" data-gray-default="true" />
@@ -85,6 +86,21 @@
           <div>
             <label for="weight">Weight</label>
             <input id="weight" name="weight" value="{{ car.weight_override if car and car.weight_override else (prefill.get('weight', '') if not car else '') }}" data-gray-default="true" />
+          </div>
+          <div>
+            <label for="aar_plate">AAR Plate</label>
+            <select id="aar_plate" name="aar_plate" data-gray-default="true">
+              <option value="" {% if not aar_plate_value %}selected{% endif %}>Unset</option>
+              <option value="B" {% if aar_plate_value == 'B' %}selected{% endif %}>B</option>
+              <option value="C" {% if aar_plate_value == 'C' %}selected{% endif %}>C</option>
+              <option value="E" {% if aar_plate_value == 'E' %}selected{% endif %}>E</option>
+              <option value="F" {% if aar_plate_value == 'F' %}selected{% endif %}>F</option>
+              <option value="H" {% if aar_plate_value == 'H' %}selected{% endif %}>H</option>
+              <option value="J" {% if aar_plate_value == 'J' %}selected{% endif %}>J</option>
+              <option value="K" {% if aar_plate_value == 'K' %}selected{% endif %}>K</option>
+              <option value="L" {% if aar_plate_value == 'L' %}selected{% endif %}>L</option>
+              <option value="M" {% if aar_plate_value == 'M' %}selected{% endif %}>M</option>
+            </select>
           </div>
         </div>
         <h3>Internal Dimensions</h3>
@@ -213,6 +229,7 @@
       capacity: document.getElementById('capacity'),
       weight: document.getElementById('weight'),
       loadLimit: document.getElementById('load_limit'),
+      aarPlate: document.getElementById('aar_plate'),
       internalLength: document.getElementById('internal_length'),
       internalWidth: document.getElementById('internal_width'),
       internalHeight: document.getElementById('internal_height'),
@@ -234,6 +251,7 @@
 
     const clearGrayDefault = (input) => {
       if (!input || input.dataset.isDefault !== 'true') return;
+      if (input.tagName === 'SELECT') return;
       input.value = '';
       input.dataset.isDefault = 'false';
       input.style.color = '';
@@ -256,6 +274,7 @@
       setGrayDefault(classFields.capacity, carClass.capacity);
       setGrayDefault(classFields.weight, carClass.weight);
       setGrayDefault(classFields.loadLimit, carClass.load_limit);
+      setGrayDefault(classFields.aarPlate, carClass.aar_plate);
       setGrayDefault(classFields.internalLength, carClass.internal_length);
       setGrayDefault(classFields.internalWidth, carClass.internal_width);
       setGrayDefault(classFields.internalHeight, carClass.internal_height);
@@ -334,7 +353,7 @@
       });
     }
 
-    [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.internalLength, classFields.internalWidth, classFields.internalHeight, classFields.carType, classFields.wheel, classFields.tender].forEach((input) => {
+    [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.aarPlate, classFields.internalLength, classFields.internalWidth, classFields.internalHeight, classFields.carType, classFields.wheel, classFields.tender].forEach((input) => {
       if (!input) return;
       input.addEventListener('focus', () => clearGrayDefault(input));
       input.addEventListener('input', () => {
@@ -343,12 +362,18 @@
         }
         input.style.color = '';
       });
+      input.addEventListener('change', () => {
+        if (input.dataset.isDefault === 'true') {
+          input.dataset.isDefault = 'false';
+        }
+        input.style.color = '';
+      });
     });
 
     const form = document.querySelector('form[data-mode]');
     if (form) {
       form.addEventListener('submit', () => {
-        [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.internalLength, classFields.internalWidth, classFields.internalHeight].forEach((input) => {
+        [classFields.capacity, classFields.weight, classFields.loadLimit, classFields.aarPlate, classFields.internalLength, classFields.internalWidth, classFields.internalHeight].forEach((input) => {
           if (input && input.dataset.isDefault === 'true') {
             input.value = '';
           }
