@@ -993,7 +993,24 @@ def location_delete(location_id: int):
 @main_bp.route("/cars/<int:car_id>")
 def car_detail(car_id: int):
     car = Car.query.get_or_404(car_id)
-    return render_template("car_detail.html", car=car)
+    compare_cars = []
+    for other in Car.query.order_by("id").all():
+        if other.id == car.id:
+            continue
+        reporting_mark = other.railroad.reporting_mark if other.railroad else other.reporting_mark_override
+        compare_cars.append(
+            {
+                "id": other.id,
+                "reporting_mark": reporting_mark,
+                "car_number": other.car_number,
+            }
+        )
+    return render_template(
+        "car_detail.html",
+        car=car,
+        compare_cars=compare_cars,
+        car_payload=serialize_car(car),
+    )
 
 
 @main_bp.route("/cars/<int:car_id>/inspect", methods=["GET", "POST"])

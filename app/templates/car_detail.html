@@ -44,11 +44,26 @@
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate) }}">Copy to New Car</a>
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate) }}">Copy to New Car (Overrides)</a>
       <a class="tag" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
+      <button type="button" class="tag" id="compare-trigger" {% if not compare_cars %}disabled{% endif %}>Compare</button>
       <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" data-action="delete" data-table="cars" data-id="{{ car.id }}" data-id-field="id" data-entity-label="car {{ car.id }}">
         <button type="submit" class="tag">Delete</button>
       </form>
       <a class="tag" href="{{ url_for('main.inventory') }}">Back to Inventory</a>
     </div>
+    <section class="compare-section" id="compare-section" hidden>
+      <h3>Comparison</h3>
+      <p class="keyboard-hint" id="compare-summary"></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Field</th>
+            <th>This Car</th>
+            <th>Other Car</th>
+          </tr>
+        </thead>
+        <tbody id="compare-body"></tbody>
+      </table>
+    </section>
     <div class="grid">
       <div>
         <h3>Identity</h3>
@@ -211,4 +226,169 @@
       </tbody>
     </table>
   </div>
+  <div id="compare-modal" class="compare-overlay" style="display: none;" aria-hidden="true">
+    <div class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="compare-title">
+      <h2 id="compare-title">Compare railcars</h2>
+      <p class="keyboard-hint">Select another car to compare with this one.</p>
+      <label for="compare-car-select">Railcar ID</label>
+      <select id="compare-car-select">
+        <option value="">Select a railcar</option>
+        {% for option in compare_cars %}
+          <option value="{{ option.id }}">{{ option.id }} - {{ option.reporting_mark or "-" }} {{ option.car_number or "" }}</option>
+        {% endfor %}
+      </select>
+      <div class="compare-actions">
+        <button type="button" id="compare-cancel">Cancel</button>
+        <button type="button" id="compare-apply" disabled>Compare</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    const compareTrigger = document.getElementById('compare-trigger');
+    const compareModal = document.getElementById('compare-modal');
+    const compareSelect = document.getElementById('compare-car-select');
+    const compareApply = document.getElementById('compare-apply');
+    const compareCancel = document.getElementById('compare-cancel');
+    const compareSection = document.getElementById('compare-section');
+    const compareBody = document.getElementById('compare-body');
+    const compareSummary = document.getElementById('compare-summary');
+    const currentCar = {{ car_payload | tojson }};
+    let compareFocusReturn = null;
+
+    const compareFields = [
+      { key: 'id', label: 'ID' },
+      { key: 'reporting_mark', label: 'Reporting Mark' },
+      { key: 'car_number', label: 'Car #' },
+      { key: 'car_type', label: 'Type' },
+      { key: 'car_class', label: 'Class' },
+      { key: 'railroad', label: 'Railroad' },
+      { key: 'location', label: 'Location' },
+      { key: 'wheel_arrangement', label: 'Wheel Arrangement' },
+      { key: 'tender_axles', label: 'Tender Axles' },
+      { key: 'dcc_id', label: 'DCC ID' },
+      { key: 'capacity', label: 'Capacity' },
+      { key: 'weight', label: 'Weight' },
+      { key: 'load_limit', label: 'Load Limit' },
+      { key: 'aar_plate', label: 'AAR Plate' },
+      { key: 'internal_length', label: 'Internal Length' },
+      { key: 'internal_width', label: 'Internal Width' },
+      { key: 'internal_height', label: 'Internal Height' },
+      { key: 'built', label: 'Built' },
+      { key: 'alt_date', label: 'Alt Date' },
+      { key: 'reweight_date', label: 'Reweigh Date' },
+      { key: 'repack_bearings_date', label: 'Repack Bearings Date' },
+      { key: 'last_inspection_date', label: 'Last Inspection Date' },
+      { key: 'brand', label: 'Brand' },
+      { key: 'upc', label: 'UPC' },
+      { key: 'traction_drivers', label: 'Traction Drivers' },
+      { key: 'other_lettering', label: 'Other Lettering' },
+      { key: 'msrp', label: 'MSRP' },
+      { key: 'price', label: 'Price' },
+      { key: 'load', label: 'Load' },
+      { key: 'repairs_required', label: 'Repairs Required' },
+      { key: 'notes', label: 'Notes' },
+      { key: 'is_locomotive', label: 'Locomotive' },
+    ];
+
+    const formatCompareValue = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return '-';
+      }
+      if (typeof value === 'boolean') {
+        return value ? 'Yes' : 'No';
+      }
+      return String(value);
+    };
+
+    const openCompareModal = () => {
+      compareFocusReturn = document.activeElement;
+      compareSelect.value = '';
+      compareApply.disabled = true;
+      compareModal.style.display = 'flex';
+      compareModal.setAttribute('aria-hidden', 'false');
+      compareSelect.focus();
+    };
+
+    const closeCompareModal = () => {
+      compareModal.style.display = 'none';
+      compareModal.setAttribute('aria-hidden', 'true');
+      if (compareFocusReturn) {
+        compareFocusReturn.focus();
+      }
+    };
+
+    compareTrigger?.addEventListener('click', openCompareModal);
+    compareCancel?.addEventListener('click', closeCompareModal);
+
+    compareSelect?.addEventListener('change', (event) => {
+      compareApply.disabled = !event.target.value;
+    });
+
+    compareApply?.addEventListener('click', async () => {
+      const carId = compareSelect.value;
+      if (!carId) return;
+      let otherCar = null;
+      try {
+        const response = await fetch(`/api/cars/${carId}`);
+        if (!response.ok) {
+          throw new Error('bad response');
+        }
+        otherCar = await response.json();
+      } catch (error) {
+        compareSummary.textContent = 'Unable to load comparison data.';
+        compareSection.hidden = false;
+        closeCompareModal();
+        return;
+      }
+      const differences = compareFields
+        .map((field) => {
+          const currentValue = formatCompareValue(currentCar[field.key]);
+          const otherValue = formatCompareValue(otherCar[field.key]);
+          if (currentValue === otherValue) return null;
+          return {
+            label: field.label,
+            currentValue,
+            otherValue,
+          };
+        })
+        .filter(Boolean);
+
+      compareBody.innerHTML = '';
+      if (!differences.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.colSpan = 3;
+        cell.textContent = 'No differences found.';
+        row.appendChild(cell);
+        compareBody.appendChild(row);
+        compareSummary.textContent = `Comparing car ${currentCar.id} to ${otherCar.id}.`;
+      } else {
+        differences.forEach((diff) => {
+          const row = document.createElement('tr');
+          row.classList.add('compare-diff');
+          const labelCell = document.createElement('td');
+          labelCell.textContent = diff.label;
+          const currentCell = document.createElement('td');
+          currentCell.textContent = diff.currentValue;
+          const otherCell = document.createElement('td');
+          otherCell.textContent = diff.otherValue;
+          row.appendChild(labelCell);
+          row.appendChild(currentCell);
+          row.appendChild(otherCell);
+          compareBody.appendChild(row);
+        });
+        compareSummary.textContent = `Comparing car ${currentCar.id} to ${otherCar.id}. Showing ${differences.length} differences.`;
+      }
+      compareSection.hidden = false;
+      closeCompareModal();
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (compareModal.getAttribute('aria-hidden') === 'true') return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCompareModal();
+      }
+    });
+  </script>
 {% endblock %}

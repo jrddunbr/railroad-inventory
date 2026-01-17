@@ -167,6 +167,46 @@
       gap: 12px;
       margin-top: 16px;
     }
+    .compare-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--mi-overlay);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      z-index: 1000;
+    }
+    .compare-dialog {
+      width: min(560px, 92vw);
+      background: var(--mi-panel);
+      border-radius: 16px;
+      border: 1px solid var(--mi-border);
+      box-shadow: 0 24px 60px rgba(34, 34, 34, 0.25);
+      padding: 20px 24px;
+    }
+    .compare-dialog label {
+      display: block;
+      margin-top: 12px;
+      font-weight: 600;
+    }
+    .compare-dialog select {
+      width: 100%;
+      margin-top: 6px;
+      padding: 6px 8px;
+    }
+    .compare-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .compare-section {
+      margin-top: 24px;
+    }
+    .compare-section .compare-diff td {
+      background: #f7f3ea;
+    }
     @media (max-width: 900px) {
       .container {
         grid-template-columns: 1fr;
