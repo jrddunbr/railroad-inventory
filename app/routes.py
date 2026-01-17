@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import math
 import os
 import re
 from datetime import datetime
@@ -14,6 +15,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.backup import ensure_periodic_backup
 from app.models import (
+    AppSettings,
     Car,
     CarInspection,
     CarClass,
@@ -30,11 +32,77 @@ from app.models import (
 
 main_bp = Blueprint("main", __name__)
 
+PAGINATION_OPTIONS = ["25", "50", "100", "250", "all"]
+DEFAULT_PAGE_SIZE = "50"
 
 
 def ensure_db_backup() -> None:
     ensure_periodic_backup(db.store.db)
 
+
+def get_app_settings() -> AppSettings:
+    settings = AppSettings.query.get(1)
+    if settings:
+        return settings
+    settings = AppSettings(id=1, page_size=DEFAULT_PAGE_SIZE)
+    db.session.add(settings)
+    db.session.commit()
+    ensure_db_backup()
+    return settings
+
+
+def get_page_size() -> str:
+    settings = get_app_settings()
+    size = settings.page_size or DEFAULT_PAGE_SIZE
+    if size not in PAGINATION_OPTIONS:
+        return DEFAULT_PAGE_SIZE
+    return size
+
+
+def get_page_number() -> int:
+    page_value = request.args.get("page", "").strip()
+    if page_value.isdigit():
+        return max(1, int(page_value))
+    return 1
+
+
+def paginate_list(items: list, page: int, page_size: str, route: str, route_params: dict) -> tuple[list, dict]:
+    total = len(items)
+    if page_size == "all":
+        start = 1 if total else 0
+        return (
+            items,
+            {
+                "page": 1,
+                "pages": 1,
+                "total": total,
+                "start": start,
+                "end": total,
+                "page_size": page_size,
+                "prev_url": None,
+                "next_url": None,
+            },
+        )
+    per_page = int(page_size)
+    pages = max(1, math.ceil(total / per_page))
+    page = min(max(1, page), pages)
+    start_index = (page - 1) * per_page
+    end_index = min(start_index + per_page, total)
+    prev_url = url_for(route, **route_params, page=page - 1) if page > 1 else None
+    next_url = url_for(route, **route_params, page=page + 1) if page < pages else None
+    return (
+        items[start_index:end_index],
+        {
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "start": start_index + 1 if total else 0,
+            "end": end_index,
+            "page_size": page_size,
+            "prev_url": prev_url,
+            "next_url": next_url,
+        },
+    )
 
 def get_or_create_location(name: str) -> Optional[Location]:
     if not name:
@@ -93,7 +161,10 @@ def index():
 @main_bp.route("/inventory")
 def inventory():
     cars = Car.query.order_by("id", reverse=True).all()
-    return render_template("inventory.html", cars=cars)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_cars, pagination = paginate_list(cars, page, page_size, "main.inventory", {})
+    return render_template("inventory.html", cars=paged_cars, pagination=pagination)
 
 
 @main_bp.route("/reports")
@@ -439,13 +510,19 @@ def conflict_report():
 @main_bp.route("/railroads")
 def railroads():
     railroads = Railroad.query.order_by("reporting_mark").all()
-    return render_template("railroads.html", railroads=railroads)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_railroads, pagination = paginate_list(railroads, page, page_size, "main.railroads", {})
+    return render_template("railroads.html", railroads=paged_railroads, pagination=pagination)
 
 
 @main_bp.route("/locations")
 def locations():
     locations = Location.query.order_by("name").all()
-    return render_template("locations.html", locations=locations)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_locations, pagination = paginate_list(locations, page, page_size, "main.locations", {})
+    return render_template("locations.html", locations=paged_locations, pagination=pagination)
 
 
 @main_bp.route("/locations/new", methods=["GET", "POST"])
@@ -475,7 +552,21 @@ def location_new():
 def railroad_detail(railroad_id: int):
     railroad = Railroad.query.get_or_404(railroad_id)
     cars = Car.query.filter_by(railroad_id=railroad.id).order_by("id", reverse=True).all()
-    return render_template("railroad_detail.html", railroad=railroad, cars=cars)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_cars, cars_pagination = paginate_list(
+        cars,
+        page,
+        page_size,
+        "main.railroad_detail",
+        {"railroad_id": railroad.id},
+    )
+    return render_template(
+        "railroad_detail.html",
+        railroad=railroad,
+        cars=paged_cars,
+        cars_pagination=cars_pagination,
+    )
 
 
 @main_bp.route("/railroads/<int:railroad_id>/delete", methods=["POST"])
@@ -742,20 +833,35 @@ def car_classes():
     classes = CarClass.query.order_by("code").all()
     car_classes = [c for c in classes if not c.is_locomotive]
     locomotive_classes = [c for c in classes if c.is_locomotive]
-    return render_template("car_classes.html", car_classes=car_classes)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_classes, pagination = paginate_list(car_classes, page, page_size, "main.car_classes", {})
+    return render_template("car_classes.html", car_classes=paged_classes, pagination=pagination)
 
 
 @main_bp.route("/locomotive-classes")
 def locomotive_classes():
     classes = CarClass.query.order_by("code").all()
     locomotive_classes = [c for c in classes if c.is_locomotive]
-    return render_template("locomotive_classes.html", locomotive_classes=locomotive_classes)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_classes, pagination = paginate_list(
+        locomotive_classes,
+        page,
+        page_size,
+        "main.locomotive_classes",
+        {},
+    )
+    return render_template("locomotive_classes.html", locomotive_classes=paged_classes, pagination=pagination)
 
 
 @main_bp.route("/loads")
 def loads():
     loads = LoadType.query.order_by("name").all()
-    return render_template("loads.html", loads=loads)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_loads, pagination = paginate_list(loads, page, page_size, "main.loads", {})
+    return render_template("loads.html", loads=paged_loads, pagination=pagination)
 
 
 @main_bp.route("/loads/new", methods=["GET", "POST"])
@@ -776,7 +882,21 @@ def load_new():
 def load_detail(load_id: int):
     load = LoadType.query.get_or_404(load_id)
     placements = LoadPlacement.query.filter_by(load_id=load.id).all()
-    return render_template("load_detail.html", load=load, placements=placements)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_placements, placements_pagination = paginate_list(
+        placements,
+        page,
+        page_size,
+        "main.load_detail",
+        {"load_id": load.id},
+    )
+    return render_template(
+        "load_detail.html",
+        load=load,
+        placements=paged_placements,
+        placements_pagination=placements_pagination,
+    )
 
 
 @main_bp.route("/loads/<int:load_id>/edit", methods=["GET", "POST"])
@@ -891,7 +1011,21 @@ def load_placement_delete(placement_id: int):
 def car_class_detail(class_id: int):
     car_class = CarClass.query.get_or_404(class_id)
     cars = Car.query.filter_by(car_class_id=car_class.id).order_by("id", reverse=True).all()
-    return render_template("car_class_detail.html", car_class=car_class, cars=cars)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_cars, cars_pagination = paginate_list(
+        cars,
+        page,
+        page_size,
+        "main.car_class_detail",
+        {"class_id": car_class.id},
+    )
+    return render_template(
+        "car_class_detail.html",
+        car_class=car_class,
+        cars=paged_cars,
+        cars_pagination=cars_pagination,
+    )
 
 
 @main_bp.route("/car-classes/<int:class_id>/delete", methods=["POST"])
@@ -933,7 +1067,21 @@ def car_class_edit(class_id: int):
 def location_detail(location_id: int):
     location = Location.query.get_or_404(location_id)
     cars = Car.query.filter_by(location_id=location.id).order_by("id", reverse=True).all()
-    return render_template("location_detail.html", location=location, cars=cars)
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_cars, cars_pagination = paginate_list(
+        cars,
+        page,
+        page_size,
+        "main.location_detail",
+        {"location_id": location.id},
+    )
+    return render_template(
+        "location_detail.html",
+        location=location,
+        cars=paged_cars,
+        cars_pagination=cars_pagination,
+    )
 
 
 def get_location_descendant_ids(location: Location) -> set[int]:
@@ -1438,7 +1586,28 @@ def apply_car_form(car: Car, form) -> None:
 def settings():
     inspection_types = InspectionType.query.all()
     type_rows = inspection_type_tree(inspection_types)
-    return render_template("settings.html", inspection_types=type_rows)
+    page_size = get_page_size()
+    options = [
+        {"value": value, "label": "All" if value == "all" else value} for value in PAGINATION_OPTIONS
+    ]
+    return render_template(
+        "settings.html",
+        inspection_types=type_rows,
+        page_size=page_size,
+        page_size_options=options,
+    )
+
+
+@main_bp.route("/settings/pagination", methods=["POST"])
+def settings_pagination():
+    page_size = request.form.get("page_size", "").strip()
+    if page_size not in PAGINATION_OPTIONS:
+        return "Invalid pagination size.", 400
+    settings = get_app_settings()
+    settings.page_size = page_size
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.settings"))
 
 
 @main_bp.route("/settings/inspection-types/new", methods=["GET", "POST"])

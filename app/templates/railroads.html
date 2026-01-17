@@ -2,7 +2,7 @@
 {% block content %}
   <div class="panel">
     <h1>Railroads</h1>
-    <p class="keyboard-hint">Results: {{ railroads|length }}</p>
+    <p class="keyboard-hint">Results: {{ pagination.total }}</p>
     <table>
       <thead>
         <tr>
@@ -39,5 +39,31 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if pagination %}
+      <div class="pagination">
+        <div class="pagination-info">
+          {% if pagination.total %}
+            Showing {{ pagination.start }}-{{ pagination.end }} of {{ pagination.total }}
+          {% else %}
+            No results.
+          {% endif %}
+        </div>
+        {% if pagination.pages > 1 %}
+          <div class="pagination-controls">
+            {% if pagination.prev_url %}
+              <a class="tag" href="{{ pagination.prev_url }}">Prev</a>
+            {% else %}
+              <span class="tag tag-muted">Prev</span>
+            {% endif %}
+            <span class="pagination-label">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.next_url %}
+              <a class="tag" href="{{ pagination.next_url }}">Next</a>
+            {% else %}
+              <span class="tag tag-muted">Next</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 {% endblock %}

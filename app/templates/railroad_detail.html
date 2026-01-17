@@ -116,7 +116,7 @@
       </tbody>
     </table>
     <h3>Cars</h3>
-    <p class="keyboard-hint">Results: {{ cars|length }}</p>
+    <p class="keyboard-hint">Results: {{ cars_pagination.total }}</p>
     <table>
       <thead>
         <tr>
@@ -161,5 +161,31 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if cars_pagination %}
+      <div class="pagination">
+        <div class="pagination-info">
+          {% if cars_pagination.total %}
+            Showing {{ cars_pagination.start }}-{{ cars_pagination.end }} of {{ cars_pagination.total }}
+          {% else %}
+            No results.
+          {% endif %}
+        </div>
+        {% if cars_pagination.pages > 1 %}
+          <div class="pagination-controls">
+            {% if cars_pagination.prev_url %}
+              <a class="tag" href="{{ cars_pagination.prev_url }}">Prev</a>
+            {% else %}
+              <span class="tag tag-muted">Prev</span>
+            {% endif %}
+            <span class="pagination-label">Page {{ cars_pagination.page }} of {{ cars_pagination.pages }}</span>
+            {% if cars_pagination.next_url %}
+              <a class="tag" href="{{ cars_pagination.next_url }}">Next</a>
+            {% else %}
+              <span class="tag tag-muted">Next</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 {% endblock %}

@@ -48,6 +48,7 @@
     <div class="actions">
       <a class="tag" href="{{ url_for('main.load_placement_new', load_id=load.id) }}">Add Placement</a>
     </div>
+    <p class="keyboard-hint">Results: {{ placements_pagination.total }}</p>
     <table>
       <thead>
         <tr>
@@ -90,5 +91,31 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if placements_pagination %}
+      <div class="pagination">
+        <div class="pagination-info">
+          {% if placements_pagination.total %}
+            Showing {{ placements_pagination.start }}-{{ placements_pagination.end }} of {{ placements_pagination.total }}
+          {% else %}
+            No results.
+          {% endif %}
+        </div>
+        {% if placements_pagination.pages > 1 %}
+          <div class="pagination-controls">
+            {% if placements_pagination.prev_url %}
+              <a class="tag" href="{{ placements_pagination.prev_url }}">Prev</a>
+            {% else %}
+              <span class="tag tag-muted">Prev</span>
+            {% endif %}
+            <span class="pagination-label">Page {{ placements_pagination.page }} of {{ placements_pagination.pages }}</span>
+            {% if placements_pagination.next_url %}
+              <a class="tag" href="{{ placements_pagination.next_url }}">Next</a>
+            {% else %}
+              <span class="tag tag-muted">Next</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
   </div>
 {% endblock %}

@@ -241,6 +241,15 @@ class CarInspection(BaseModel):
     inspection_type_id: int | None = None
     inspection_date: str | None = None
     details: str | None = None
+
+
+@dataclass
+class AppSettings(BaseModel):
+    doc_type = "app_settings"
+    counter_key = "app_settings"
+    query = QueryDescriptor()
+
+    page_size: str | None = None
     passed: bool | None = None
 
     @property

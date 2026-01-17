@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields
+import time
 from typing import Any, Iterable, Type, TypeVar
 
 import couchdb
 from couchdb import http
-from flask import abort
+from flask import abort, g, has_request_context
 
 from app.backup import ensure_schema_backup
 
@@ -100,7 +101,9 @@ class CouchStore:
         if cached is not None:
             return cached  # type: ignore[return-value]
         doc_id = f"{model_cls.doc_type}:{item_id}"
+        start = time.perf_counter()
         doc = self.db.get(doc_id)
+        self._track_db_time(start)
         if not doc:
             return None
         obj = model_cls.from_doc(doc, self)
@@ -111,12 +114,14 @@ class CouchStore:
         if not self.db:
             return []
         prefix = f"{model_cls.doc_type}:"
+        start = time.perf_counter()
         rows = self.db.view(
             "_all_docs",
             include_docs=True,
             startkey=prefix,
             endkey=f"{prefix}\ufff0",
         )
+        self._track_db_time(start)
         results: list[T] = []
         for row in rows:
             doc = row.doc
@@ -155,7 +160,9 @@ class CouchStore:
         else:
             self.ensure_counter_at_least(obj.counter_key, obj.id)
         doc = obj.to_doc()
+        start = time.perf_counter()
         doc_id, rev = self.db.save(doc)
+        self._track_db_time(start)
         obj.id = int(doc_id.split(":")[-1])
         obj._rev = rev
         obj._dirty = False
@@ -166,10 +173,21 @@ class CouchStore:
         if not self.db or obj.id is None:
             return
         doc_id = f"{obj.doc_type}:{obj.id}"
+        start = time.perf_counter()
         doc = self.db.get(doc_id)
+        self._track_db_time(start)
         if doc:
+            start = time.perf_counter()
             self.db.delete(doc)
+            self._track_db_time(start)
         self.cache.pop((obj.__class__, obj.id), None)
+
+    def _track_db_time(self, start: float) -> None:
+        if not has_request_context():
+            return
+        elapsed = time.perf_counter() - start
+        current = getattr(g, "db_time", 0.0)
+        setattr(g, "db_time", current + elapsed)
 
     def dirty_objects(self) -> list[T]:
         return [obj for obj in self.cache.values() if obj._dirty]

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import os
-from flask import Flask
+import time
+
+from flask import Flask, g
 
 from app.storage import db
 
@@ -37,6 +39,7 @@ def create_app() -> Flask:
             "railroad_color_schemes",
             "railroad_logos",
             "railroad_slogans",
+            "app_settings",
         ],
         SCHEMA_VERSION=SCHEMA_VERSION,
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
@@ -50,6 +53,20 @@ def create_app() -> Flask:
     from app.routes import main_bp
 
     app.register_blueprint(main_bp)
+
+    @app.before_request
+    def start_timer() -> None:
+        g.request_start = time.perf_counter()
+        g.db_time = 0.0
+
+    @app.context_processor
+    def inject_timing() -> dict:
+        start = getattr(g, "request_start", None)
+        if start is None:
+            return {"page_timing": None}
+        total_ms = (time.perf_counter() - start) * 1000
+        db_ms = getattr(g, "db_time", 0.0) * 1000
+        return {"page_timing": {"total_ms": total_ms, "db_ms": db_ms}}
 
     with app.app_context():
         from app.models import Location

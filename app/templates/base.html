@@ -113,11 +113,37 @@
       color: #2d5f5d;
       font-size: 12px;
       font-weight: 600;
+      text-decoration: none;
+    }
+    .tag-muted {
+      background: #f1ede5;
+      color: #7b7b7b;
     }
     .keyboard-hint {
       font-size: 12px;
       color: #666666;
       margin-top: 8px;
+    }
+    .pagination {
+      margin-top: 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .pagination-info {
+      font-size: 13px;
+      color: #555555;
+    }
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pagination-label {
+      font-size: 13px;
+      color: #555555;
     }
     .confirm-overlay {
       position: fixed;
@@ -254,6 +280,9 @@
   <footer>
     Copyright Jared Dunbar 2026 ·
     <a href="https://github.com/jrddunbr/railroad-inventory" target="_blank" rel="noopener">GitHub</a>
+    {% if page_timing %}
+      · Load: {{ "%.0f"|format(page_timing.total_ms) }} ms (DB: {{ "%.0f"|format(page_timing.db_ms) }} ms)
+    {% endif %}
   </footer>
   <div id="mi-confirm-modal" class="confirm-overlay" style="display: none;" aria-hidden="true">
     <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="mi-confirm-title">
@@ -293,6 +322,7 @@
       railroad_slogans: 'railroad_slogan',
       car_inspections: 'car_inspection',
       inspection_types: 'inspection_type',
+      app_settings: 'app_settings',
     };
 
     const getLabelText = (input) => {

@@ -2,6 +2,18 @@
 {% block content %}
   <div class="panel">
     <h1>Settings</h1>
+    <h2>Table Pagination</h2>
+    <form method="post" action="{{ url_for('main.settings_pagination') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="pagination settings">
+      <label for="page_size">Rows per page</label>
+      <select name="page_size" id="page_size">
+        {% for option in page_size_options %}
+          <option value="{{ option.value }}" {% if option.value == page_size %}selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+      <div class="actions">
+        <button type="submit" class="tag">Save Pagination</button>
+      </div>
+    </form>
     <h2>Inspection Types</h2>
     <p class="keyboard-hint">Types: {{ inspection_types|length }}</p>
     <div class="actions">
