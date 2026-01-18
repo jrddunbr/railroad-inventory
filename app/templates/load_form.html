@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>{{ "Edit Load" if load else "New Load" }}</h1>
     <form method="post" action="{{ url_for('main.load_edit', load_id=load.id) if load else url_for('main.load_new') }}" data-table="loads" data-id="{{ load.id if load else '' }}" data-id-field="id">
       <div class="grid">
@@ -83,12 +83,12 @@
           <textarea id="notes" name="notes" rows="3">{{ load.notes if load else '' }}</textarea>
         </div>
       </div>
-      <div class="actions">
-        <button type="submit">Save</button>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Save</button>
         {% if load %}
-          <a href="{{ url_for('main.load_detail', load_id=load.id) }}">Cancel</a>
+          <a class="button is-small is-light" href="{{ url_for('main.load_detail', load_id=load.id) }}">Cancel</a>
         {% else %}
-          <a href="{{ url_for('main.loads') }}">Cancel</a>
+          <a class="button is-small is-light" href="{{ url_for('main.loads') }}">Cancel</a>
         {% endif %}
       </div>
     </form>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>{{ "Edit Placement" if placement else "New Placement" }}</h1>
     <form method="post" action="{{ url_for('main.load_placement_edit', placement_id=placement.id) if placement else (url_for('main.load_placement_new', load_id=load.id) if load else url_for('main.load_placement_new_generic')) }}" data-table="load_placements" data-id="{{ placement.id if placement else '' }}" data-id-field="id">
       <div class="grid">
@@ -44,12 +44,12 @@
           </select>
         </div>
       </div>
-      <div class="actions">
-        <button type="submit">Save</button>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Save</button>
         {% if load %}
-          <a href="{{ url_for('main.load_detail', load_id=load.id) }}">Cancel</a>
+          <a class="button is-small is-light" href="{{ url_for('main.load_detail', load_id=load.id) }}">Cancel</a>
         {% else %}
-          <a href="{{ url_for('main.loads') }}">Cancel</a>
+          <a class="button is-small is-light" href="{{ url_for('main.loads') }}">Cancel</a>
         {% endif %}
       </div>
     </form>

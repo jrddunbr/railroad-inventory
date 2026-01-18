@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Settings</h1>
     <h2>Table Pagination</h2>
     <form method="post" action="{{ url_for('main.settings_pagination') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="pagination settings">
@@ -10,16 +10,16 @@
           <option value="{{ option.value }}" {% if option.value == page_size %}selected{% endif %}>{{ option.label }}</option>
         {% endfor %}
       </select>
-      <div class="actions">
-        <button type="submit" class="tag">Save Pagination</button>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary is-light">Save Pagination</button>
       </div>
     </form>
     <h2>Inspection Types</h2>
     <p class="keyboard-hint">Types: {{ inspection_types|length }}</p>
-    <div class="actions">
-      <a class="tag" href="{{ url_for('main.inspection_type_new') }}">Add Inspection Type</a>
+    <div class="actions buttons">
+      <a class="button is-small is-light" href="{{ url_for('main.inspection_type_new') }}">Add Inspection Type</a>
     </div>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Name</th>
@@ -33,9 +33,9 @@
           <td>{{ row.label }}</td>
           <td>{{ row.type.parent.name if row.type.parent else "-" }}</td>
           <td>
-            <a class="tag" href="{{ url_for('main.inspection_type_edit', type_id=row.type.id) }}">Edit</a>
+            <a class="button is-small is-light" href="{{ url_for('main.inspection_type_edit', type_id=row.type.id) }}">Edit</a>
             <form method="post" action="{{ url_for('main.inspection_type_delete', type_id=row.type.id) }}" data-action="delete" data-table="inspection_types" data-id="{{ row.type.id }}" data-id-field="id" data-entity-label="inspection type {{ row.type.id }}" style="display: inline;">
-              <button type="submit" class="tag">Delete</button>
+              <button type="submit" class="button is-small is-primary is-light">Delete</button>
             </form>
           </td>
         </tr>

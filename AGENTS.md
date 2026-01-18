@@ -2,8 +2,8 @@
 
 ## Project Structure & Module Organization
 - `app/`: Flask application package (routes, templates, static assets).
-- `app/templates/`: HTML/Jinja templates for Cloudscape UI pages.
-- `app/static/`: CSS, JS, and Cloudscape assets.
+- `app/templates/`: HTML/Jinja templates for Bulma UI pages.
+- `app/static/`: CSS, JS, and Bulma assets.
 - `data/`: CouchDB data volume and seed CSVs (e.g., `Railroad Inventory.csv`).
 - `migrations/`: Database migration scripts (if using Alembic).
 - `tests/`: Unit/integration tests.
@@ -44,7 +44,7 @@ Adjust paths as modules are added; keep domain logic (models, services) in `app/
 - Reporting marks can be blank for some railroads (e.g., Amtrak).
 
 ## UI & API Expectations
-- Use Cloudscape Design System for templates and components.
+- Use Bulma Design System for templates and components.
 - Maintain API endpoints that back the UI pages (inventory, railroads, car classes, locomotive classes, search, car detail/edit, new entry).
 - Keep forms keyboard-friendly; add/maintain auto-fill for reporting mark → railroad name and class → car type/locomotive details.
 - Schema version lives in `schema_version` and is seeded on app init (see `docs/SCHEMA.md`).

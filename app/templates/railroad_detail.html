@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>{{ railroad.reporting_mark or "-" }} - {{ railroad.name }}</h1>
     {% if railroad.representative_logo and railroad.representative_logo.image_path %}
       <p>
         <img src="{{ url_for('static', filename=railroad.representative_logo.image_path) }}" alt="{{ railroad.representative_logo.description }}" style="max-height: 72px; max-width: 160px;" />
       </p>
     {% endif %}
-    <div class="actions">
-      <a class="tag" href="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">Edit</a>
+    <div class="actions buttons">
+      <a class="button is-small is-light" href="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">Edit</a>
       <form method="post" action="{{ url_for('main.railroad_delete', railroad_id=railroad.id) }}" data-action="delete" data-table="railroads" data-id="{{ railroad.id }}" data-id-field="id" data-entity-label="railroad {{ railroad.name }}">
-        <button type="submit" class="tag">Delete</button>
+        <button type="submit" class="button is-small is-primary is-light">Delete</button>
       </form>
-      <a class="tag" href="{{ url_for('main.railroads') }}">Back to Railroads</a>
+      <a class="button is-small is-light" href="{{ url_for('main.railroads') }}">Back to Railroads</a>
     </div>
     <div class="grid">
       <div>
@@ -26,7 +26,7 @@
       </div>
     </div>
     <h3>Paint Schemes</h3>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Scheme</th>
@@ -60,7 +60,7 @@
       </tbody>
     </table>
     <h3>Logos</h3>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Logo</th>
@@ -91,7 +91,7 @@
       </tbody>
     </table>
     <h3>Slogans</h3>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Slogan</th>
@@ -117,7 +117,7 @@
     </table>
     <h3>Cars</h3>
     <p class="keyboard-hint">Results: {{ cars_pagination.total }}</p>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>ID</th>
@@ -173,15 +173,15 @@
         {% if cars_pagination.pages > 1 %}
           <div class="pagination-controls">
             {% if cars_pagination.prev_url %}
-              <a class="tag" href="{{ cars_pagination.prev_url }}">Prev</a>
+              <a class="button is-small is-light" href="{{ cars_pagination.prev_url }}">Prev</a>
             {% else %}
-              <span class="tag tag-muted">Prev</span>
+              <span class="button is-small is-static">Prev</span>
             {% endif %}
             <span class="pagination-label">Page {{ cars_pagination.page }} of {{ cars_pagination.pages }}</span>
             {% if cars_pagination.next_url %}
-              <a class="tag" href="{{ cars_pagination.next_url }}">Next</a>
+              <a class="button is-small is-light" href="{{ cars_pagination.next_url }}">Next</a>
             {% else %}
-              <span class="tag tag-muted">Next</span>
+              <span class="button is-small is-static">Next</span>
             {% endif %}
           </div>
         {% endif %}

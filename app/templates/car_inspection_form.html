@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Inspect Car {{ car.id }}</h1>
     <p class="keyboard-hint">Record a new inspection and update the last inspection date.</p>
     <form method="post" action="{{ url_for('main.car_inspect', car_id=car.id) }}" data-confirm-skip="true">
@@ -36,9 +36,9 @@
       {% if not inspection_types %}
         <p class="keyboard-hint">Add inspection types first in <a href="{{ url_for('main.settings') }}">Settings</a>.</p>
       {% endif %}
-      <div class="actions">
-        <button type="submit" {% if not inspection_types %}disabled{% endif %}>Save Inspection</button>
-        <a href="{{ url_for('main.car_detail', car_id=car.id) }}">Cancel</a>
+      <div class="actions buttons">
+        <button  type="submit" {% if not inspection_types %}disabled{% endif %}>Save Inspection</button>
+        <a class="button is-small is-light" href="{{ url_for('main.car_detail', car_id=car.id) }}">Cancel</a>
       </div>
     </form>
   </div>

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Scale AAR Plate Viewer</h1>
     <p class="keyboard-hint">Enter a scale name (HO, N, Z, S, O, OO, TT, G) or ratio like 1:87.</p>
     <div class="grid">
@@ -24,11 +24,11 @@
       </div>
     </div>
     <p class="keyboard-hint">Plates are based on gabarit diagrams and AAR Appendix A breakpoint data.</p>
-    <div class="panel" style="margin-top: 16px;">
+    <div class="box" style="margin-top: 16px;">
       <h2>Result</h2>
       <p id="scale_summary">Enter a scale and plate to view the size.</p>
-      <div class="actions">
-        <button type="button" class="tag" id="export_dxf">Download DXF</button>
+      <div class="actions buttons">
+        <button type="button" id="export_dxf" class="button is-small is-light">Download DXF</button>
       </div>
       <div id="plate_viewer"></div>
       <div id="plate_legend"></div>
@@ -374,7 +374,7 @@
         const overallHeightScaled = heightMax / scale;
         legend.innerHTML = `
           <h3>Dimension Legend</h3>
-          <table>
+          <table class="table is-fullwidth is-striped">
             <thead>
               <tr>
                 <th>Label</th>

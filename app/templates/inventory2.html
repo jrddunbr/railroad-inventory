@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Inventory (Client Render)</h1>
     <p class="keyboard-hint" id="inventory2-status">Loading inventory...</p>
-    <div class="actions" id="inventory2-actions" style="display: none;">
-      <button type="button" class="tag" id="inventory2-prev">Prev</button>
+    <div class="actions buttons" id="inventory2-actions" style="display: none;">
+      <button type="button" id="inventory2-prev" class="button is-small is-light">Prev</button>
       <span class="keyboard-hint" id="inventory2-page"></span>
-      <button type="button" class="tag" id="inventory2-next">Next</button>
+      <button type="button" id="inventory2-next" class="button is-small is-light">Next</button>
     </div>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>ID</th>

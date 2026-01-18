@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Search</h1>
     <form method="get" action="{{ url_for('main.search') }}">
-      <div class="actions">
+      <div class="actions buttons">
         <input name="q" placeholder="Search by location, car number, or notes" value="{{ query }}" />
-        <button type="submit">Search</button>
+        <button type="submit" class="button is-small is-primary">Search</button>
       </div>
     </form>
     {% if query %}
       <h3>Results for "{{ query }}"</h3>
       <p class="keyboard-hint">Results: {{ cars|length }}</p>
-      <table>
+      <table class="table is-fullwidth is-striped">
         <thead>
           <tr>
             <th>ID</th>

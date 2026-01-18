@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Inspection Status Report</h1>
     <p class="keyboard-hint">Pick an inspection type and result to see the latest inspection for each car.</p>
-    <form method="get" action="{{ url_for('main.inspections_report') }}" class="panel" style="margin-bottom: 16px;">
+    <form method="get" action="{{ url_for('main.inspections_report') }}" class="box" style="margin-bottom: 16px;">
       <div class="grid">
         <div>
           <label for="inspection_type_id">Inspection Type</label>
@@ -23,13 +23,13 @@
           </select>
         </div>
       </div>
-      <div class="actions">
-        <button type="submit">Run Report</button>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Run Report</button>
         <a href="{{ url_for('main.reports') }}">Back to Reports</a>
       </div>
     </form>
     <p class="keyboard-hint">Results: {{ inspections|length }}</p>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Car</th>

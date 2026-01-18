@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>PRR Home Shop Repair Form</h1>
     <form method="post" action="{{ url_for('main.prr_home_shop_repair') }}" data-confirm-skip="true">
       <div style="margin-bottom: 12px;">
@@ -33,7 +33,7 @@
       </div>
       <div style="margin-bottom: 12px;">
         <label>Responsibility</label>
-        <div class="actions" style="margin-top: 0;">
+        <div class="actions buttons" style="margin-top: 0;">
           <label>
             <input type="radio" name="responsibility" value="Owner" {% if form_data.get('responsibility') == 'Owner' %}checked{% endif %} />
             Owner
@@ -44,15 +44,15 @@
           </label>
         </div>
       </div>
-      <div class="actions">
-        <button type="submit">Done</button>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Done</button>
         <a href="{{ url_for('main.tools') }}">Back to Tools</a>
       </div>
     </form>
   </div>
 
   {% if image_filename %}
-    <div class="panel" style="margin-top: 16px;">
+    <div class="box" style="margin-top: 16px;">
       <h2>Generated Form</h2>
       <a href="{{ url_for('main.prr_home_shop_render', file=image_filename) }}">
         <img src="{{ url_for('static', filename='tools/generated/' ~ image_filename) }}" alt="PRR Home Shop Repair Form" style="max-width: 100%; height: auto;" />

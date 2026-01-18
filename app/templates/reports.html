@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Reports</h1>
     <p class="keyboard-hint">Download CSV exports for sharing or offline analysis.</p>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Report</th>
@@ -15,37 +15,37 @@
         <tr>
           <td>Inventory Export</td>
           <td>Full inventory with class, location, and lettering details.</td>
-          <td><a class="tag" href="{{ url_for('main.inventory_export') }}">Download CSV</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.inventory_export') }}">Download CSV</a></td>
         </tr>
         <tr>
           <td>Locomotive DCC Roster</td>
           <td>Locomotive DCC IDs with reporting marks, car numbers, and class era to spot conflicts.</td>
-          <td><a class="tag" href="{{ url_for('main.locomotive_dcc_export') }}">Download CSV</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.locomotive_dcc_export') }}">Download CSV</a></td>
         </tr>
         <tr>
           <td>Railroad Era Histogram</td>
           <td>Histogram of car class eras across the inventory.</td>
-          <td><a class="tag" href="{{ url_for('main.era_histogram') }}">View</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.era_histogram') }}">View</a></td>
         </tr>
         <tr>
           <td>Introduction Years</td>
           <td>Car class introductions and car built dates listed by year.</td>
-          <td><a class="tag" href="{{ url_for('main.introduction_years') }}">View</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.introduction_years') }}">View</a></td>
         </tr>
         <tr>
           <td>Repairs Report</td>
           <td>Cars that currently list required repairs.</td>
-          <td><a class="tag" href="{{ url_for('main.repairs_report') }}">View</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.repairs_report') }}">View</a></td>
         </tr>
         <tr>
           <td>Inspection Status</td>
           <td>Cars passing or failing a specific inspection type.</td>
-          <td><a class="tag" href="{{ url_for('main.inspections_report') }}">View</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.inspections_report') }}">View</a></td>
         </tr>
         <tr>
           <td>Conflicts Report</td>
           <td>Duplicate car IDs and DCC IDs across the inventory.</td>
-          <td><a class="tag" href="{{ url_for('main.conflict_report') }}">View</a></td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.conflict_report') }}">View</a></td>
         </tr>
       </tbody>
     </table>

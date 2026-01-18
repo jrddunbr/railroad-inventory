@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Edit Railroad</h1>
     <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}" enctype="multipart/form-data" data-table="railroads" data-id="{{ railroad.id }}" data-id-field="id" data-related-tables="railroad_color_schemes,railroad_logos,railroad_slogans">
       <div class="grid">
@@ -35,7 +35,7 @@
       </div>
       <h2>Color Schemes</h2>
       <p class="keyboard-hint">Use the color picker to add hex colors; stored as comma-separated values.</p>
-      <table>
+      <table class="table is-fullwidth is-striped">
         <thead>
           <tr>
             <th>Scheme</th>
@@ -55,22 +55,22 @@
             <td><input name="color_scheme_start" value="{{ scheme.start_date or '' }}" /></td>
             <td><input name="color_scheme_end" value="{{ scheme.end_date or '' }}" /></td>
             <td>
-              <div class="actions" style="margin-top: 0;">
+              <div class="actions buttons" style="margin-top: 0;">
                 <input id="scheme-colors-{{ loop.index0 }}" class="scheme-colors" name="color_scheme_colors" value="{{ scheme.colors or '' }}" />
                 <input type="color" data-target="scheme-colors-{{ loop.index0 }}" title="Add color" />
               </div>
             </td>
-            <td><button type="button" class="remove-row">Remove</button></td>
+            <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      <div class="actions">
-        <button type="button" class="add-row" data-section="schemes">Add another scheme</button>
+      <div class="actions buttons">
+        <button type="button" data-section="schemes" class="button is-small is-light add-row">Add another scheme</button>
       </div>
       <h2>Logos</h2>
       <p class="keyboard-hint">Upload PNG/JPEG/SVG logos (max 2MB). Select one as the representative logo.</p>
-      <table>
+      <table class="table is-fullwidth is-striped">
         <thead>
           <tr>
             <th>Representative</th>
@@ -100,16 +100,16 @@
               {% endif %}
               <input type="file" name="logo_image_{{ loop.index0 }}" accept=".png,.jpg,.jpeg,.svg" data-max-bytes="2097152" />
             </td>
-            <td><button type="button" class="remove-row">Remove</button></td>
+            <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      <div class="actions">
-        <button type="button" class="add-row" data-section="logos">Add another logo</button>
+      <div class="actions buttons">
+        <button type="button" data-section="logos" class="button is-small is-light add-row">Add another logo</button>
       </div>
       <h2>Slogans</h2>
-      <table>
+      <table class="table is-fullwidth is-striped">
         <thead>
           <tr>
             <th>Description</th>
@@ -129,17 +129,17 @@
             <td><input name="slogan_text" value="{{ slogan.slogan_text or '' }}" /></td>
             <td><input name="slogan_start" value="{{ slogan.start_date or '' }}" /></td>
             <td><input name="slogan_end" value="{{ slogan.end_date or '' }}" /></td>
-            <td><button type="button" class="remove-row">Remove</button></td>
+            <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      <div class="actions">
-        <button type="button" class="add-row" data-section="slogans">Add another slogan</button>
+      <div class="actions buttons">
+        <button type="button" data-section="slogans" class="button is-small is-light add-row">Add another slogan</button>
       </div>
-      <div class="actions">
-        <button type="submit">Save</button>
-        <a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">Cancel</a>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Save</button>
+        <a class="button is-small is-light" href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">Cancel</a>
       </div>
     </form>
   </div>
@@ -156,12 +156,12 @@
         <td><input name="color_scheme_start" value="" /></td>
         <td><input name="color_scheme_end" value="" /></td>
         <td>
-          <div class="actions" style="margin-top: 0;">
+          <div class="actions buttons" style="margin-top: 0;">
             <input id="scheme-colors-${index}" class="scheme-colors" name="color_scheme_colors" value="" />
             <input type="color" data-target="scheme-colors-${index}" title="Add color" />
           </div>
         </td>
-        <td><button type="button" class="remove-row">Remove</button></td>
+        <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
       `;
       return row;
     };
@@ -183,7 +183,7 @@
         <td>
           <input type="file" name="logo_image_" accept=".png,.jpg,.jpeg,.svg" data-max-bytes="2097152" />
         </td>
-        <td><button type="button" class="remove-row">Remove</button></td>
+        <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
       `;
       return row;
     };
@@ -198,7 +198,7 @@
         <td><input name="slogan_text" value="" /></td>
         <td><input name="slogan_start" value="" /></td>
         <td><input name="slogan_end" value="" /></td>
-        <td><button type="button" class="remove-row">Remove</button></td>
+        <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
       `;
       return row;
     };

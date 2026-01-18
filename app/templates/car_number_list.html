@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Car Number {{ number }}</h1>
     <p class="keyboard-hint">Results: {{ cars|length }}</p>
     <p>Select the car you want to view.</p>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>ID</th>

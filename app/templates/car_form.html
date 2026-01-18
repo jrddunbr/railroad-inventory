@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>{{ 'Edit Car' if car else 'Add New Car' }}</h1>
     <form method="post" action="{{ form_action }}" data-mode="{{ 'edit' if car else 'new' }}" data-table="cars" data-id="{{ car.id if car else '' }}" data-id-field="id">
-      <div class="panel" style="margin-bottom: 16px;">
+      <div class="box" style="margin-bottom: 16px;">
         <h2>Location</h2>
         <div class="grid">
           <div>
@@ -18,7 +18,7 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom: 16px;">
+      <div class="box" style="margin-bottom: 16px;">
         <h2>Railroad</h2>
         <div class="grid">
           <div>
@@ -33,13 +33,13 @@
           <div>
             <label>&nbsp;</label>
             <input type="hidden" id="clear_railroad" name="clear_railroad" value="0" data-confirm-include="true" data-confirm-label="Remove Railroad" />
-            <button type="button" class="tag" id="remove-railroad">Remove Railroad</button>
+            <button type="button" id="remove-railroad" class="button is-small is-light">Remove Railroad</button>
           </div>
           {% endif %}
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom: 16px;">
+      <div class="box" style="margin-bottom: 16px;">
         <h2>Car ID</h2>
         <div class="grid">
           <div>
@@ -53,7 +53,7 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom: 16px;">
+      <div class="box" style="margin-bottom: 16px;">
         <h2>Car Info</h2>
         <p class="keyboard-hint">CAPY - Load Capacity; LD LMT - Load Limit; LT WT - Car Weight</p>
         <h3>Basics</h3>
@@ -166,7 +166,7 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom: 16px;">
+      <div class="box" style="margin-bottom: 16px;">
         <h2>Asset</h2>
         <div class="grid">
           <div>
@@ -188,7 +188,7 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom: 16px;">
+      <div class="box" style="margin-bottom: 16px;">
         <h2>Other Information</h2>
         <div class="grid">
           <div>
@@ -202,9 +202,9 @@
         </div>
       </div>
 
-      <div class="actions">
-        <button type="submit">Save</button>
-        <a href="{{ url_for('main.inventory') }}">Cancel</a>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Save</button>
+        <a class="button is-small is-light" href="{{ url_for('main.inventory') }}">Cancel</a>
       </div>
     </form>
   </div>

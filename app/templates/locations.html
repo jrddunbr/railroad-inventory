@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% block content %}
-  <div class="panel">
+  <div class="box">
     <h1>Locations</h1>
-    <div class="actions">
-      <a class="tag" href="{{ url_for('main.location_new') }}">Add Location</a>
+    <div class="actions buttons">
+      <a class="button is-small is-light" href="{{ url_for('main.location_new') }}">Add Location</a>
     </div>
     <p class="keyboard-hint">Results: {{ pagination.total }}</p>
-    <table>
+    <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Name</th>
@@ -48,15 +48,15 @@
         {% if pagination.pages > 1 %}
           <div class="pagination-controls">
             {% if pagination.prev_url %}
-              <a class="tag" href="{{ pagination.prev_url }}">Prev</a>
+              <a class="button is-small is-light" href="{{ pagination.prev_url }}">Prev</a>
             {% else %}
-              <span class="tag tag-muted">Prev</span>
+              <span class="button is-small is-static">Prev</span>
             {% endif %}
             <span class="pagination-label">Page {{ pagination.page }} of {{ pagination.pages }}</span>
             {% if pagination.next_url %}
-              <a class="tag" href="{{ pagination.next_url }}">Next</a>
+              <a class="button is-small is-light" href="{{ pagination.next_url }}">Next</a>
             {% else %}
-              <span class="tag tag-muted">Next</span>
+              <span class="button is-small is-static">Next</span>
             {% endif %}
           </div>
         {% endif %}

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Railroad Inventory</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='cloudscape.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='bulma.min.css') }}">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
   <style>
     :root {
@@ -70,23 +70,6 @@
     footer a:hover {
       text-decoration: underline;
     }
-    .panel {
-      background: var(--mi-panel);
-      border: 1px solid var(--mi-border);
-      border-radius: 12px;
-      padding: 16px;
-      box-shadow: 0 8px 24px rgba(34, 34, 34, 0.06);
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    th, td {
-      text-align: left;
-      padding: 8px 10px;
-      border-bottom: 1px solid var(--mi-border);
-      vertical-align: top;
-    }
     input, select, textarea, button {
       font-family: inherit;
       font-size: 14px;
@@ -97,27 +80,10 @@
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
     .actions {
-      display: flex;
-      gap: 12px;
-      align-items: center;
       margin-top: 16px;
     }
     .actions form {
       margin: 0;
-    }
-    .tag {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: #e8efe8;
-      color: #2d5f5d;
-      font-size: 12px;
-      font-weight: 600;
-      text-decoration: none;
-    }
-    .tag-muted {
-      background: #f1ede5;
-      color: #7b7b7b;
     }
     .keyboard-hint {
       font-size: 12px;
@@ -253,11 +219,11 @@
 <body>
   <header>
     <div class="brand">Railroad Inventory</div>
-    <div class="actions" style="margin-top: 0;">
+    <div class="actions buttons" style="margin-top: 0;">
       <form method="get" action="{{ url_for('main.search') }}">
-        <input name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
+        <input class="input is-small" name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
       </form>
-      <a href="{{ url_for('main.car_new') }}" class="tag">Add New</a>
+      <a href="{{ url_for('main.car_new') }}" class="button is-small is-light">Add New</a>
     </div>
   </header>
   <div class="container">
@@ -289,13 +255,13 @@
       <h2 id="mi-confirm-title">Confirm database change</h2>
       <p class="keyboard-hint" id="mi-confirm-hint">Press Enter to confirm or Esc to cancel.</p>
       <ul id="mi-confirm-summary"></ul>
-      <button type="button" class="confirm-toggle" id="mi-confirm-toggle">More details</button>
+      <button type="button" id="mi-confirm-toggle" class="button is-small is-light confirm-toggle">More details</button>
       <div class="confirm-details" id="mi-confirm-details" hidden>
         <pre id="mi-confirm-payload"></pre>
       </div>
       <div class="confirm-actions">
-        <button type="button" id="mi-confirm-cancel">Cancel</button>
-        <button type="button" id="mi-confirm-approve">Confirm</button>
+        <button type="button" id="mi-confirm-cancel" class="button is-small is-light">Cancel</button>
+        <button type="button" id="mi-confirm-approve" class="button is-small is-light is-primary">Confirm</button>
       </div>
     </div>
   </div>
