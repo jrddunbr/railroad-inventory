@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Edit Car Class</h1>
+    <h1 class="title is-3">Edit Car Class</h1>
     <form method="post" action="{{ url_for('main.car_class_edit', class_id=car_class.id) }}" data-table="car_classes" data-id="{{ car_class.id }}" data-id-field="id">
       <div class="grid">
         <div>

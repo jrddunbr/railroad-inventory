@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>{{ railroad.reporting_mark or "-" }} - {{ railroad.name }}</h1>
+    <h1 class="title is-3">{{ railroad.reporting_mark or "-" }} - {{ railroad.name }}</h1>
     {% if railroad.representative_logo and railroad.representative_logo.image_path %}
       <p>
         <img src="{{ url_for('static', filename=railroad.representative_logo.image_path) }}" alt="{{ railroad.representative_logo.description }}" style="max-height: 72px; max-width: 160px;" />
       </p>
     {% endif %}
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">Edit</a>
+      <a class="button is-small is-info" href="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}">Edit</a>
       <form method="post" action="{{ url_for('main.railroad_delete', railroad_id=railroad.id) }}" data-action="delete" data-table="railroads" data-id="{{ railroad.id }}" data-id-field="id" data-entity-label="railroad {{ railroad.name }}">
-        <button type="submit" class="button is-small is-primary is-light">Delete</button>
+        <button type="submit" class="button is-small is-danger">Delete</button>
       </form>
       <a class="button is-small is-light" href="{{ url_for('main.railroads') }}">Back to Railroads</a>
     </div>
@@ -25,7 +25,7 @@
         <p><strong>Notes:</strong> {{ railroad.notes or "-" }}</p>
       </div>
     </div>
-    <h3>Paint Schemes</h3>
+    <h3 class="title is-5">Paint Schemes</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
@@ -59,7 +59,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3>Logos</h3>
+    <h3 class="title is-5">Logos</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
@@ -90,7 +90,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3>Slogans</h3>
+    <h3 class="title is-5">Slogans</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
@@ -115,7 +115,7 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3>Cars</h3>
+    <h3 class="title is-5">Cars</h3>
     <p class="keyboard-hint">Results: {{ cars_pagination.total }}</p>
     <table class="table is-fullwidth is-striped">
       <thead>

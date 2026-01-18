@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Conflicts Report</h1>
-    <h2>Car ID Conflicts</h2>
+    <h1 class="title is-3">Conflicts Report</h1>
+    <h2 class="title is-4">Car ID Conflicts</h2>
     {% if car_conflicts %}
       {% for key, cars in car_conflicts.items() %}
         <p><strong>{{ key }}</strong></p>
@@ -20,7 +20,7 @@
       <p class="keyboard-hint">No car ID conflicts detected.</p>
     {% endif %}
 
-    <h2>DCC ID Conflicts</h2>
+    <h2 class="title is-4">DCC ID Conflicts</h2>
     {% if dcc_conflicts %}
       {% for dcc_id, cars in dcc_conflicts.items() %}
         <p><strong>{{ dcc_id }}</strong></p>

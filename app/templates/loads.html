@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Loads</h1>
+    <h1 class="title is-3">Loads</h1>
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.load_new') }}">Add Load</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.load_new') }}">Add Load</a>
     </div>
     <p class="keyboard-hint">Results: {{ pagination.total }}</p>
     <table class="table is-fullwidth is-striped">

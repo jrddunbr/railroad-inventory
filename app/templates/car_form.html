@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>{{ 'Edit Car' if car else 'Add New Car' }}</h1>
+    <h1 class="title is-3">{{ 'Edit Car' if car else 'Add New Car' }}</h1>
     <form method="post" action="{{ form_action }}" data-mode="{{ 'edit' if car else 'new' }}" data-table="cars" data-id="{{ car.id if car else '' }}" data-id-field="id">
       <div class="box" style="margin-bottom: 16px;">
-        <h2>Location</h2>
+        <h2 class="title is-4">Location</h2>
         <div class="grid">
           <div>
             <label for="location">Location</label>
@@ -19,7 +19,7 @@
       </div>
 
       <div class="box" style="margin-bottom: 16px;">
-        <h2>Railroad</h2>
+        <h2 class="title is-4">Railroad</h2>
         <div class="grid">
           <div>
             <label for="reporting_mark">Reporting Mark</label>
@@ -40,7 +40,7 @@
       </div>
 
       <div class="box" style="margin-bottom: 16px;">
-        <h2>Car ID</h2>
+        <h2 class="title is-4">Car ID</h2>
         <div class="grid">
           <div>
             <label for="car_number">Car #</label>
@@ -54,9 +54,9 @@
       </div>
 
       <div class="box" style="margin-bottom: 16px;">
-        <h2>Car Info</h2>
+        <h2 class="title is-4">Car Info</h2>
         <p class="keyboard-hint">CAPY - Load Capacity; LD LMT - Load Limit; LT WT - Car Weight</p>
-        <h3>Basics</h3>
+        <h3 class="title is-5">Basics</h3>
         <div class="grid">
           <div>
             <label for="car_class">Car Class</label>
@@ -72,7 +72,7 @@
             <input id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
           </div>
         </div>
-        <h3>Weight Specifications</h3>
+        <h3 class="title is-5">Weight Specifications</h3>
         <div class="grid">
           {% set aar_plate_value = car.aar_plate_override if car and car.aar_plate_override else (prefill.get('aar_plate', '') if not car else '') %}
           <div>
@@ -103,7 +103,7 @@
             </select>
           </div>
         </div>
-        <h3>Internal Dimensions</h3>
+        <h3 class="title is-5">Internal Dimensions</h3>
         <div class="grid">
           <div>
             <label for="internal_length">Internal Length</label>
@@ -118,7 +118,7 @@
             <input id="internal_height" name="internal_height" value="{{ car.internal_height_override if car and car.internal_height_override else (prefill.get('internal_height', '') if not car else '') }}" data-gray-default="true" />
           </div>
         </div>
-        <h3>Dates</h3>
+        <h3 class="title is-5">Dates</h3>
         <div class="grid">
           <div>
             <label for="built">Built</label>
@@ -137,7 +137,7 @@
             <input id="repack_bearings_date" name="repack_bearings_date" value="{{ car.repack_bearings_date if car else '' }}" />
           </div>
         </div>
-        <h3>Other Info</h3>
+        <h3 class="title is-5">Other Info</h3>
         <div class="grid">
           <div>
             <label for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>
@@ -167,7 +167,7 @@
       </div>
 
       <div class="box" style="margin-bottom: 16px;">
-        <h2>Asset</h2>
+        <h2 class="title is-4">Asset</h2>
         <div class="grid">
           <div>
             <label for="msrp">MSRP</label>
@@ -189,7 +189,7 @@
       </div>
 
       <div class="box" style="margin-bottom: 16px;">
-        <h2>Other Information</h2>
+        <h2 class="title is-4">Other Information</h2>
         <div class="grid">
           <div>
             <label for="repairs_required">Repairs Required</label>

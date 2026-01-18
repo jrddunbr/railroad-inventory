@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>{{ "Edit Load" if load else "New Load" }}</h1>
+    <h1 class="title is-3">{{ "Edit Load" if load else "New Load" }}</h1>
     <form method="post" action="{{ url_for('main.load_edit', load_id=load.id) if load else url_for('main.load_new') }}" data-table="loads" data-id="{{ load.id if load else '' }}" data-id-field="id">
       <div class="grid">
         <div>
@@ -9,7 +9,7 @@
           <input id="name" name="name" value="{{ load.name if load else '' }}" required />
         </div>
       </div>
-      <h2>Dimensions</h2>
+      <h2 class="title is-4">Dimensions</h2>
       <div class="grid">
         <div>
           <label for="length">Length</label>
@@ -33,7 +33,7 @@
           </select>
         </div>
       </div>
-      <h2>Model Details</h2>
+      <h2 class="title is-4">Model Details</h2>
       <div class="grid">
         <div>
           <label for="lettering">Lettering</label>
@@ -53,7 +53,7 @@
           </select>
         </div>
       </div>
-      <h2>Asset</h2>
+      <h2 class="title is-4">Asset</h2>
       <div class="grid">
         <div>
           <label for="msrp">MSRP</label>
@@ -72,7 +72,7 @@
           <input id="upc" name="upc" value="{{ load.upc if load else '' }}" />
         </div>
       </div>
-      <h2>Notes</h2>
+      <h2 class="title is-4">Notes</h2>
       <div class="grid">
         <div>
           <label for="repairs_required">Repairs Required</label>

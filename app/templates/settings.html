@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Settings</h1>
-    <h2>Table Pagination</h2>
+    <h1 class="title is-3">Settings</h1>
+    <h2 class="title is-4">Table Pagination</h2>
     <form method="post" action="{{ url_for('main.settings_pagination') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="pagination settings">
       <label for="page_size">Rows per page</label>
       <select name="page_size" id="page_size">
@@ -14,10 +14,10 @@
         <button type="submit" class="button is-small is-primary is-light">Save Pagination</button>
       </div>
     </form>
-    <h2>Inspection Types</h2>
+    <h2 class="title is-4">Inspection Types</h2>
     <p class="keyboard-hint">Types: {{ inspection_types|length }}</p>
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.inspection_type_new') }}">Add Inspection Type</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.inspection_type_new') }}">Add Inspection Type</a>
     </div>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -33,9 +33,9 @@
           <td>{{ row.label }}</td>
           <td>{{ row.type.parent.name if row.type.parent else "-" }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.inspection_type_edit', type_id=row.type.id) }}">Edit</a>
+            <a class="button is-small is-info" href="{{ url_for('main.inspection_type_edit', type_id=row.type.id) }}">Edit</a>
             <form method="post" action="{{ url_for('main.inspection_type_delete', type_id=row.type.id) }}" data-action="delete" data-table="inspection_types" data-id="{{ row.type.id }}" data-id-field="id" data-entity-label="inspection type {{ row.type.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-primary is-light">Delete</button>
+              <button type="submit" class="button is-small is-danger">Delete</button>
             </form>
           </td>
         </tr>

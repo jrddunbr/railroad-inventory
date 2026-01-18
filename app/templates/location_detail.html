@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Location: {{ location.name }}</h1>
+    <h1 class="title is-3">Location: {{ location.name }}</h1>
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
+      <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
       <form method="post" action="{{ url_for('main.location_delete', location_id=location.id) }}" data-action="delete" data-table="locations" data-id="{{ location.id }}" data-id-field="id" data-entity-label="location {{ location.name }}">
-        <button type="submit" class="button is-small is-primary is-light">Delete</button>
+        <button type="submit" class="button is-small is-danger">Delete</button>
       </form>
       <a class="button is-small is-light" href="{{ url_for('main.locations') }}">Back to Locations</a>
     </div>
@@ -20,7 +20,7 @@
         {% endfor %}
       </p>
     {% endif %}
-    <h3>Cars</h3>
+    <h3 class="title is-5">Cars</h3>
     <p class="keyboard-hint">Results: {{ cars_pagination.total }}</p>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -66,9 +66,9 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3>Loads</h3>
+    <h3 class="title is-5">Loads</h3>
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
     </div>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -86,7 +86,7 @@
           <td>
             <a class="button is-small is-light" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
             <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" data-action="delete" data-table="load_placements" data-id="{{ placement.id }}" data-id-field="id" data-entity-label="placement {{ placement.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-primary is-light">Delete</button>
+              <button type="submit" class="button is-small is-danger">Delete</button>
             </form>
           </td>
         </tr>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Inspection Status Report</h1>
+    <h1 class="title is-3">Inspection Status Report</h1>
     <p class="keyboard-hint">Pick an inspection type and result to see the latest inspection for each car.</p>
     <form method="get" action="{{ url_for('main.inspections_report') }}" class="box" style="margin-bottom: 16px;">
       <div class="grid">

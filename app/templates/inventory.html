@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Inventory</h1>
+    <h1 class="title is-3">Inventory</h1>
     <p class="keyboard-hint">Results: {{ pagination.total }}</p>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -55,7 +55,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="7">No cars yet. <a href="{{ url_for('main.car_new') }}">Add the first entry</a>.</td>
+          <td colspan="7">No cars yet. <a class="button is-small is-primary" href="{{ url_for('main.car_new') }}">Add the first entry</a>.</td>
         </tr>
         {% endfor %}
       </tbody>

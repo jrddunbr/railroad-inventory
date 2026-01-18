@@ -8,21 +8,27 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
   <style>
     :root {
-      --mi-bg: #f5f2ea;
-      --mi-ink: #222222;
-      --mi-accent: #2d5f5d;
+      --mi-bg: #eef1f6;
+      --mi-surface: #ffffff;
+      --mi-shell: #f6f8fb;
       --mi-panel: #ffffff;
-      --mi-border: #d6d1c8;
-      --mi-overlay: rgba(34, 34, 34, 0.45);
+      --mi-ink: #1f2937;
+      --mi-ink-muted: #6b7280;
+      --mi-accent: #475569;
+      --mi-border: #d6dce6;
+      --mi-overlay: rgba(31, 41, 55, 0.45);
     }
     body {
       font-family: "IBM Plex Sans", sans-serif;
-      background: radial-gradient(circle at top, #fef9f0 0%, var(--mi-bg) 55%, #efe9de 100%);
+      background:
+        radial-gradient(circle at 12% 12%, rgba(163, 177, 198, 0.35), transparent 45%),
+        radial-gradient(circle at 88% 16%, rgba(190, 205, 221, 0.28), transparent 40%),
+        linear-gradient(180deg, #f9fafb 0%, #eef1f6 55%, #e7ecf3 100%);
       color: var(--mi-ink);
       margin: 0;
     }
     header {
-      background: var(--mi-panel);
+      background: var(--mi-surface);
       border-bottom: 1px solid var(--mi-border);
       padding: 16px 24px;
       display: flex;
@@ -33,6 +39,7 @@
     .brand {
       font-size: 20px;
       font-weight: 600;
+      letter-spacing: 0.02em;
     }
     .container {
       display: grid;
@@ -42,6 +49,7 @@
     nav {
       border-right: 1px solid var(--mi-border);
       padding: 16px;
+      background: var(--mi-surface);
     }
     nav a {
       display: block;
@@ -52,16 +60,19 @@
     }
     nav a.active {
       color: var(--mi-accent);
+      border-left: 2px solid var(--mi-accent);
+      padding-left: 10px;
     }
     main {
       padding: 24px;
     }
     footer {
       border-top: 1px solid var(--mi-border);
-      color: #6b7280;
+      color: var(--mi-ink-muted);
       font-size: 0.85rem;
       padding: 16px 24px;
       text-align: center;
+      background: var(--mi-surface);
     }
     footer a {
       color: inherit;
@@ -87,7 +98,7 @@
     }
     .keyboard-hint {
       font-size: 12px;
-      color: #666666;
+      color: var(--mi-ink-muted);
       margin-top: 8px;
     }
     .pagination {
@@ -100,7 +111,7 @@
     }
     .pagination-info {
       font-size: 13px;
-      color: #555555;
+      color: var(--mi-ink-muted);
     }
     .pagination-controls {
       display: flex;
@@ -109,7 +120,29 @@
     }
     .pagination-label {
       font-size: 13px;
-      color: #555555;
+      color: var(--mi-ink-muted);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --mi-bg: #0f141f;
+        --mi-surface: #151c2a;
+        --mi-shell: #111827;
+        --mi-panel: #151c2a;
+        --mi-ink: #e2e8f0;
+        --mi-ink-muted: #94a3b8;
+        --mi-accent: #cbd5f5;
+        --mi-border: #273043;
+        --mi-overlay: rgba(15, 23, 42, 0.6);
+      }
+      body {
+        background:
+          radial-gradient(circle at 14% 12%, rgba(132, 148, 176, 0.2), transparent 45%),
+          radial-gradient(circle at 86% 18%, rgba(96, 112, 137, 0.18), transparent 40%),
+          linear-gradient(180deg, #0f141f 0%, #0b111b 100%);
+      }
+      nav a.active {
+        color: var(--mi-accent);
+      }
     }
     .confirm-overlay {
       position: fixed;
@@ -223,7 +256,7 @@
       <form method="get" action="{{ url_for('main.search') }}">
         <input class="input is-small" name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
       </form>
-      <a href="{{ url_for('main.car_new') }}" class="button is-small is-light">Add New</a>
+      <a href="{{ url_for('main.car_new') }}" class="button is-small is-primary">Add New</a>
     </div>
   </header>
   <div class="container">
@@ -252,7 +285,7 @@
   </footer>
   <div id="mi-confirm-modal" class="confirm-overlay" style="display: none;" aria-hidden="true">
     <div class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="mi-confirm-title">
-      <h2 id="mi-confirm-title">Confirm database change</h2>
+      <h2 class="title is-4" id="mi-confirm-title">Confirm database change</h2>
       <p class="keyboard-hint" id="mi-confirm-hint">Press Enter to confirm or Esc to cancel.</p>
       <ul id="mi-confirm-summary"></ul>
       <button type="button" id="mi-confirm-toggle" class="button is-small is-light confirm-toggle">More details</button>
@@ -261,7 +294,7 @@
       </div>
       <div class="confirm-actions">
         <button type="button" id="mi-confirm-cancel" class="button is-small is-light">Cancel</button>
-        <button type="button" id="mi-confirm-approve" class="button is-small is-light is-primary">Confirm</button>
+        <button type="button" id="mi-confirm-approve" class="button is-small is-primary">Confirm</button>
       </div>
     </div>
   </div>

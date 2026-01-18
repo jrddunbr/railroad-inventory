@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>{{ 'Edit' if inspection_type else 'Add' }} Inspection Type</h1>
+    <h1 class="title is-3">{{ 'Edit' if inspection_type else 'Add' }} Inspection Type</h1>
     <form method="post" action="{{ url_for('main.inspection_type_edit', type_id=inspection_type.id) if inspection_type else url_for('main.inspection_type_new') }}" data-table="inspection_types" data-id="{{ inspection_type.id if inspection_type else '' }}" data-id-field="id">
       <div class="grid">
         <div>

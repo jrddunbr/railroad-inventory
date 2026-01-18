@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Railroad Era Histogram</h1>
+    <h1 class="title is-3">Railroad Era Histogram</h1>
     <div class="actions buttons" style="margin-top: 8px;">
       <a class="button is-small is-light" href="{{ url_for('main.era_histogram', mode='car') }}">By Car Count</a>
       <a class="button is-small is-light" href="{{ url_for('main.era_histogram', mode='class') }}">By Class</a>

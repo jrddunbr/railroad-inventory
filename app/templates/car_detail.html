@@ -32,27 +32,25 @@
       {% set copy_override_load_limit = copy_load_limit %}
       {% set copy_override_aar_plate = copy_aar_plate %}
     {% endif %}
-    <h1>
+    <h1 class="title is-3">
       {{ (car.railroad.reporting_mark if car.railroad else car.reporting_mark_override) or "" }} {{ car.car_number or "" }}
       {% if car.railroad and car.railroad.representative_logo and car.railroad.representative_logo.image_path %}
         <img src="{{ url_for('static', filename=car.railroad.representative_logo.image_path) }}" alt="{{ car.railroad.representative_logo.description or car.railroad.name }}" style="max-height: 32px; max-width: 96px; margin-left: 8px; vertical-align: middle;" />
       {% endif %}
     </h1>
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
-      <a class="button is-small is-light" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
-      <a class="button is-small is-light" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate) }}">Copy to New Car</a>
-      <a class="button is-small is-light" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate) }}">Copy to New Car (Overrides)</a>
-      <a class="button is-small is-light" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
-      <button type="button" id="compare-trigger" {% if not compare_cars %}disabled{% endif %} class="button is-small is-light">Compare</button>
+      <a class="button is-small is-info" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
+      <a class="button is-small is-warning" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
+      <button type="button" class="button is-small is-success" id="copy-trigger">Copy...</button>
+      <button type="button" id="compare-trigger" {% if not compare_cars %}disabled{% endif %} class="button is-small is-link">Compare</button>
       <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" data-action="delete" data-table="cars" data-id="{{ car.id }}" data-id-field="id" data-entity-label="car {{ car.id }}">
-        <button type="submit" class="button is-small is-primary is-light">Delete</button>
+        <button type="submit" class="button is-small is-danger">Delete</button>
       </form>
       <a class="button is-small is-light" href="{{ url_for('main.inventory') }}">Back to Inventory</a>
     </div>
     <div class="grid">
       <div>
-        <h3>Identity</h3>
+        <h3 class="title is-5">Identity</h3>
         <p><strong>Type:</strong> {{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</p>
         <p><strong>Class:</strong>
           {% if car.car_class %}
@@ -78,7 +76,7 @@
         </p>
       </div>
       <div>
-        <h3>Location</h3>
+        <h3 class="title is-5">Location</h3>
         <p><strong>Location:</strong>
           {% if car.location %}
             <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
@@ -88,7 +86,7 @@
         </p>
       </div>
       <div>
-        <h3>Specs</h3>
+        <h3 class="title is-5">Specs</h3>
         <p><strong>Wheel Arrangement:</strong> {{ car.wheel_arrangement_override or (car.car_class.wheel_arrangement if car.car_class else "-") }}</p>
         {% if car.car_class and car.car_class.tender_axles %}
           <p><strong>Tender Axles:</strong> {{ car.tender_axles_override or car.car_class.tender_axles }}</p>
@@ -98,12 +96,12 @@
         <p><strong>DCC ID:</strong> {{ car.dcc_id or "-" }}</p>
       </div>
       <div>
-        <h3>Pricing</h3>
+        <h3 class="title is-5">Pricing</h3>
         <p><strong>MSRP:</strong> {{ car.msrp or "-" }}</p>
         <p><strong>Price:</strong> {{ car.price or "-" }}</p>
       </div>
       <div>
-        <h3>Lettering</h3>
+        <h3 class="title is-5">Lettering</h3>
         <p><strong>Capacity:</strong>
           {% if car.capacity_override %}
             {{ car.capacity_override }}{% if car.car_class %} (override){% endif %}
@@ -141,13 +139,13 @@
         <p><strong>Repack Bearings Date:</strong> {{ car.repack_bearings_date or "-" }}</p>
       </div>
       <div>
-        <h3>Maintenance</h3>
+        <h3 class="title is-5">Maintenance</h3>
         <p><strong>Last Inspection Date:</strong> {{ car.last_inspection_date or "-" }}</p>
         <p><strong>Repairs Required:</strong> {{ car.repairs_required or "None" }}</p>
         <p><strong>Notes:</strong> {{ car.notes or "-" }}</p>
       </div>
     </div>
-    <h3>Inspections</h3>
+    <h3 class="title is-5">Inspections</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
@@ -180,9 +178,9 @@
         {% endfor %}
       </tbody>
     </table>
-    <h3>Loads</h3>
+    <h3 class="title is-5">Loads</h3>
     <div class="actions buttons">
-      <a class="button is-small is-light" href="{{ url_for('main.load_placement_new_generic', car_id=car.id) }}">Add Load</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', car_id=car.id) }}">Add Load</a>
     </div>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -200,7 +198,7 @@
           <td>
             <a class="button is-small is-light" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
             <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" data-action="delete" data-table="load_placements" data-id="{{ placement.id }}" data-id-field="id" data-entity-label="placement {{ placement.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-primary is-light">Delete</button>
+              <button type="submit" class="button is-small is-danger">Delete</button>
             </form>
           </td>
         </tr>
@@ -214,7 +212,7 @@
   </div>
   <div id="compare-modal" class="compare-overlay" style="display: none;" aria-hidden="true">
     <div class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="compare-title">
-      <h2 id="compare-title">Compare railcars</h2>
+      <h2 class="title is-4" id="compare-title">Compare railcars</h2>
       <p class="keyboard-hint">Select another car to compare with this one.</p>
       <label for="compare-car-select">Railcar ID</label>
       <select id="compare-car-select">
@@ -225,13 +223,13 @@
       </select>
       <div class="compare-actions">
         <button type="button" id="compare-cancel" class="button is-small is-light">Cancel</button>
-        <button type="button" id="compare-apply" disabled class="button is-small is-light is-primary">Compare</button>
+        <button type="button" id="compare-apply" disabled class="button is-small is-primary">Compare</button>
       </div>
     </div>
   </div>
   <div id="compare-result-modal" class="compare-overlay" style="display: none;" aria-hidden="true">
     <div class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="compare-result-title">
-      <h2 id="compare-result-title">Comparison</h2>
+      <h2 class="title is-4" id="compare-result-title">Comparison</h2>
       <p class="keyboard-hint" id="compare-summary"></p>
       <table class="table is-fullwidth is-striped">
         <thead>
@@ -248,6 +246,42 @@
       </div>
     </div>
   </div>
+  <div id="copy-modal" class="compare-overlay" style="display: none;" aria-hidden="true">
+    <div class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="copy-title">
+      <h2 class="title is-4" id="copy-title">Copy to new car</h2>
+      <p class="keyboard-hint">Choose how much of this car to copy into a new entry.</p>
+      <article class="message is-success">
+        <div class="message-body">
+          <strong>Copy to New Car</strong> copies the railroad, class, and core lettering details.
+          Use this when you want a quick new entry that matches the class defaults.
+          <div class="actions buttons" style="margin-top: 12px;">
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate) }}">Copy to New Car</a>
+          </div>
+        </div>
+      </article>
+      <article class="message is-success">
+        <div class="message-body">
+          <strong>Copy to New Car (Overrides)</strong> keeps any overrides you set for this car
+          (type, capacity, weight, load limit, AAR plate) instead of class defaults.
+          <div class="actions buttons" style="margin-top: 12px;">
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate) }}">Copy to New Car (Overrides)</a>
+          </div>
+        </div>
+      </article>
+      <article class="message is-success">
+        <div class="message-body">
+          <strong>Copy to New Car (Clone)</strong> brings over everything, including built date,
+          brand, price, and MSRP for a near-duplicate entry.
+          <div class="actions buttons" style="margin-top: 12px;">
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
+          </div>
+        </div>
+      </article>
+      <div class="compare-actions">
+        <button type="button" class="button is-small is-light" id="copy-cancel">Close</button>
+      </div>
+    </div>
+  </div>
   <script>
     const compareTrigger = document.getElementById('compare-trigger');
     const compareModal = document.getElementById('compare-modal');
@@ -260,6 +294,10 @@
     const compareResultClose = document.getElementById('compare-result-close');
     const currentCar = {{ car_payload | tojson }};
     let compareFocusReturn = null;
+    const copyTrigger = document.getElementById('copy-trigger');
+    const copyModal = document.getElementById('copy-modal');
+    const copyCancel = document.getElementById('copy-cancel');
+    let copyFocusReturn = null;
 
     const compareFields = [
       { key: 'id', label: 'ID' },
@@ -338,6 +376,24 @@
     compareCancel?.addEventListener('click', closeCompareModal);
     compareResultClose?.addEventListener('click', closeCompareResultModal);
 
+    const openCopyModal = () => {
+      copyFocusReturn = document.activeElement;
+      copyModal.style.display = 'flex';
+      copyModal.setAttribute('aria-hidden', 'false');
+      copyCancel.focus();
+    };
+
+    const closeCopyModal = () => {
+      copyModal.style.display = 'none';
+      copyModal.setAttribute('aria-hidden', 'true');
+      if (copyFocusReturn) {
+        copyFocusReturn.focus();
+      }
+    };
+
+    copyTrigger?.addEventListener('click', openCopyModal);
+    copyCancel?.addEventListener('click', closeCopyModal);
+
     compareSelect?.addEventListener('change', (event) => {
       compareApply.disabled = !event.target.value;
     });
@@ -413,6 +469,13 @@
       if (event.key === 'Escape') {
         event.preventDefault();
         closeCompareResultModal();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (copyModal.getAttribute('aria-hidden') === 'true') return;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        closeCopyModal();
       }
     });
   </script>

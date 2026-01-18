@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Search</h1>
+    <h1 class="title is-3">Search</h1>
     <form method="get" action="{{ url_for('main.search') }}">
       <div class="actions buttons">
         <input name="q" placeholder="Search by location, car number, or notes" value="{{ query }}" />
@@ -9,7 +9,7 @@
       </div>
     </form>
     {% if query %}
-      <h3>Results for "{{ query }}"</h3>
+      <h3 class="title is-5">Results for "{{ query }}"</h3>
       <p class="keyboard-hint">Results: {{ cars|length }}</p>
       <table class="table is-fullwidth is-striped">
         <thead>

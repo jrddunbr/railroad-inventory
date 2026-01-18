@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
   <div class="box">
-    <h1>Edit Railroad</h1>
+    <h1 class="title is-3">Edit Railroad</h1>
     <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}" enctype="multipart/form-data" data-table="railroads" data-id="{{ railroad.id }}" data-id-field="id" data-related-tables="railroad_color_schemes,railroad_logos,railroad_slogans">
       <div class="grid">
         <div>
@@ -33,7 +33,7 @@
           <textarea id="notes" name="notes">{{ railroad.notes or '' }}</textarea>
         </div>
       </div>
-      <h2>Color Schemes</h2>
+      <h2 class="title is-4">Color Schemes</h2>
       <p class="keyboard-hint">Use the color picker to add hex colors; stored as comma-separated values.</p>
       <table class="table is-fullwidth is-striped">
         <thead>
@@ -68,7 +68,7 @@
       <div class="actions buttons">
         <button type="button" data-section="schemes" class="button is-small is-light add-row">Add another scheme</button>
       </div>
-      <h2>Logos</h2>
+      <h2 class="title is-4">Logos</h2>
       <p class="keyboard-hint">Upload PNG/JPEG/SVG logos (max 2MB). Select one as the representative logo.</p>
       <table class="table is-fullwidth is-striped">
         <thead>
@@ -108,7 +108,7 @@
       <div class="actions buttons">
         <button type="button" data-section="logos" class="button is-small is-light add-row">Add another logo</button>
       </div>
-      <h2>Slogans</h2>
+      <h2 class="title is-4">Slogans</h2>
       <table class="table is-fullwidth is-striped">
         <thead>
           <tr>
