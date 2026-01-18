@@ -4,41 +4,41 @@
     <h1 class="title is-3">PRR Home Shop Repair Form</h1>
     <form method="post" action="{{ url_for('main.prr_home_shop_repair') }}" data-confirm-skip="true">
       <div style="margin-bottom: 12px;">
-        <label for="via">Via</label>
-        <input id="via" name="via" value="{{ form_data.get('via', '') }}" placeholder="nearest interchange point or junction with owner" />
+        <label class="label" for="via">Via</label>
+        <input class="input" id="via" name="via" value="{{ form_data.get('via', '') }}" placeholder="nearest interchange point or junction with owner" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label for="from_value">From</label>
-        <input id="from_value" name="from_value" value="{{ form_data.get('from_value', '') }}" />
+        <label class="label" for="from_value">From</label>
+        <input class="input" id="from_value" name="from_value" value="{{ form_data.get('from_value', '') }}" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label for="date_value">Date</label>
-        <input id="date_value" name="date_value" value="{{ form_data.get('date_value', '') }}" />
+        <label class="label" for="date_value">Date</label>
+        <input class="input" id="date_value" name="date_value" value="{{ form_data.get('date_value', '') }}" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label for="main_defects">Main Defects</label>
-        <input id="main_defects" name="main_defects" value="{{ form_data.get('main_defects', '') }}" />
+        <label class="label" for="main_defects">Main Defects</label>
+        <input class="input" id="main_defects" name="main_defects" value="{{ form_data.get('main_defects', '') }}" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label for="car_initials">Car Initials</label>
-        <input id="car_initials" name="car_initials" value="{{ form_data.get('car_initials', '') }}" />
+        <label class="label" for="car_initials">Car Initials</label>
+        <input class="input" id="car_initials" name="car_initials" value="{{ form_data.get('car_initials', '') }}" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label for="car_number">No.</label>
-        <input id="car_number" name="car_number" value="{{ form_data.get('car_number', '') }}" />
+        <label class="label" for="car_number">No.</label>
+        <input class="input" id="car_number" name="car_number" value="{{ form_data.get('car_number', '') }}" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label for="inspector">Inspector</label>
-        <input id="inspector" name="inspector" value="{{ form_data.get('inspector', '') }}" />
+        <label class="label" for="inspector">Inspector</label>
+        <input class="input" id="inspector" name="inspector" value="{{ form_data.get('inspector', '') }}" />
       </div>
       <div style="margin-bottom: 12px;">
-        <label>Responsibility</label>
+        <label class="label">Responsibility</label>
         <div class="actions buttons" style="margin-top: 0;">
-          <label>
+          <label class="label">
             <input type="radio" name="responsibility" value="Owner" {% if form_data.get('responsibility') == 'Owner' %}checked{% endif %} />
             Owner
           </label>
-          <label>
+          <label class="label">
             <input type="radio" name="responsibility" value="Railroad" {% if form_data.get('responsibility') == 'Railroad' %}checked{% endif %} />
             Railroad
           </label>

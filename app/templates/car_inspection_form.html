@@ -5,32 +5,44 @@
     <p class="keyboard-hint">Record a new inspection and update the last inspection date.</p>
     <form method="post" action="{{ url_for('main.car_inspect', car_id=car.id) }}" data-confirm-skip="true">
       <div class="grid">
-        <div>
-          <label for="inspection_date">Inspection Date</label>
-          <input id="inspection_date" name="inspection_date" type="date" required />
+        <div class="field">
+          <label class="label" for="inspection_date">Inspection Date</label>
+          <div class="control">
+            <input class="input" id="inspection_date" name="inspection_date" type="date" required />
+          </div>
         </div>
-        <div>
-          <label for="inspection_type_id">Inspection Type</label>
-          <select id="inspection_type_id" name="inspection_type_id" required {% if not inspection_types %}disabled{% endif %}>
-            <option value="">Select...</option>
-            {% for row in inspection_types %}
-              <option value="{{ row.type.id }}">{{ row.label }}</option>
-            {% endfor %}
-          </select>
+        <div class="field">
+          <label class="label" for="inspection_type_id">Inspection Type</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="inspection_type_id" name="inspection_type_id" required {% if not inspection_types %}disabled{% endif %}>
+                <option value="">Select...</option>
+                {% for row in inspection_types %}
+                  <option value="{{ row.type.id }}">{{ row.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
         </div>
-        <div>
-          <label for="inspection_passed">Result</label>
-          <select id="inspection_passed" name="inspection_passed" required {% if not inspection_types %}disabled{% endif %}>
-            <option value="">Select...</option>
-            <option value="passed">Passed</option>
-            <option value="failed">Failed</option>
-          </select>
+        <div class="field">
+          <label class="label" for="inspection_passed">Result</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="inspection_passed" name="inspection_passed" required {% if not inspection_types %}disabled{% endif %}>
+                <option value="">Select...</option>
+                <option value="passed">Passed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="grid">
-        <div>
-          <label for="inspection_details">Comments</label>
-          <textarea id="inspection_details" name="inspection_details" rows="4"></textarea>
+        <div class="field">
+          <label class="label" for="inspection_details">Comments</label>
+          <div class="control">
+            <textarea class="textarea" id="inspection_details" name="inspection_details" rows="4"></textarea>
+          </div>
         </div>
       </div>
       {% if not inspection_types %}

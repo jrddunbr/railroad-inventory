@@ -214,13 +214,17 @@
     <div class="compare-dialog" role="dialog" aria-modal="true" aria-labelledby="compare-title">
       <h2 class="title is-4" id="compare-title">Compare railcars</h2>
       <p class="keyboard-hint">Select another car to compare with this one.</p>
-      <label for="compare-car-select">Railcar ID</label>
-      <select id="compare-car-select">
-        <option value="">Select a railcar</option>
-        {% for option in compare_cars %}
-          <option value="{{ option.id }}">{{ option.id }} - {{ option.reporting_mark or "-" }} {{ option.car_number or "" }}</option>
-        {% endfor %}
-      </select>
+      <label class="label" for="compare-car-select">Railcar ID</label>
+      <div class="control">
+        <div class="select is-fullwidth">
+          <select id="compare-car-select">
+            <option value="">Select a railcar</option>
+            {% for option in compare_cars %}
+              <option value="{{ option.id }}">{{ option.id }} - {{ option.reporting_mark or "-" }} {{ option.car_number or "" }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
       <div class="compare-actions">
         <button type="button" id="compare-cancel" class="button is-small is-light">Cancel</button>
         <button type="button" id="compare-apply" disabled class="button is-small is-primary">Compare</button>

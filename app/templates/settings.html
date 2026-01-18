@@ -4,12 +4,16 @@
     <h1 class="title is-3">Settings</h1>
     <h2 class="title is-4">Table Pagination</h2>
     <form method="post" action="{{ url_for('main.settings_pagination') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="pagination settings">
-      <label for="page_size">Rows per page</label>
-      <select name="page_size" id="page_size">
-        {% for option in page_size_options %}
-          <option value="{{ option.value }}" {% if option.value == page_size %}selected{% endif %}>{{ option.label }}</option>
-        {% endfor %}
-      </select>
+      <label class="label" for="page_size">Rows per page</label>
+      <div class="control">
+        <div class="select is-fullwidth">
+          <select name="page_size" id="page_size">
+            {% for option in page_size_options %}
+              <option value="{{ option.value }}" {% if option.value == page_size %}selected{% endif %}>{{ option.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
       <div class="actions buttons">
         <button type="submit" class="button is-small is-primary is-light">Save Pagination</button>
       </div>

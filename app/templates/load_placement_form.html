@@ -5,43 +5,73 @@
     <form method="post" action="{{ url_for('main.load_placement_edit', placement_id=placement.id) if placement else (url_for('main.load_placement_new', load_id=load.id) if load else url_for('main.load_placement_new_generic')) }}" data-table="load_placements" data-id="{{ placement.id if placement else '' }}" data-id-field="id">
       <div class="grid">
         {% if load %}
-          <div>
-            <label>Load</label>
-            <p>{{ load.name }}</p>
+          <div class="field">
+            <label class="label">Load</label>
+            <div class="control">
+              <p>{{ load.name }}</p>
+            </div>
           </div>
         {% else %}
-          <div>
-            <label for="load_id">Load</label>
-            <select id="load_id" name="load_id" required>
-              <option value="">-</option>
-              {% for load_item in loads %}
-                <option value="{{ load_item.id }}">{{ load_item.name }}</option>
-              {% endfor %}
-            </select>
+          <div class="field">
+            <label class="label" for="load_id">Load</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id="load_id" name="load_id" required>
+                  <option value="">-</option>
+                  {% for load_item in loads %}
+                    <option value="{{ load_item.id }}">{{ load_item.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
           </div>
         {% endif %}
-        <div>
-          <label for="quantity">Quantity</label>
-          <input id="quantity" name="quantity" value="{{ placement.quantity if placement else 1 }}" />
+        <div class="field">
+          <label class="label" for="quantity">Quantity</label>
+          <div class="control">
+            <input class="input" id="quantity" name="quantity" value="{{ placement.quantity if placement else 1 }}" />
+          </div>
         </div>
-        <div>
-          <label for="car_id">Car</label>
-          <select id="car_id" name="car_id">
-            <option value="">-</option>
-            {% for car in cars %}
-              {% set car_label = (car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "")) ~ " " ~ (car.car_number or "") %}
-              <option value="{{ car.id }}" {% if preset_car_id and preset_car_id == car.id|string %}selected{% endif %}>{{ car_label.strip() or ("Car " ~ car.id) }}</option>
-            {% endfor %}
-          </select>
+        <div class="field">
+          <label class="label">Placement Target</label>
+          <div class="control">
+            <label class="radio">
+              <input type="radio" name="placement_target" value="car" {% if preset_car_id %}checked{% endif %} />
+              Car
+            </label>
+            <label class="radio">
+              <input type="radio" name="placement_target" value="location" {% if preset_location_id and not preset_car_id %}checked{% endif %} />
+              Location
+            </label>
+          </div>
+          <p class="help">Choose either a car or a location.</p>
         </div>
-        <div>
-          <label for="location_id">Location</label>
-          <select id="location_id" name="location_id">
-            <option value="">-</option>
-            {% for location in locations %}
-              <option value="{{ location.id }}" {% if preset_location_id and preset_location_id == location.id|string %}selected{% endif %}>{{ location.name }}</option>
-            {% endfor %}
-          </select>
+        <div class="field" id="car-target">
+          <label class="label" for="car_id">Car</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="car_id" name="car_id">
+                <option value="">-</option>
+                {% for car in cars %}
+                  {% set car_label = (car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "")) ~ " " ~ (car.car_number or "") %}
+                  <option value="{{ car.id }}" {% if preset_car_id and preset_car_id == car.id|string %}selected{% endif %}>{{ car_label.strip() or ("Car " ~ car.id) }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field" id="location-target">
+          <label class="label" for="location_id">Location</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="location_id" name="location_id">
+                <option value="">-</option>
+                {% for location in locations %}
+                  <option value="{{ location.id }}" {% if preset_location_id and preset_location_id == location.id|string %}selected{% endif %}>{{ location.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="actions buttons">
@@ -54,4 +84,42 @@
       </div>
     </form>
   </div>
+  <script>
+    const targetRadios = Array.from(document.querySelectorAll('input[name="placement_target"]'));
+    const carTarget = document.getElementById('car-target');
+    const locationTarget = document.getElementById('location-target');
+    const carSelect = document.getElementById('car_id');
+    const locationSelect = document.getElementById('location_id');
+
+    const setTarget = (value) => {
+      if (!value) {
+        carTarget.style.display = '';
+        locationTarget.style.display = '';
+        return;
+      }
+      if (value === 'car') {
+        carTarget.style.display = '';
+        locationTarget.style.display = 'none';
+        if (locationSelect) locationSelect.value = '';
+      } else {
+        carTarget.style.display = 'none';
+        locationTarget.style.display = '';
+        if (carSelect) carSelect.value = '';
+      }
+    };
+
+    const selected = targetRadios.find((radio) => radio.checked);
+    if (selected) {
+      setTarget(selected.value);
+    } else {
+      carTarget.style.display = 'none';
+      locationTarget.style.display = 'none';
+    }
+
+    targetRadios.forEach((radio) => {
+      radio.addEventListener('change', (event) => {
+        setTarget(event.target.value);
+      });
+    });
+  </script>
 {% endblock %}

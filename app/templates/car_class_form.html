@@ -5,71 +5,75 @@
     <form method="post" action="{{ url_for('main.car_class_edit', class_id=car_class.id) }}" data-table="car_classes" data-id="{{ car_class.id }}" data-id-field="id">
       <div class="grid">
         <div>
-          <label for="code">Code</label>
-          <input id="code" name="code" value="{{ car_class.code }}" required />
+          <label class="label" for="code">Code</label>
+          <input class="input" id="code" name="code" value="{{ car_class.code }}" required />
         </div>
         <div>
-          <label for="car_type">Car Type</label>
-          <input id="car_type" name="car_type" value="{{ car_class.car_type or '' }}" />
+          <label class="label" for="car_type">Car Type</label>
+          <input class="input" id="car_type" name="car_type" value="{{ car_class.car_type or '' }}" />
         </div>
         <div>
-          <label for="era">Era</label>
-          <input id="era" name="era" value="{{ car_class.era or '' }}" />
+          <label class="label" for="era">Era</label>
+          <input class="input" id="era" name="era" value="{{ car_class.era or '' }}" />
         </div>
         <div>
-          <label for="wheel_arrangement">Wheel Arrangement</label>
-          <input id="wheel_arrangement" name="wheel_arrangement" value="{{ car_class.wheel_arrangement or '' }}" />
+          <label class="label" for="wheel_arrangement">Wheel Arrangement</label>
+          <input class="input" id="wheel_arrangement" name="wheel_arrangement" value="{{ car_class.wheel_arrangement or '' }}" />
         </div>
         <div>
-          <label for="tender_axles">Tender Axles</label>
-          <input id="tender_axles" name="tender_axles" value="{{ car_class.tender_axles or '' }}" />
+          <label class="label" for="tender_axles">Tender Axles</label>
+          <input class="input" id="tender_axles" name="tender_axles" value="{{ car_class.tender_axles or '' }}" />
         </div>
         <div>
-          <label for="is_locomotive">Locomotive</label>
+          <label class="label" for="is_locomotive">Locomotive</label>
           <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car_class.is_locomotive %}checked{% endif %} />
         </div>
         <div>
-          <label for="capacity">Capacity</label>
-          <input id="capacity" name="capacity" value="{{ car_class.capacity or '' }}" />
+          <label class="label" for="capacity">Capacity</label>
+          <input class="input" id="capacity" name="capacity" value="{{ car_class.capacity or '' }}" />
         </div>
         <div>
-          <label for="weight">Weight</label>
-          <input id="weight" name="weight" value="{{ car_class.weight or '' }}" />
+          <label class="label" for="weight">Weight</label>
+          <input class="input" id="weight" name="weight" value="{{ car_class.weight or '' }}" />
         </div>
         <div>
-          <label for="load_limit">Load Limit</label>
-          <input id="load_limit" name="load_limit" value="{{ car_class.load_limit or '' }}" />
+          <label class="label" for="load_limit">Load Limit</label>
+          <input class="input" id="load_limit" name="load_limit" value="{{ car_class.load_limit or '' }}" />
         </div>
         <div>
-          <label for="aar_plate">AAR Plate</label>
-          <select id="aar_plate" name="aar_plate">
-            <option value="" {% if not car_class.aar_plate %}selected{% endif %}>Unset</option>
-            <option value="B" {% if car_class.aar_plate == 'B' %}selected{% endif %}>B</option>
-            <option value="C" {% if car_class.aar_plate == 'C' %}selected{% endif %}>C</option>
-            <option value="E" {% if car_class.aar_plate == 'E' %}selected{% endif %}>E</option>
-            <option value="F" {% if car_class.aar_plate == 'F' %}selected{% endif %}>F</option>
-            <option value="H" {% if car_class.aar_plate == 'H' %}selected{% endif %}>H</option>
-            <option value="J" {% if car_class.aar_plate == 'J' %}selected{% endif %}>J</option>
-            <option value="K" {% if car_class.aar_plate == 'K' %}selected{% endif %}>K</option>
-            <option value="L" {% if car_class.aar_plate == 'L' %}selected{% endif %}>L</option>
-            <option value="M" {% if car_class.aar_plate == 'M' %}selected{% endif %}>M</option>
-          </select>
+          <label class="label" for="aar_plate">AAR Plate</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="aar_plate" name="aar_plate">
+                <option value="" {% if not car_class.aar_plate %}selected{% endif %}>Unset</option>
+                <option value="B" {% if car_class.aar_plate == 'B' %}selected{% endif %}>B</option>
+                <option value="C" {% if car_class.aar_plate == 'C' %}selected{% endif %}>C</option>
+                <option value="E" {% if car_class.aar_plate == 'E' %}selected{% endif %}>E</option>
+                <option value="F" {% if car_class.aar_plate == 'F' %}selected{% endif %}>F</option>
+                <option value="H" {% if car_class.aar_plate == 'H' %}selected{% endif %}>H</option>
+                <option value="J" {% if car_class.aar_plate == 'J' %}selected{% endif %}>J</option>
+                <option value="K" {% if car_class.aar_plate == 'K' %}selected{% endif %}>K</option>
+                <option value="L" {% if car_class.aar_plate == 'L' %}selected{% endif %}>L</option>
+                <option value="M" {% if car_class.aar_plate == 'M' %}selected{% endif %}>M</option>
+              </select>
+            </div>
+          </div>
         </div>
         <div>
-          <label for="internal_length">Internal Length</label>
-          <input id="internal_length" name="internal_length" value="{{ car_class.internal_length or '' }}" />
+          <label class="label" for="internal_length">Internal Length</label>
+          <input class="input" id="internal_length" name="internal_length" value="{{ car_class.internal_length or '' }}" />
         </div>
         <div>
-          <label for="internal_width">Internal Width</label>
-          <input id="internal_width" name="internal_width" value="{{ car_class.internal_width or '' }}" />
+          <label class="label" for="internal_width">Internal Width</label>
+          <input class="input" id="internal_width" name="internal_width" value="{{ car_class.internal_width or '' }}" />
         </div>
         <div>
-          <label for="internal_height">Internal Height</label>
-          <input id="internal_height" name="internal_height" value="{{ car_class.internal_height or '' }}" />
+          <label class="label" for="internal_height">Internal Height</label>
+          <input class="input" id="internal_height" name="internal_height" value="{{ car_class.internal_height or '' }}" />
         </div>
         <div>
-          <label for="notes">Notes</label>
-          <textarea id="notes" name="notes">{{ car_class.notes or '' }}</textarea>
+          <label class="label" for="notes">Notes</label>
+          <textarea class="textarea" id="notes" name="notes">{{ car_class.notes or '' }}</textarea>
         </div>
       </div>
       <div class="actions buttons">

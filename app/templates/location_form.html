@@ -4,31 +4,39 @@
     <h1 class="title is-3">{{ "Edit Location" if location else "New Location" }}</h1>
     <form method="post" action="{{ url_for('main.location_edit', location_id=location.id) if location else url_for('main.location_new') }}" data-table="locations" data-id="{{ location.id if location else '' }}" data-id-field="id">
       <div class="grid">
-        <div>
-          <label for="name">Name</label>
-          <input id="name" name="name" value="{{ location.name }}" required />
+        <div class="field">
+          <label class="label" for="name">Name</label>
+          <div class="control">
+            <input class="input" id="name" name="name" value="{{ location.name }}" required />
+          </div>
         </div>
-        <div>
-          <label for="location_type">Location Type</label>
-          <input list="location_types" id="location_type" name="location_type" value="{{ location.location_type }}" required />
+        <div class="field">
+          <label class="label" for="location_type">Location Type</label>
+          <div class="control">
+            <input class="input" list="location_types" id="location_type" name="location_type" value="{{ location.location_type }}" required />
+          </div>
           <datalist id="location_types">
             {% for type in location_types %}
               <option value="{{ type }}"></option>
             {% endfor %}
           </datalist>
         </div>
-        <div>
-          <label for="parent_id">Parent Location</label>
-          <select id="parent_id" name="parent_id">
-            <option value="">None</option>
-            {% for loc in locations %}
-              {% if loc.id != location.id and loc.id not in descendant_ids %}
-                <option value="{{ loc.id }}" {% if location.parent_id == loc.id %}selected{% endif %}>
-                  {{ loc.name }}
-                </option>
-              {% endif %}
-            {% endfor %}
-          </select>
+        <div class="field">
+          <label class="label" for="parent_id">Parent Location</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="parent_id" name="parent_id">
+                <option value="">None</option>
+                {% for loc in locations %}
+                  {% if loc.id != location.id and loc.id not in descendant_ids %}
+                    <option value="{{ loc.id }}" {% if location.parent_id == loc.id %}selected{% endif %}>
+                      {{ loc.name }}
+                    </option>
+                  {% endif %}
+                {% endfor %}
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="actions buttons">

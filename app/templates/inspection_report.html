@@ -6,21 +6,29 @@
     <form method="get" action="{{ url_for('main.inspections_report') }}" class="box" style="margin-bottom: 16px;">
       <div class="grid">
         <div>
-          <label for="inspection_type_id">Inspection Type</label>
-          <select id="inspection_type_id" name="inspection_type_id" required>
-            <option value="">Select...</option>
-            {% for row in inspection_types %}
-              <option value="{{ row.type.id }}" {% if selected_type_id|int == row.type.id %}selected{% endif %}>{{ row.label }}</option>
-            {% endfor %}
-          </select>
+          <label class="label" for="inspection_type_id">Inspection Type</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="inspection_type_id" name="inspection_type_id" required>
+                <option value="">Select...</option>
+                {% for row in inspection_types %}
+                  <option value="{{ row.type.id }}" {% if selected_type_id|int == row.type.id %}selected{% endif %}>{{ row.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
         </div>
         <div>
-          <label for="result">Result</label>
-          <select id="result" name="result" required>
-            <option value="">Select...</option>
-            <option value="passed" {% if selected_result == 'passed' %}selected{% endif %}>Passed</option>
-            <option value="failed" {% if selected_result == 'failed' %}selected{% endif %}>Failed</option>
-          </select>
+          <label class="label" for="result">Result</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="result" name="result" required>
+                <option value="">Select...</option>
+                <option value="passed" {% if selected_result == 'passed' %}selected{% endif %}>Passed</option>
+                <option value="failed" {% if selected_result == 'failed' %}selected{% endif %}>Failed</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
       <div class="actions buttons">

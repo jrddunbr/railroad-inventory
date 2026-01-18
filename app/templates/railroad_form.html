@@ -5,32 +5,32 @@
     <form method="post" action="{{ url_for('main.railroad_edit', railroad_id=railroad.id) }}" enctype="multipart/form-data" data-table="railroads" data-id="{{ railroad.id }}" data-id-field="id" data-related-tables="railroad_color_schemes,railroad_logos,railroad_slogans">
       <div class="grid">
         <div>
-          <label for="reporting_mark">Reporting Mark</label>
-          <input id="reporting_mark" name="reporting_mark" value="{{ railroad.reporting_mark }}" required />
+          <label class="label" for="reporting_mark">Reporting Mark</label>
+          <input class="input" id="reporting_mark" name="reporting_mark" value="{{ railroad.reporting_mark }}" required />
         </div>
         <div>
-          <label for="name">Name</label>
-          <input id="name" name="name" value="{{ railroad.name }}" required />
+          <label class="label" for="name">Name</label>
+          <input class="input" id="name" name="name" value="{{ railroad.name }}" required />
         </div>
         <div>
-          <label for="start_date">Start Date</label>
-          <input id="start_date" name="start_date" value="{{ railroad.start_date or '' }}" />
+          <label class="label" for="start_date">Start Date</label>
+          <input class="input" id="start_date" name="start_date" value="{{ railroad.start_date or '' }}" />
         </div>
         <div>
-          <label for="end_date">End Date</label>
-          <input id="end_date" name="end_date" value="{{ railroad.end_date or '' }}" />
+          <label class="label" for="end_date">End Date</label>
+          <input class="input" id="end_date" name="end_date" value="{{ railroad.end_date or '' }}" />
         </div>
         <div>
-          <label for="merged_into">Merged Into</label>
-          <input id="merged_into" name="merged_into" value="{{ railroad.merged_into or '' }}" />
+          <label class="label" for="merged_into">Merged Into</label>
+          <input class="input" id="merged_into" name="merged_into" value="{{ railroad.merged_into or '' }}" />
         </div>
         <div>
-          <label for="merged_from">Merged From</label>
-          <input id="merged_from" name="merged_from" value="{{ railroad.merged_from or '' }}" />
+          <label class="label" for="merged_from">Merged From</label>
+          <input class="input" id="merged_from" name="merged_from" value="{{ railroad.merged_from or '' }}" />
         </div>
         <div>
-          <label for="notes">Notes</label>
-          <textarea id="notes" name="notes">{{ railroad.notes or '' }}</textarea>
+          <label class="label" for="notes">Notes</label>
+          <textarea class="textarea" id="notes" name="notes">{{ railroad.notes or '' }}</textarea>
         </div>
       </div>
       <h2 class="title is-4">Color Schemes</h2>
@@ -50,10 +50,10 @@
           <tr>
             <td>
               <input type="hidden" name="color_scheme_id" value="{{ scheme.id }}" />
-              <input name="color_scheme_description" value="{{ scheme.description }}" />
+              <input class="input" name="color_scheme_description" value="{{ scheme.description }}" />
             </td>
-            <td><input name="color_scheme_start" value="{{ scheme.start_date or '' }}" /></td>
-            <td><input name="color_scheme_end" value="{{ scheme.end_date or '' }}" /></td>
+            <td><input class="input" name="color_scheme_start" value="{{ scheme.start_date or '' }}" /></td>
+            <td><input class="input" name="color_scheme_end" value="{{ scheme.end_date or '' }}" /></td>
             <td>
               <div class="actions buttons" style="margin-top: 0;">
                 <input id="scheme-colors-{{ loop.index0 }}" class="scheme-colors" name="color_scheme_colors" value="{{ scheme.colors or '' }}" />
@@ -90,10 +90,10 @@
             <td>
               <input type="hidden" name="logo_id" value="{{ logo.id }}" />
               <input type="hidden" name="logo_existing_path" value="{{ logo.image_path or '' }}" />
-              <input name="logo_description" value="{{ logo.description }}" />
+              <input class="input" name="logo_description" value="{{ logo.description }}" />
             </td>
-            <td><input name="logo_start" value="{{ logo.start_date or '' }}" /></td>
-            <td><input name="logo_end" value="{{ logo.end_date or '' }}" /></td>
+            <td><input class="input" name="logo_start" value="{{ logo.start_date or '' }}" /></td>
+            <td><input class="input" name="logo_end" value="{{ logo.end_date or '' }}" /></td>
             <td>
               {% if logo.image_path %}
                 <img src="{{ url_for('static', filename=logo.image_path) }}" alt="{{ logo.description }}" style="max-height: 48px; max-width: 120px;" />
@@ -124,11 +124,11 @@
           <tr>
             <td>
               <input type="hidden" name="slogan_id" value="{{ slogan.id }}" />
-              <input name="slogan_description" value="{{ slogan.description }}" />
+              <input class="input" name="slogan_description" value="{{ slogan.description }}" />
             </td>
-            <td><input name="slogan_text" value="{{ slogan.slogan_text or '' }}" /></td>
-            <td><input name="slogan_start" value="{{ slogan.start_date or '' }}" /></td>
-            <td><input name="slogan_end" value="{{ slogan.end_date or '' }}" /></td>
+            <td><input class="input" name="slogan_text" value="{{ slogan.slogan_text or '' }}" /></td>
+            <td><input class="input" name="slogan_start" value="{{ slogan.start_date or '' }}" /></td>
+            <td><input class="input" name="slogan_end" value="{{ slogan.end_date or '' }}" /></td>
             <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
           </tr>
           {% endfor %}
@@ -151,10 +151,10 @@
       row.innerHTML = `
         <td>
           <input type="hidden" name="color_scheme_id" value="" />
-          <input name="color_scheme_description" value="" />
+          <input class="input" name="color_scheme_description" value="" />
         </td>
-        <td><input name="color_scheme_start" value="" /></td>
-        <td><input name="color_scheme_end" value="" /></td>
+        <td><input class="input" name="color_scheme_start" value="" /></td>
+        <td><input class="input" name="color_scheme_end" value="" /></td>
         <td>
           <div class="actions buttons" style="margin-top: 0;">
             <input id="scheme-colors-${index}" class="scheme-colors" name="color_scheme_colors" value="" />
@@ -176,10 +176,10 @@
         <td>
           <input type="hidden" name="logo_id" value="" />
           <input type="hidden" name="logo_existing_path" value="" />
-          <input name="logo_description" value="" />
+          <input class="input" name="logo_description" value="" />
         </td>
-        <td><input name="logo_start" value="" /></td>
-        <td><input name="logo_end" value="" /></td>
+        <td><input class="input" name="logo_start" value="" /></td>
+        <td><input class="input" name="logo_end" value="" /></td>
         <td>
           <input type="file" name="logo_image_" accept=".png,.jpg,.jpeg,.svg" data-max-bytes="2097152" />
         </td>
@@ -193,11 +193,11 @@
       row.innerHTML = `
         <td>
           <input type="hidden" name="slogan_id" value="" />
-          <input name="slogan_description" value="" />
+          <input class="input" name="slogan_description" value="" />
         </td>
-        <td><input name="slogan_text" value="" /></td>
-        <td><input name="slogan_start" value="" /></td>
-        <td><input name="slogan_end" value="" /></td>
+        <td><input class="input" name="slogan_text" value="" /></td>
+        <td><input class="input" name="slogan_start" value="" /></td>
+        <td><input class="input" name="slogan_end" value="" /></td>
         <td><button type="button" class="button is-small is-light remove-row">Remove</button></td>
       `;
       return row;

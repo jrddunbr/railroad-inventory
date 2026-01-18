@@ -5,22 +5,26 @@
     <p class="keyboard-hint">Enter a scale name (HO, N, Z, S, O, OO, TT, G) or ratio like 1:87.</p>
     <div class="grid">
       <div>
-        <label for="plate">AAR Plate</label>
-        <select id="plate" name="plate">
-          <option value="B">B</option>
-          <option value="C">C</option>
-          <option value="E">E</option>
-          <option value="F">F</option>
-          <option value="H">H</option>
-          <option value="J">J</option>
-          <option value="K">K</option>
-          <option value="L">L</option>
-          <option value="M">M</option>
-        </select>
+        <label class="label" for="plate">AAR Plate</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="plate" name="plate">
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="E">E</option>
+              <option value="F">F</option>
+              <option value="H">H</option>
+              <option value="J">J</option>
+              <option value="K">K</option>
+              <option value="L">L</option>
+              <option value="M">M</option>
+            </select>
+          </div>
+        </div>
       </div>
       <div>
-        <label for="scale_input">Scale</label>
-        <input id="scale_input" name="scale_input" value="HO" />
+        <label class="label" for="scale_input">Scale</label>
+        <input class="input" id="scale_input" name="scale_input" value="HO" />
       </div>
     </div>
     <p class="keyboard-hint">Plates are based on gabarit diagrams and AAR Appendix A breakpoint data.</p>
