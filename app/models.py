@@ -159,6 +159,9 @@ class Car(BaseModel):
     capacity_override: str | None = None
     weight_override: str | None = None
     load_limit_override: str | None = None
+    actual_weight: str | None = None
+    scale: str | None = None
+    gauge: str | None = None
     aar_plate_override: str | None = None
     built: str | None = None
     alt_date: str | None = None
@@ -258,6 +261,8 @@ class AppSettings(BaseModel):
     query = QueryDescriptor()
 
     page_size: str | None = None
+    scale_options: str | None = None
+    gauge_options: str | None = None
     passed: bool | None = None
 
     @property

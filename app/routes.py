@@ -34,6 +34,45 @@ main_bp = Blueprint("main", __name__)
 
 PAGINATION_OPTIONS = ["25", "50", "100", "250", "all"]
 DEFAULT_PAGE_SIZE = "50"
+DEFAULT_SCALE_OPTIONS = [
+    "G|1:22.5",
+    "F|1:20.3",
+    "O|1:48",
+    "S|1:64",
+    "HO|1:87",
+    "TT|1:120",
+    "N|1:160",
+    "Z|1:220",
+    "1:6",
+    "1:8",
+    "1:12",
+    "1:16",
+    "1:24",
+    "1:29",
+    "1:32",
+]
+DEFAULT_GAUGE_OPTIONS = [
+    "16.5 mm|HO, HOn3, HOn30",
+    "12 mm|TT",
+    "9 mm|N, Nn3",
+    "6.5 mm|Z",
+    "14.2 mm|OO",
+    "18.2 mm|S",
+    "21 mm|Sn3",
+    "32 mm|O, On30, On3",
+    "45 mm|G, 1:20.3, 1:22.5, 1:29",
+    "64 mm|1",
+    "89 mm|2",
+    "127 mm|3",
+    "3.5 in|1 in scale",
+    "4.75 in|1 in scale",
+    "5 in|1 in scale",
+    "7.25 in|1.5 in scale",
+    "7.5 in|1.5 in scale",
+    "10.25 in|2 in scale",
+    "12 in|3 in scale",
+    "15 in|3.5 in scale",
+]
 
 
 def ensure_db_backup() -> None:
@@ -72,6 +111,167 @@ def normalize_page_size(value: str) -> str:
     if value in PAGINATION_OPTIONS:
         return value
     return ""
+
+
+def parse_scale_line(line: str) -> tuple[str | None, str | None]:
+    raw = line.strip()
+    if "|" in raw:
+        name, ratio = [part.strip() for part in raw.split("|", 1)]
+        return name or None, ratio or None
+    if "=" in raw:
+        name, ratio = [part.strip() for part in raw.split("=", 1)]
+        return name or None, ratio or None
+    if raw.endswith(")") and "(" in raw:
+        prefix, suffix = raw.rsplit("(", 1)
+        ratio = suffix[:-1].strip()
+        name = prefix.strip()
+        if ratio.startswith("1:") and name:
+            return name, ratio
+    return None, raw or None
+
+
+def parse_gauge_line(line: str) -> tuple[str | None, str | None]:
+    raw = line.strip()
+    if "|" in raw:
+        value, scales = [part.strip() for part in raw.split("|", 1)]
+        return value or None, scales or None
+    if "=" in raw:
+        value, scales = [part.strip() for part in raw.split("=", 1)]
+        return value or None, scales or None
+    if raw.endswith(")") and "(" in raw:
+        prefix, suffix = raw.rsplit("(", 1)
+        value = prefix.strip()
+        scales = suffix[:-1].strip()
+        return value or None, scales or None
+    return raw or None, None
+
+
+def build_scale_options(text: str | None) -> list[dict[str, str | None]]:
+    if not text:
+        return []
+    options = []
+    seen_values: set[str] = set()
+    for line in text.splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        name, ratio = parse_scale_line(cleaned)
+        if name and ratio:
+            value = ratio
+            label = f"{name} ({ratio})"
+            raw = f"{name}|{ratio}"
+        else:
+            value = cleaned
+            label = cleaned
+            raw = cleaned
+            name = None
+        if value in seen_values:
+            continue
+        seen_values.add(value)
+        options.append({"name": name, "value": value, "label": label, "raw": raw})
+    return options
+
+
+def build_gauge_options(text: str | None) -> list[dict[str, str | None]]:
+    if not text:
+        return []
+    options = []
+    seen_values: set[str] = set()
+    for line in text.splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+        value, scales = parse_gauge_line(cleaned)
+        if not value:
+            continue
+        label = f"{value} ({scales})" if scales else value
+        raw = f"{value}|{scales}" if scales else value
+        if value in seen_values:
+            continue
+        seen_values.add(value)
+        options.append({"value": value, "label": label, "scales": scales, "raw": raw})
+    return options
+
+
+def get_scale_options_text() -> str:
+    settings = get_app_settings()
+    if settings.scale_options is None:
+        return "\n".join(DEFAULT_SCALE_OPTIONS)
+    return settings.scale_options or ""
+
+
+def get_gauge_options_text() -> str:
+    settings = get_app_settings()
+    if settings.gauge_options is None:
+        return "\n".join(DEFAULT_GAUGE_OPTIONS)
+    return settings.gauge_options or ""
+
+
+def get_scale_options() -> list[dict[str, str | None]]:
+    return build_scale_options(get_scale_options_text())
+
+
+def get_gauge_options() -> list[dict[str, str | None]]:
+    return build_gauge_options(get_gauge_options_text())
+
+
+def normalize_scale_input(value: str | None) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip()
+    for option in get_scale_options():
+        if cleaned == option["value"] or (option["name"] and cleaned == option["name"]):
+            return option["value"] or cleaned
+    return cleaned
+
+
+def normalize_gauge_input(value: str | None) -> str:
+    if not value:
+        return ""
+    cleaned = value.strip()
+    for option in get_gauge_options():
+        if cleaned == option["value"] or cleaned == option["label"]:
+            return option["value"] or cleaned
+    if cleaned.endswith(")") and "(" in cleaned:
+        cleaned = cleaned.rsplit("(", 1)[0].strip()
+    return cleaned
+
+
+def format_scale_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    for option in get_scale_options():
+        if option["value"] == value and option.get("name"):
+            return option["label"]
+    return value
+
+
+def format_gauge_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    for option in get_gauge_options():
+        if option["value"] == value:
+            return option["label"]
+    return value
+
+
+def parse_actual_weight(value: str | None) -> tuple[str, str]:
+    if not value:
+        return "", ""
+    cleaned = value.strip()
+    match = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)$", cleaned)
+    if match:
+        amount = match.group(1)
+        unit = match.group(2).lower()
+        if unit in {"g", "kg", "lb", "oz"}:
+            return amount, unit
+    parts = cleaned.split()
+    if len(parts) >= 2:
+        amount = parts[0]
+        unit = parts[1].lower()
+        if unit in {"g", "kg", "lb", "oz"}:
+            return amount, unit
+    return cleaned, ""
 
 
 def paginate_list(items: list, page: int, page_size: str, route: str, route_params: dict) -> tuple[list, dict]:
@@ -1239,6 +1439,8 @@ def car_detail(car_id: int):
         car=car,
         compare_cars=compare_cars,
         car_payload=serialize_car(car),
+        scale_label=format_scale_label(car.scale),
+        gauge_label=format_gauge_label(car.gauge),
     )
 
 
@@ -1304,6 +1506,9 @@ def car_edit(car_id: int):
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
     locations = Location.query.order_by("name").all()
+    scale_value = normalize_scale_input(car.scale)
+    gauge_value = normalize_gauge_input(car.gauge)
+    actual_weight_value, actual_weight_unit = parse_actual_weight(car.actual_weight)
     return render_template(
         "car_form.html",
         car=car,
@@ -1311,6 +1516,12 @@ def car_edit(car_id: int):
         classes=classes,
         locations=locations,
         prefill={},
+        scale_options=get_scale_options(),
+        gauge_options=get_gauge_options(),
+        scale_value=scale_value,
+        gauge_value=gauge_value,
+        actual_weight_value=actual_weight_value,
+        actual_weight_unit=actual_weight_unit,
         form_action=url_for("main.car_edit", car_id=car.id),
     )
 
@@ -1333,6 +1544,9 @@ def car_new():
         "capacity": request.args.get("capacity", "").strip(),
         "weight": request.args.get("weight", "").strip(),
         "load_limit": request.args.get("load_limit", "").strip(),
+        "actual_weight": request.args.get("actual_weight", "").strip(),
+        "scale": request.args.get("scale", "").strip(),
+        "gauge": request.args.get("gauge", "").strip(),
         "built": request.args.get("built", "").strip(),
         "brand": request.args.get("brand", "").strip(),
         "price": request.args.get("price", "").strip(),
@@ -1341,6 +1555,9 @@ def car_new():
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
     locations = Location.query.order_by("name").all()
+    scale_value = normalize_scale_input(prefill.get("scale", ""))
+    gauge_value = normalize_gauge_input(prefill.get("gauge", ""))
+    actual_weight_value, actual_weight_unit = parse_actual_weight(prefill.get("actual_weight", ""))
     return render_template(
         "car_form.html",
         car=None,
@@ -1348,6 +1565,12 @@ def car_new():
         classes=classes,
         locations=locations,
         prefill=prefill,
+        scale_options=get_scale_options(),
+        gauge_options=get_gauge_options(),
+        scale_value=scale_value,
+        gauge_value=gauge_value,
+        actual_weight_value=actual_weight_value,
+        actual_weight_unit=actual_weight_unit,
         form_action=url_for("main.car_new"),
     )
 
@@ -1453,6 +1676,9 @@ def search_cars(query: str) -> list[Car]:
             car.car_type_override,
             car.load,
             car.notes,
+            car.actual_weight,
+            car.scale,
+            car.gauge,
         ]
         if car.car_class:
             values.extend([car.car_class.code, car.car_class.car_type])
@@ -1549,6 +1775,16 @@ def apply_car_form(car: Car, form) -> None:
     weight_value = form.get("weight", "").strip()
     load_limit_value = form.get("load_limit", "").strip()
     aar_plate_value = form.get("aar_plate", "").strip()
+    actual_weight_value = form.get("actual_weight_value", "").strip()
+    actual_weight_unit = form.get("actual_weight_unit", "").strip()
+    if actual_weight_value and actual_weight_unit:
+        car.actual_weight = f"{actual_weight_value} {actual_weight_unit}"
+    else:
+        car.actual_weight = actual_weight_value or None
+    scale_value = normalize_scale_input(form.get("scale", ""))
+    gauge_value = normalize_gauge_input(form.get("gauge", ""))
+    car.scale = scale_value or None
+    car.gauge = gauge_value or None
     car.built = form.get("built", "").strip()
     car.alt_date = form.get("alt_date", "").strip()
     car.reweight_date = form.get("reweight_date", "").strip()
@@ -1682,6 +1918,8 @@ def settings():
     inspection_types = InspectionType.query.all()
     type_rows = inspection_type_tree(inspection_types)
     page_size = get_page_size()
+    scale_options_text = get_scale_options_text()
+    gauge_options_text = get_gauge_options_text()
     options = [
         {"value": value, "label": "All" if value == "all" else value} for value in PAGINATION_OPTIONS
     ]
@@ -1690,6 +1928,8 @@ def settings():
         inspection_types=type_rows,
         page_size=page_size,
         page_size_options=options,
+        scale_options_text=scale_options_text,
+        gauge_options_text=gauge_options_text,
     )
 
 
@@ -1700,6 +1940,24 @@ def settings_pagination():
         return "Invalid pagination size.", 400
     settings = get_app_settings()
     settings.page_size = page_size
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/settings/scale-gauge", methods=["POST"])
+def settings_scale_gauge():
+    scale_text = request.form.get("scale_options", "").strip()
+    gauge_text = request.form.get("gauge_options", "").strip()
+    scale_options = build_scale_options(scale_text)
+    gauge_options = build_gauge_options(gauge_text)
+    settings = get_app_settings()
+    settings.scale_options = "\n".join(
+        option["raw"] for option in scale_options if option.get("raw")
+    )
+    settings.gauge_options = "\n".join(
+        option["raw"] for option in gauge_options if option.get("raw")
+    )
     db.session.commit()
     ensure_db_backup()
     return redirect(url_for("main.settings"))
@@ -1791,6 +2049,9 @@ def serialize_car(car: Car) -> dict:
         "capacity": car.capacity_override or class_capacity,
         "weight": car.weight_override or class_weight,
         "load_limit": car.load_limit_override or class_load_limit,
+        "actual_weight": car.actual_weight,
+        "scale": car.scale,
+        "gauge": car.gauge,
         "aar_plate": car.aar_plate_override or class_aar_plate,
         "internal_length": car.internal_length_override or class_internal_length,
         "internal_width": car.internal_width_override or class_internal_width,

@@ -87,8 +87,77 @@
               <input class="input" id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
             </div>
           </div>
+          <div class="field">
+            <label class="label" for="actual_weight">Actual Weight</label>
+            <div class="control">
+              {% set actual_weight_value = actual_weight_value if actual_weight_value is defined else (car.actual_weight if car else prefill.get('actual_weight', '')) %}
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="actual_weight_value" name="actual_weight_value" value="{{ actual_weight_value }}" />
+                </div>
+                <div class="control">
+                  {% set actual_weight_unit = actual_weight_unit if actual_weight_unit is defined else '' %}
+                  <div class="select">
+                    <select id="actual_weight_unit" name="actual_weight_unit">
+                      <option value="" {% if not actual_weight_unit %}selected{% endif %}>Unit</option>
+                      <option value="g" {% if actual_weight_unit == 'g' %}selected{% endif %}>g</option>
+                      <option value="kg" {% if actual_weight_unit == 'kg' %}selected{% endif %}>kg</option>
+                      <option value="lb" {% if actual_weight_unit == 'lb' %}selected{% endif %}>lb</option>
+                      <option value="oz" {% if actual_weight_unit == 'oz' %}selected{% endif %}>oz</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% set scale_value = scale_value if scale_value is defined else (car.scale if car else prefill.get('scale', '')) %}
+          {% set scale_state = namespace(found=false) %}
+          {% for option in scale_options %}
+            {% if option.value == scale_value %}
+              {% set scale_state.found = true %}
+            {% endif %}
+          {% endfor %}
+          <div class="field">
+            <label class="label" for="scale">Scale</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id="scale" name="scale">
+                  <option value="" {% if not scale_value %}selected{% endif %}>Unset</option>
+                  {% if scale_value and not scale_state.found %}
+                    <option value="{{ scale_value }}" selected>{{ scale_value }}</option>
+                  {% endif %}
+                  {% for option in scale_options %}
+                    <option value="{{ option.value }}" {% if option.value == scale_value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+          {% set gauge_value = gauge_value if gauge_value is defined else (car.gauge if car else prefill.get('gauge', '')) %}
+          {% set gauge_state = namespace(found=false) %}
+          {% for option in gauge_options %}
+            {% if option.value == gauge_value %}
+              {% set gauge_state.found = true %}
+            {% endif %}
+          {% endfor %}
+          <div class="field">
+            <label class="label" for="gauge">Gauge</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id="gauge" name="gauge">
+                  <option value="" {% if not gauge_value %}selected{% endif %}>Unset</option>
+                  {% if gauge_value and not gauge_state.found %}
+                    <option value="{{ gauge_value }}" selected>{{ gauge_value }}</option>
+                  {% endif %}
+                  {% for option in gauge_options %}
+                    <option value="{{ option.value }}" {% if option.value == gauge_value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
-        <h3 class="title is-5">Weight Specifications</h3>
+        <h3 class="title is-5">Prototype Specifications</h3>
         <div class="grid">
           {% set aar_plate_value = car.aar_plate_override if car and car.aar_plate_override else (prefill.get('aar_plate', '') if not car else '') %}
           <div class="field">

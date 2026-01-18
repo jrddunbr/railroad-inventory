@@ -7,6 +7,9 @@
     {% set copy_brand = car.brand or '' %}
     {% set copy_price = car.price or '' %}
     {% set copy_msrp = car.msrp or '' %}
+    {% set copy_actual_weight = car.actual_weight or '' %}
+    {% set copy_scale = car.scale or '' %}
+    {% set copy_gauge = car.gauge or '' %}
     {% if car.car_class %}
       {% set copy_car_class = car.car_class.code or '' %}
       {% set copy_car_type = car.car_class.car_type or '' %}
@@ -94,6 +97,9 @@
           <p><strong>Tender Axles:</strong> {{ car.tender_axles_override }}</p>
         {% endif %}
         <p><strong>DCC ID:</strong> {{ car.dcc_id or "-" }}</p>
+        <p><strong>Actual Weight:</strong> {{ car.actual_weight or "-" }}</p>
+        <p><strong>Scale:</strong> {{ scale_label or "-" }}</p>
+        <p><strong>Gauge:</strong> {{ gauge_label or "-" }}</p>
       </div>
       <div>
         <h3 class="title is-5">Pricing</h3>
@@ -259,7 +265,7 @@
           <strong>Copy to New Car</strong> copies the railroad, class, and core lettering details.
           Use this when you want a quick new entry that matches the class defaults.
           <div class="actions buttons" style="margin-top: 12px;">
-            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate) }}">Copy to New Car</a>
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate, actual_weight=copy_actual_weight, scale=copy_scale, gauge=copy_gauge) }}">Copy to New Car</a>
           </div>
         </div>
       </article>
@@ -268,7 +274,7 @@
           <strong>Copy to New Car (Overrides)</strong> keeps any overrides you set for this car
           (type, capacity, weight, load limit, AAR plate) instead of class defaults.
           <div class="actions buttons" style="margin-top: 12px;">
-            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate) }}">Copy to New Car (Overrides)</a>
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, actual_weight=copy_actual_weight, scale=copy_scale, gauge=copy_gauge) }}">Copy to New Car (Overrides)</a>
           </div>
         </div>
       </article>
@@ -277,7 +283,7 @@
           <strong>Copy to New Car (Clone)</strong> brings over everything, including built date,
           brand, price, and MSRP for a near-duplicate entry.
           <div class="actions buttons" style="margin-top: 12px;">
-            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, actual_weight=copy_actual_weight, scale=copy_scale, gauge=copy_gauge, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
           </div>
         </div>
       </article>
@@ -317,6 +323,9 @@
       { key: 'capacity', label: 'Capacity' },
       { key: 'weight', label: 'Weight' },
       { key: 'load_limit', label: 'Load Limit' },
+      { key: 'actual_weight', label: 'Actual Weight' },
+      { key: 'scale', label: 'Scale' },
+      { key: 'gauge', label: 'Gauge' },
       { key: 'aar_plate', label: 'AAR Plate' },
       { key: 'internal_length', label: 'Internal Length' },
       { key: 'internal_width', label: 'Internal Width' },
