@@ -88,7 +88,7 @@
             </div>
           </div>
           <div class="field">
-            <label class="label" for="actual_weight">Actual Weight</label>
+            <label class="label" for="actual_weight_value">Actual Weight</label>
             <div class="control">
               {% set actual_weight_value = actual_weight_value if actual_weight_value is defined else (car.actual_weight if car else prefill.get('actual_weight', '')) %}
               <div class="field has-addons">
@@ -104,6 +104,31 @@
                       <option value="kg" {% if actual_weight_unit == 'kg' %}selected{% endif %}>kg</option>
                       <option value="lb" {% if actual_weight_unit == 'lb' %}selected{% endif %}>lb</option>
                       <option value="oz" {% if actual_weight_unit == 'oz' %}selected{% endif %}>oz</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="help">NMRA Weight Check runs automatically when weight and length are saved.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="actual_length_value">Actual Length</label>
+            <div class="control">
+              {% set actual_length_value = actual_length_value if actual_length_value is defined else (car.actual_length if car else prefill.get('actual_length', '')) %}
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="actual_length_value" name="actual_length_value" value="{{ actual_length_value }}" />
+                </div>
+                <div class="control">
+                  {% set actual_length_unit = actual_length_unit if actual_length_unit is defined else '' %}
+                  <div class="select">
+                    <select id="actual_length_unit" name="actual_length_unit">
+                      <option value="" {% if not actual_length_unit %}selected{% endif %}>Unit</option>
+                      <option value="in" {% if actual_length_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if actual_length_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if actual_length_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if actual_length_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if actual_length_unit == 'm' %}selected{% endif %}>m</option>
                     </select>
                   </div>
                 </div>

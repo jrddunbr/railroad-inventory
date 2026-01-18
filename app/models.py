@@ -160,6 +160,7 @@ class Car(BaseModel):
     weight_override: str | None = None
     load_limit_override: str | None = None
     actual_weight: str | None = None
+    actual_length: str | None = None
     scale: str | None = None
     gauge: str | None = None
     aar_plate_override: str | None = None
@@ -252,17 +253,6 @@ class CarInspection(BaseModel):
     inspection_type_id: int | None = None
     inspection_date: str | None = None
     details: str | None = None
-
-
-@dataclass
-class AppSettings(BaseModel):
-    doc_type = "app_settings"
-    counter_key = "app_settings"
-    query = QueryDescriptor()
-
-    page_size: str | None = None
-    scale_options: str | None = None
-    gauge_options: str | None = None
     passed: bool | None = None
 
     @property
@@ -276,6 +266,18 @@ class AppSettings(BaseModel):
         if not self._store or not self.inspection_type_id:
             return None
         return self._store.get(InspectionType, self.inspection_type_id)
+
+
+@dataclass
+class AppSettings(BaseModel):
+    doc_type = "app_settings"
+    counter_key = "app_settings"
+    query = QueryDescriptor()
+
+    page_size: str | None = None
+    scale_options: str | None = None
+    gauge_options: str | None = None
+    passed: bool | None = None
 
 
 @dataclass

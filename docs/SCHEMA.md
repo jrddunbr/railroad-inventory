@@ -61,6 +61,7 @@ This document describes the current database schema and common alternate names u
 - `weight_override` (string, optional)
 - `load_limit_override` (string, optional)
 - `actual_weight` (string, optional)
+- `actual_length` (string, optional)
 - `scale` (string, optional)
 - `gauge` (string, optional)
 - `aar_plate_override` (string, optional)

@@ -83,12 +83,15 @@ def create_app() -> Flask:
         return {"page_timing": {"total_ms": total_ms, "db_ms": db_ms}}
 
     with app.app_context():
-        from app.models import Location
+        from app.models import InspectionType, Location
 
         db_types = sorted({loc.location_type for loc in Location.query.all() if loc.location_type})
         merged_types = DEFAULT_LOCATION_TYPES + [
             location_type for location_type in db_types if location_type not in DEFAULT_LOCATION_TYPES
         ]
         app.config["LOCATION_TYPES"] = merged_types
+        if not InspectionType.query.filter_by(name="NMRA Weight Check").first():
+            db.session.add(InspectionType(name="NMRA Weight Check"))
+            db.session.commit()
 
     return app

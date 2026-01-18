@@ -73,6 +73,43 @@ DEFAULT_GAUGE_OPTIONS = [
     "12 in|3 in scale",
     "15 in|3.5 in scale",
 ]
+NMRA_WEIGHT_CHECK_NAME = "NMRA Weight Check"
+NMRA_WEIGHT_BY_SCALE = {
+    "O": (5.0, 1.0),
+    "On3": (1.5, 0.75),
+    "S": (2.0, 0.5),
+    "Sn3": (1.0, 0.5),
+    "HO": (1.0, 0.5),
+    "HOn3": (0.75, 0.375),
+    "TT": (0.75, 0.375),
+    "N": (0.5, 0.15),
+}
+WEIGHT_UNIT_TO_OZ = {
+    "oz": 1.0,
+    "lb": 16.0,
+    "g": 0.03527396195,
+    "kg": 35.27396195,
+}
+WEIGHT_UNIT_TO_KG = {
+    "kg": 1.0,
+    "g": 0.001,
+    "lb": 0.45359237,
+    "oz": 0.028349523125,
+}
+LENGTH_UNIT_TO_IN = {
+    "in": 1.0,
+    "ft": 12.0,
+    "mm": 0.03937007874,
+    "cm": 0.3937007874,
+    "m": 39.37007874,
+}
+LENGTH_UNIT_TO_M = {
+    "m": 1.0,
+    "cm": 0.01,
+    "mm": 0.001,
+    "ft": 0.3048,
+    "in": 0.0254,
+}
 
 
 def ensure_db_backup() -> None:
@@ -272,6 +309,170 @@ def parse_actual_weight(value: str | None) -> tuple[str, str]:
         if unit in {"g", "kg", "lb", "oz"}:
             return amount, unit
     return cleaned, ""
+
+
+def parse_actual_length(value: str | None) -> tuple[str, str]:
+    if not value:
+        return "", ""
+    cleaned = value.strip()
+    match = re.match(r"^([0-9]+(?:\.[0-9]+)?)\s*([a-zA-Z]+)$", cleaned)
+    if match:
+        amount = match.group(1)
+        unit = match.group(2).lower()
+        if unit in {"in", "ft", "mm", "cm", "m"}:
+            return amount, unit
+    parts = cleaned.split()
+    if len(parts) >= 2:
+        amount = parts[0]
+        unit = parts[1].lower()
+        if unit in {"in", "ft", "mm", "cm", "m"}:
+            return amount, unit
+    return cleaned, ""
+
+
+def get_scale_name(value: str | None) -> str | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if cleaned in NMRA_WEIGHT_BY_SCALE:
+        return cleaned
+    for option in get_scale_options():
+        if option["value"] == cleaned and option.get("name"):
+            return option["name"]
+    return None
+
+
+def weight_to_ounces(amount: str, unit: str) -> float | None:
+    try:
+        numeric = float(amount)
+    except ValueError:
+        return None
+    factor = WEIGHT_UNIT_TO_OZ.get(unit)
+    if factor is None:
+        return None
+    return numeric * factor
+
+
+def weight_to_kg(amount: str, unit: str) -> float | None:
+    try:
+        numeric = float(amount)
+    except ValueError:
+        return None
+    factor = WEIGHT_UNIT_TO_KG.get(unit)
+    if factor is None:
+        return None
+    return numeric * factor
+
+
+def length_to_inches(amount: str, unit: str) -> float | None:
+    try:
+        numeric = float(amount)
+    except ValueError:
+        return None
+    factor = LENGTH_UNIT_TO_IN.get(unit)
+    if factor is None:
+        return None
+    return numeric * factor
+
+
+def length_to_meters(amount: str, unit: str) -> float | None:
+    try:
+        numeric = float(amount)
+    except ValueError:
+        return None
+    factor = LENGTH_UNIT_TO_M.get(unit)
+    if factor is None:
+        return None
+    return numeric * factor
+
+
+def format_ounces(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def format_linear_density(value: float) -> str:
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def maybe_run_nmra_weight_check(
+    car: Car,
+    previous_weight: str | None,
+    previous_length: str | None,
+    previous_scale: str | None,
+) -> bool:
+    if not car.id or not car.actual_weight or not car.actual_length:
+        return False
+    if (
+        previous_weight == car.actual_weight
+        and previous_length == car.actual_length
+        and previous_scale == car.scale
+    ):
+        return False
+    scale_name = get_scale_name(car.scale)
+    if not scale_name or scale_name not in NMRA_WEIGHT_BY_SCALE:
+        return False
+    weight_amount, weight_unit = parse_actual_weight(car.actual_weight)
+    length_amount, length_unit = parse_actual_length(car.actual_length)
+    if not weight_amount or not weight_unit or not length_amount or not length_unit:
+        return False
+    actual_oz = weight_to_ounces(weight_amount, weight_unit)
+    length_in = length_to_inches(length_amount, length_unit)
+    if actual_oz is None or length_in is None:
+        return False
+    initial, additional = NMRA_WEIGHT_BY_SCALE[scale_name]
+    minimum_oz = initial + (additional * length_in)
+    passed = actual_oz >= minimum_oz
+    details = (
+        f"Min {format_ounces(minimum_oz)} oz (scale {scale_name}, "
+        f"length {format_ounces(length_in)} in). "
+        f"Actual {format_ounces(actual_oz)} oz."
+    )
+    inspection_type = InspectionType.query.filter_by(name=NMRA_WEIGHT_CHECK_NAME).first()
+    if not inspection_type:
+        inspection_type = InspectionType(name=NMRA_WEIGHT_CHECK_NAME)
+        db.session.add(inspection_type)
+        db.session.commit()
+        ensure_db_backup()
+    today = datetime.now().date().isoformat()
+    existing = (
+        CarInspection.query.filter_by(car_id=car.id, inspection_type_id=inspection_type.id)
+        .order_by("inspection_date", reverse=True)
+        .first()
+    )
+    if existing and existing.inspection_date == today:
+        if existing.inspection_type_id is None:
+            existing.inspection_type_id = inspection_type.id
+        existing.passed = passed
+        existing.details = details
+    else:
+        db.session.add(
+            CarInspection(
+                car_id=car.id,
+                inspection_type_id=inspection_type.id,
+                inspection_date=today,
+                details=details,
+                passed=passed,
+            )
+        )
+    car.last_inspection_date = today
+    db.session.commit()
+    ensure_db_backup()
+    return True
+
+
+def calculate_linear_density(car: Car) -> str | None:
+    if not car.actual_weight or not car.actual_length:
+        return None
+    weight_amount, weight_unit = parse_actual_weight(car.actual_weight)
+    length_amount, length_unit = parse_actual_length(car.actual_length)
+    if not weight_amount or not weight_unit or not length_amount or not length_unit:
+        return None
+    weight_kg = weight_to_kg(weight_amount, weight_unit)
+    length_m = length_to_meters(length_amount, length_unit)
+    if weight_kg is None or length_m is None or length_m <= 0 or weight_kg <= 0:
+        return None
+    density = weight_kg / length_m
+    return f"{format_linear_density(density)} kg/m"
 
 
 def paginate_list(items: list, page: int, page_size: str, route: str, route_params: dict) -> tuple[list, dict]:
@@ -1441,6 +1642,7 @@ def car_detail(car_id: int):
         car_payload=serialize_car(car),
         scale_label=format_scale_label(car.scale),
         gauge_label=format_gauge_label(car.gauge),
+        linear_density=calculate_linear_density(car),
     )
 
 
@@ -1499,9 +1701,13 @@ def car_by_number():
 def car_edit(car_id: int):
     car = Car.query.get_or_404(car_id)
     if request.method == "POST":
+        previous_weight = car.actual_weight
+        previous_length = car.actual_length
+        previous_scale = car.scale
         apply_car_form(car, request.form)
         db.session.commit()
         ensure_db_backup()
+        maybe_run_nmra_weight_check(car, previous_weight, previous_length, previous_scale)
         return redirect(url_for("main.car_detail", car_id=car.id))
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
@@ -1509,6 +1715,7 @@ def car_edit(car_id: int):
     scale_value = normalize_scale_input(car.scale)
     gauge_value = normalize_gauge_input(car.gauge)
     actual_weight_value, actual_weight_unit = parse_actual_weight(car.actual_weight)
+    actual_length_value, actual_length_unit = parse_actual_length(car.actual_length)
     return render_template(
         "car_form.html",
         car=car,
@@ -1522,6 +1729,8 @@ def car_edit(car_id: int):
         gauge_value=gauge_value,
         actual_weight_value=actual_weight_value,
         actual_weight_unit=actual_weight_unit,
+        actual_length_value=actual_length_value,
+        actual_length_unit=actual_length_unit,
         form_action=url_for("main.car_edit", car_id=car.id),
     )
 
@@ -1534,6 +1743,7 @@ def car_new():
         db.session.add(car)
         db.session.commit()
         ensure_db_backup()
+        maybe_run_nmra_weight_check(car, None, None, None)
         return redirect(url_for("main.car_detail", car_id=car.id))
     prefill = {
         "reporting_mark": request.args.get("reporting_mark", "").strip(),
@@ -1545,6 +1755,7 @@ def car_new():
         "weight": request.args.get("weight", "").strip(),
         "load_limit": request.args.get("load_limit", "").strip(),
         "actual_weight": request.args.get("actual_weight", "").strip(),
+        "actual_length": request.args.get("actual_length", "").strip(),
         "scale": request.args.get("scale", "").strip(),
         "gauge": request.args.get("gauge", "").strip(),
         "built": request.args.get("built", "").strip(),
@@ -1558,6 +1769,7 @@ def car_new():
     scale_value = normalize_scale_input(prefill.get("scale", ""))
     gauge_value = normalize_gauge_input(prefill.get("gauge", ""))
     actual_weight_value, actual_weight_unit = parse_actual_weight(prefill.get("actual_weight", ""))
+    actual_length_value, actual_length_unit = parse_actual_length(prefill.get("actual_length", ""))
     return render_template(
         "car_form.html",
         car=None,
@@ -1571,6 +1783,8 @@ def car_new():
         gauge_value=gauge_value,
         actual_weight_value=actual_weight_value,
         actual_weight_unit=actual_weight_unit,
+        actual_length_value=actual_length_value,
+        actual_length_unit=actual_length_unit,
         form_action=url_for("main.car_new"),
     )
 
@@ -1677,6 +1891,7 @@ def search_cars(query: str) -> list[Car]:
             car.load,
             car.notes,
             car.actual_weight,
+            car.actual_length,
             car.scale,
             car.gauge,
         ]
@@ -1781,6 +1996,12 @@ def apply_car_form(car: Car, form) -> None:
         car.actual_weight = f"{actual_weight_value} {actual_weight_unit}"
     else:
         car.actual_weight = actual_weight_value or None
+    actual_length_value = form.get("actual_length_value", "").strip()
+    actual_length_unit = form.get("actual_length_unit", "").strip()
+    if actual_length_value and actual_length_unit:
+        car.actual_length = f"{actual_length_value} {actual_length_unit}"
+    else:
+        car.actual_length = actual_length_value or None
     scale_value = normalize_scale_input(form.get("scale", ""))
     gauge_value = normalize_gauge_input(form.get("gauge", ""))
     car.scale = scale_value or None
@@ -2050,6 +2271,7 @@ def serialize_car(car: Car) -> dict:
         "weight": car.weight_override or class_weight,
         "load_limit": car.load_limit_override or class_load_limit,
         "actual_weight": car.actual_weight,
+        "actual_length": car.actual_length,
         "scale": car.scale,
         "gauge": car.gauge,
         "aar_plate": car.aar_plate_override or class_aar_plate,
