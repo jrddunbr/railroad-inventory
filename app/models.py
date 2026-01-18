@@ -19,6 +19,7 @@ class Railroad(BaseModel):
     merged_from: str | None = None
     notes: str | None = None
     representative_logo_id: int | None = None
+    _representative_logo_ref: RailroadLogo | None = field(default=None, repr=False, compare=False)
 
     @property
     def cars(self) -> list[Car]:
@@ -46,9 +47,16 @@ class Railroad(BaseModel):
 
     @property
     def representative_logo(self) -> RailroadLogo | None:
+        if self._representative_logo_ref is not None:
+            return self._representative_logo_ref
         if not self._store or not self.representative_logo_id:
             return None
         return self._store.get(RailroadLogo, self.representative_logo_id)
+
+    @representative_logo.setter
+    def representative_logo(self, value: RailroadLogo | None) -> None:
+        self._representative_logo_ref = value
+        self.representative_logo_id = value.id if value else None
 
 
 @dataclass

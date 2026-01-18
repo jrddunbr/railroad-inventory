@@ -66,6 +66,14 @@ def get_page_number() -> int:
     return 1
 
 
+def normalize_page_size(value: str) -> str:
+    if not value:
+        return ""
+    if value in PAGINATION_OPTIONS:
+        return value
+    return ""
+
+
 def paginate_list(items: list, page: int, page_size: str, route: str, route_params: dict) -> tuple[list, dict]:
     total = len(items)
     if page_size == "all":
@@ -103,6 +111,73 @@ def paginate_list(items: list, page: int, page_size: str, route: str, route_para
             "next_url": next_url,
         },
     )
+
+
+def paginate_query(query, page: int, page_size: str, route: str, route_params: dict) -> tuple[list, dict]:
+    if page_size == "all":
+        items = query.all()
+        total = len(items)
+        start = 1 if total else 0
+        return (
+            items,
+            {
+                "page": 1,
+                "pages": 1,
+                "total": total,
+                "start": start,
+                "end": total,
+                "page_size": page_size,
+                "prev_url": None,
+                "next_url": None,
+            },
+        )
+    per_page = int(page_size)
+    total = query.total()
+    pages = max(1, math.ceil(total / per_page)) if total else 1
+    page = min(max(1, page), pages)
+    items = query.page(page, per_page)
+    start_index = (page - 1) * per_page
+    end_index = min(start_index + per_page, total)
+    prev_url = url_for(route, **route_params, page=page - 1) if page > 1 else None
+    next_url = url_for(route, **route_params, page=page + 1) if page < pages else None
+    return (
+        items,
+        {
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "start": start_index + 1 if total else 0,
+            "end": end_index,
+            "page_size": page_size,
+            "prev_url": prev_url,
+            "next_url": next_url,
+        },
+    )
+
+
+def prefetch_car_relations(cars: list[Car]) -> None:
+    railroad_ids = {car.railroad_id for car in cars if car.railroad_id}
+    class_ids = {car.car_class_id for car in cars if car.car_class_id}
+    location_ids = {car.location_id for car in cars if car.location_id}
+    railroads = {rid: Railroad.query.get(rid) for rid in railroad_ids}
+    classes = {cid: CarClass.query.get(cid) for cid in class_ids}
+    locations = {lid: Location.query.get(lid) for lid in location_ids}
+    logo_ids = {
+        railroad.representative_logo_id
+        for railroad in railroads.values()
+        if railroad and railroad.representative_logo_id
+    }
+    logos = {lid: RailroadLogo.query.get(lid) for lid in logo_ids}
+    for car in cars:
+        if car.railroad_id:
+            railroad = railroads.get(car.railroad_id)
+            car._railroad_ref = railroad
+            if railroad and railroad.representative_logo_id:
+                railroad._representative_logo_ref = logos.get(railroad.representative_logo_id)
+        if car.car_class_id:
+            car._car_class_ref = classes.get(car.car_class_id)
+        if car.location_id:
+            car._location_ref = locations.get(car.location_id)
 
 def get_or_create_location(name: str) -> Optional[Location]:
     if not name:
@@ -160,11 +235,17 @@ def index():
 
 @main_bp.route("/inventory")
 def inventory():
-    cars = Car.query.order_by("id", reverse=True).all()
+    car_query = Car.query.order_by("id", reverse=True)
     page_size = get_page_size()
     page = get_page_number()
-    paged_cars, pagination = paginate_list(cars, page, page_size, "main.inventory", {})
+    paged_cars, pagination = paginate_query(car_query, page, page_size, "main.inventory", {})
+    prefetch_car_relations(paged_cars)
     return render_template("inventory.html", cars=paged_cars, pagination=pagination)
+
+
+@main_bp.route("/inventory2")
+def inventory2():
+    return render_template("inventory2.html")
 
 
 @main_bp.route("/reports")
@@ -1280,8 +1361,22 @@ def search():
 
 @main_bp.route("/api/cars")
 def api_cars():
-    cars = Car.query.all()
-    return jsonify([serialize_car(car) for car in cars])
+    page_value = request.args.get("page", "").strip()
+    page_size_value = request.args.get("page_size", "").strip()
+    page_size = normalize_page_size(page_size_value) if page_size_value else ""
+    page = int(page_value) if page_value.isdigit() else 1
+    car_query = Car.query.order_by("id", reverse=True)
+    if not page_size and not page_value:
+        cars = car_query.all()
+        prefetch_car_relations(cars)
+        return jsonify([serialize_car(car) for car in cars])
+    if not page_size:
+        page_size = get_page_size()
+    if page_size not in PAGINATION_OPTIONS:
+        return jsonify({"error": "Invalid page size."}), 400
+    paged_cars, pagination = paginate_query(car_query, page, page_size, "main.api_cars", {})
+    prefetch_car_relations(paged_cars)
+    return jsonify({"items": [serialize_car(car) for car in paged_cars], "pagination": pagination})
 
 
 @main_bp.route("/api/cars/<int:car_id>")

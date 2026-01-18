@@ -28,7 +28,9 @@ class CouchStore:
         else:
             self.db = self.server.create(db_name)
         self.cache = {}
+        self.ensure_views()
         self.ensure_counters(app.config["COUCHDB_COUNTERS"])
+        self.ensure_totals(app.config.get("COUCHDB_TOTALS", []))
         self.ensure_schema_version(app.config["SCHEMA_VERSION"])
 
     def ensure_schema_version(self, version: str) -> None:
@@ -65,6 +67,56 @@ class CouchStore:
         if updated:
             self.db.save(doc)
 
+    def ensure_views(self) -> None:
+        if not self.db:
+            return
+        design_id = "_design/indexes"
+        map_source = (
+            "function(doc) {"
+            " if (doc.type && doc.id !== undefined && doc.id !== null) {"
+            " emit([doc.type, doc.id], null);"
+            " }"
+            "}"
+        )
+        view_doc = {
+            "_id": design_id,
+            "views": {
+                "by_type_id": {
+                    "map": map_source,
+                }
+            },
+        }
+        try:
+            existing = self.db[design_id]
+        except http.ResourceNotFound:
+            self.db[design_id] = view_doc
+            return
+        if existing.get("views", {}).get("by_type_id", {}).get("map") != map_source:
+            existing["views"] = view_doc["views"]
+            self.db.save(existing)
+
+    def ensure_totals(self, totals: Iterable[dict[str, str]]) -> None:
+        if not self.db:
+            return
+        doc_id = "counters"
+        try:
+            doc = self.db[doc_id]
+        except http.ResourceNotFound:
+            doc = {"_id": doc_id, "type": "counters"}
+        updated = False
+        for entry in totals:
+            doc_type = entry.get("doc_type")
+            counter_key = entry.get("counter_key")
+            if not doc_type or not counter_key:
+                continue
+            total_key = f"{counter_key}_total"
+            if total_key in doc:
+                continue
+            doc[total_key] = self._count_docs(doc_type)
+            updated = True
+        if updated:
+            self.db.save(doc)
+
     def next_id(self, counter_key: str) -> int:
         if not self.db:
             raise RuntimeError("CouchDB is not initialized.")
@@ -92,6 +144,21 @@ class CouchStore:
                 return
             except http.ResourceConflict:
                 continue
+
+    def total_count(self, counter_key: str) -> int | None:
+        if not self.db:
+            return None
+        try:
+            doc = self.db["counters"]
+        except http.ResourceNotFound:
+            return None
+        total_key = f"{counter_key}_total"
+        if total_key not in doc:
+            return None
+        try:
+            return int(doc.get(total_key, 0))
+        except (TypeError, ValueError):
+            return None
 
     def get(self, model_cls: Type[T], item_id: int | None) -> T | None:
         if not self.db or item_id is None:
@@ -138,6 +205,40 @@ class CouchStore:
             results.append(obj)
         return results
 
+    def page(self, model_cls: Type[T], page: int, per_page: int, reverse: bool = False) -> list[T]:
+        if not self.db:
+            return []
+        if per_page <= 0:
+            return []
+        page = max(1, page)
+        doc_type = model_cls.doc_type
+        startkey = [doc_type, {}] if reverse else [doc_type, 0]
+        endkey = [doc_type, 0] if reverse else [doc_type, {}]
+        rows = self.db.view(
+            "_design/indexes/_view/by_type_id",
+            include_docs=True,
+            startkey=startkey,
+            endkey=endkey,
+            descending=reverse,
+            limit=per_page,
+            skip=(page - 1) * per_page,
+        )
+        results: list[T] = []
+        for row in rows:
+            doc = row.doc
+            if not doc:
+                continue
+            obj_id = doc.get("id")
+            cache_key = (model_cls, int(obj_id)) if obj_id is not None else None
+            if cache_key and cache_key in self.cache:
+                results.append(self.cache[cache_key])  # type: ignore[arg-type]
+                continue
+            obj = model_cls.from_doc(doc, self)
+            if cache_key:
+                self.cache[cache_key] = obj
+            results.append(obj)
+        return results
+
     def filter_by(self, model_cls: Type[T], **filters: Any) -> list[T]:
         results = []
         for item in self.all(model_cls):
@@ -155,6 +256,7 @@ class CouchStore:
             raise RuntimeError("CouchDB is not initialized.")
         if hasattr(obj, "prepare_save"):
             obj.prepare_save()
+        is_new = obj._rev is None
         if obj.id is None:
             obj.id = self.next_id(obj.counter_key)
         else:
@@ -168,6 +270,8 @@ class CouchStore:
         obj._dirty = False
         obj._store = self
         self.cache[(obj.__class__, obj.id)] = obj
+        if is_new:
+            self._update_total(obj.counter_key, 1)
 
     def delete(self, obj: T) -> None:
         if not self.db or obj.id is None:
@@ -180,7 +284,37 @@ class CouchStore:
             start = time.perf_counter()
             self.db.delete(doc)
             self._track_db_time(start)
+            self._update_total(obj.counter_key, -1)
         self.cache.pop((obj.__class__, obj.id), None)
+
+    def _count_docs(self, doc_type: str) -> int:
+        if not self.db:
+            return 0
+        prefix = f"{doc_type}:"
+        rows = self.db.view(
+            "_all_docs",
+            include_docs=False,
+            startkey=prefix,
+            endkey=f"{prefix}\ufff0",
+        )
+        return sum(1 for _ in rows)
+
+    def _update_total(self, counter_key: str, delta: int) -> None:
+        if not self.db:
+            return
+        total_key = f"{counter_key}_total"
+        while True:
+            doc = self.db["counters"]
+            if total_key not in doc:
+                return
+            current_value = int(doc.get(total_key, 0))
+            next_value = max(0, current_value + delta)
+            doc[total_key] = next_value
+            try:
+                self.db.save(doc)
+                return
+            except http.ResourceConflict:
+                continue
 
     def _track_db_time(self, start: float) -> None:
         if not has_request_context():
@@ -260,6 +394,22 @@ class Query:
 
     def count(self) -> int:
         return len(self.all())
+
+    def total(self) -> int:
+        if self._filters or (self._sort_field and self._sort_field != "id"):
+            return len(self.all())
+        total = self.store.total_count(self.model_cls.counter_key)
+        if total is None:
+            return len(self.all())
+        return total
+
+    def page(self, page: int, per_page: int) -> list[T]:
+        if self._filters or (self._sort_field and self._sort_field != "id"):
+            items = self.all()
+            start_index = max(0, (page - 1) * per_page)
+            end_index = start_index + per_page
+            return items[start_index:end_index]
+        return self.store.page(self.model_cls, page, per_page, reverse=self._sort_reverse)
 
     def get(self, item_id: int) -> T | None:
         return self.store.get(self.model_cls, item_id)

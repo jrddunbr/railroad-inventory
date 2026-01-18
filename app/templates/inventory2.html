@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="panel">
+    <h1>Inventory (Client Render)</h1>
+    <p class="keyboard-hint" id="inventory2-status">Loading inventory...</p>
+    <div class="actions" id="inventory2-actions" style="display: none;">
+      <button type="button" class="tag" id="inventory2-prev">Prev</button>
+      <span class="keyboard-hint" id="inventory2-page"></span>
+      <button type="button" class="tag" id="inventory2-next">Next</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Reporting Mark</th>
+          <th>Car #</th>
+          <th>Type</th>
+          <th>Class</th>
+          <th>Location</th>
+          <th>Brand</th>
+        </tr>
+      </thead>
+      <tbody id="inventory2-body"></tbody>
+    </table>
+  </div>
+  <script>
+    const inventoryStatus = document.getElementById('inventory2-status');
+    const inventoryBody = document.getElementById('inventory2-body');
+    const inventoryActions = document.getElementById('inventory2-actions');
+    const inventoryPrev = document.getElementById('inventory2-prev');
+    const inventoryNext = document.getElementById('inventory2-next');
+    const inventoryPage = document.getElementById('inventory2-page');
+    let currentPage = 1;
+    const pageSize = '50';
+
+    const escapeText = (value) => {
+      if (value === null || value === undefined || value === '') {
+        return '-';
+      }
+      return String(value);
+    };
+
+    const setControls = (pagination) => {
+      if (!pagination) {
+        inventoryActions.style.display = 'none';
+        return;
+      }
+      inventoryActions.style.display = 'flex';
+      inventoryPrev.disabled = pagination.page <= 1;
+      inventoryNext.disabled = pagination.page >= pagination.pages;
+      inventoryPage.textContent = `Page ${pagination.page} of ${pagination.pages}`;
+    };
+
+    const loadInventory = async (page = 1) => {
+      try {
+        const response = await fetch(`/api/cars?page=${page}&page_size=${pageSize}`);
+        if (!response.ok) {
+          throw new Error('bad response');
+        }
+        const payload = await response.json();
+        const cars = payload.items || [];
+        inventoryBody.innerHTML = '';
+        if (!cars.length) {
+          const row = document.createElement('tr');
+          const cell = document.createElement('td');
+          cell.colSpan = 7;
+          cell.textContent = 'No cars yet. Add the first entry.';
+          row.appendChild(cell);
+          inventoryBody.appendChild(row);
+          inventoryStatus.textContent = 'Results: 0';
+          setControls(payload.pagination);
+          return;
+        }
+        cars.forEach((car) => {
+          const row = document.createElement('tr');
+          const idCell = document.createElement('td');
+          const idLink = document.createElement('a');
+          idLink.href = `/cars/${car.id}`;
+          idLink.textContent = escapeText(car.id);
+          idCell.appendChild(idLink);
+          row.appendChild(idCell);
+
+          const reportingCell = document.createElement('td');
+          reportingCell.textContent = escapeText(car.reporting_mark);
+          row.appendChild(reportingCell);
+
+          const numberCell = document.createElement('td');
+          numberCell.textContent = escapeText(car.car_number);
+          row.appendChild(numberCell);
+
+          const typeCell = document.createElement('td');
+          typeCell.textContent = escapeText(car.car_type);
+          row.appendChild(typeCell);
+
+          const classCell = document.createElement('td');
+          classCell.textContent = escapeText(car.car_class);
+          row.appendChild(classCell);
+
+          const locationCell = document.createElement('td');
+          locationCell.textContent = escapeText(car.location);
+          row.appendChild(locationCell);
+
+          const brandCell = document.createElement('td');
+          brandCell.textContent = escapeText(car.brand);
+          row.appendChild(brandCell);
+
+          inventoryBody.appendChild(row);
+        });
+        inventoryStatus.textContent = `Results: ${payload.pagination.total}`;
+        setControls(payload.pagination);
+        currentPage = payload.pagination.page;
+      } catch (error) {
+        inventoryStatus.textContent = 'Unable to load inventory.';
+        inventoryActions.style.display = 'none';
+      }
+    };
+
+    inventoryPrev.addEventListener('click', () => {
+      if (currentPage > 1) {
+        loadInventory(currentPage - 1);
+      }
+    });
+    inventoryNext.addEventListener('click', () => {
+      loadInventory(currentPage + 1);
+    });
+
+    loadInventory(currentPage);
+  </script>
+{% endblock %}
