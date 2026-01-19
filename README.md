@@ -61,7 +61,6 @@ kubectl port-forward service/modelinventory 5000:5000
 ## Notes
 - CouchDB runs in a Podman container named `modelinventory-couchdb`.
 - The CouchDB data volume lives at `data/couchdb`.
-- To migrate an existing SQLite database, run `python scripts/convert_sqlite_to_couchdb.py data/inventory.db`.
 
 ## Documentation
 - Schema details are in `docs/SCHEMA.md`.
