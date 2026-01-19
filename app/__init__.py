@@ -90,8 +90,9 @@ def create_app() -> Flask:
             location_type for location_type in db_types if location_type not in DEFAULT_LOCATION_TYPES
         ]
         app.config["LOCATION_TYPES"] = merged_types
-        if not InspectionType.query.filter_by(name="NMRA Weight Check").first():
-            db.session.add(InspectionType(name="NMRA Weight Check"))
-            db.session.commit()
+        for inspection_name in ("NMRA Weight Check", "NMRA Weight Check (Loaded)"):
+            if not InspectionType.query.filter_by(name=inspection_name).first():
+                db.session.add(InspectionType(name=inspection_name))
+                db.session.commit()
 
     return app

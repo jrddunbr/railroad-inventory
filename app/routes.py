@@ -74,6 +74,7 @@ DEFAULT_GAUGE_OPTIONS = [
     "15 in|3.5 in scale",
 ]
 NMRA_WEIGHT_CHECK_NAME = "NMRA Weight Check"
+NMRA_WEIGHT_CHECK_LOADED_NAME = "NMRA Weight Check (Loaded)"
 NMRA_WEIGHT_BY_SCALE = {
     "O": (5.0, 1.0),
     "On3": (1.5, 0.75),
@@ -455,6 +456,87 @@ def maybe_run_nmra_weight_check(
     inspection_type = InspectionType.query.filter_by(name=NMRA_WEIGHT_CHECK_NAME).first()
     if not inspection_type:
         inspection_type = InspectionType(name=NMRA_WEIGHT_CHECK_NAME)
+        db.session.add(inspection_type)
+        db.session.commit()
+        ensure_db_backup()
+    today = datetime.now().date().isoformat()
+    existing = (
+        CarInspection.query.filter_by(car_id=car.id, inspection_type_id=inspection_type.id)
+        .order_by("inspection_date", reverse=True)
+        .first()
+    )
+    if existing and existing.inspection_date == today:
+        if existing.inspection_type_id is None:
+            existing.inspection_type_id = inspection_type.id
+        existing.passed = passed
+        existing.details = details
+    else:
+        db.session.add(
+            CarInspection(
+                car_id=car.id,
+                inspection_type_id=inspection_type.id,
+                inspection_date=today,
+                details=details,
+                passed=passed,
+            )
+        )
+    car.last_inspection_date = today
+    db.session.commit()
+    ensure_db_backup()
+    return True
+
+
+def maybe_run_nmra_loaded_weight_check(
+    car: Car,
+    previous_weight: str | None,
+    previous_length: str | None,
+    previous_scale: str | None,
+    force: bool = False,
+) -> bool:
+    if not car.id or not car.actual_weight or not car.actual_length:
+        return False
+    if not force and (
+        previous_weight == car.actual_weight
+        and previous_length == car.actual_length
+        and previous_scale == car.scale
+    ):
+        return False
+    scale_name = get_scale_name(car.scale)
+    if not scale_name or scale_name not in NMRA_WEIGHT_BY_SCALE:
+        return False
+    weight_amount, weight_unit = parse_actual_weight(car.actual_weight)
+    length_amount, length_unit = parse_actual_length(car.actual_length)
+    if not weight_amount or not weight_unit or not length_amount or not length_unit:
+        return False
+    car_oz = weight_to_ounces(weight_amount, weight_unit)
+    length_in = length_to_inches(length_amount, length_unit)
+    if car_oz is None or length_in is None:
+        return False
+    load_oz_total = 0.0
+    placements = LoadPlacement.query.filter_by(car_id=car.id).all()
+    for placement in placements:
+        if not placement.load or not placement.load.weight:
+            continue
+        load_amount, load_unit = parse_actual_weight(placement.load.weight)
+        if not load_amount or not load_unit:
+            continue
+        load_oz = weight_to_ounces(load_amount, load_unit)
+        if load_oz is None:
+            continue
+        load_oz_total += load_oz * max(placement.quantity, 1)
+    initial, additional = NMRA_WEIGHT_BY_SCALE[scale_name]
+    minimum_oz = initial + (additional * length_in)
+    loaded_oz = car_oz + load_oz_total
+    passed = loaded_oz >= minimum_oz
+    details = (
+        f"Min {format_ounces(minimum_oz)} oz (scale {scale_name}, "
+        f"length {format_ounces(length_in)} in). "
+        f"Loaded {format_ounces(loaded_oz)} oz "
+        f"(car {format_ounces(car_oz)} oz + loads {format_ounces(load_oz_total)} oz)."
+    )
+    inspection_type = InspectionType.query.filter_by(name=NMRA_WEIGHT_CHECK_LOADED_NAME).first()
+    if not inspection_type:
+        inspection_type = InspectionType(name=NMRA_WEIGHT_CHECK_LOADED_NAME)
         db.session.add(inspection_type)
         db.session.commit()
         ensure_db_backup()
@@ -1481,6 +1563,10 @@ def load_placement_new(load_id: int):
         db.session.add(placement)
         db.session.commit()
         ensure_db_backup()
+        if placement.car_id:
+            car = Car.query.get(placement.car_id)
+            if car:
+                maybe_run_nmra_loaded_weight_check(car, car.actual_weight, car.actual_length, car.scale, True)
         return redirect(url_for("main.load_detail", load_id=load.id))
     return render_template(
         "load_placement_form.html",
@@ -1509,6 +1595,10 @@ def load_placement_new_generic():
         db.session.add(placement)
         db.session.commit()
         ensure_db_backup()
+        if placement.car_id:
+            car = Car.query.get(placement.car_id)
+            if car:
+                maybe_run_nmra_loaded_weight_check(car, car.actual_weight, car.actual_length, car.scale, True)
         return redirect(url_for("main.load_detail", load_id=load.id))
     return render_template(
         "load_placement_form.html",
@@ -1528,10 +1618,25 @@ def load_placement_edit(placement_id: int):
     cars = Car.query.order_by("id", reverse=True).all()
     locations = Location.query.order_by("name").all()
     if request.method == "POST":
+        previous_car_id = placement.car_id
         if not apply_load_placement_form(placement, request.form):
             return "Select a car or location for this load placement.", 400
         db.session.commit()
         ensure_db_backup()
+        if previous_car_id and previous_car_id != placement.car_id:
+            previous_car = Car.query.get(previous_car_id)
+            if previous_car:
+                maybe_run_nmra_loaded_weight_check(
+                    previous_car,
+                    previous_car.actual_weight,
+                    previous_car.actual_length,
+                    previous_car.scale,
+                    True,
+                )
+        if placement.car_id:
+            car = Car.query.get(placement.car_id)
+            if car:
+                maybe_run_nmra_loaded_weight_check(car, car.actual_weight, car.actual_length, car.scale, True)
         return redirect(url_for("main.load_detail", load_id=placement.load_id))
     return render_template(
         "load_placement_form.html",
@@ -1548,9 +1653,14 @@ def load_placement_edit(placement_id: int):
 def load_placement_delete(placement_id: int):
     placement = LoadPlacement.query.get_or_404(placement_id)
     load_id = placement.load_id
+    car_id = placement.car_id
     db.session.delete(placement)
     db.session.commit()
     ensure_db_backup()
+    if car_id:
+        car = Car.query.get(car_id)
+        if car:
+            maybe_run_nmra_loaded_weight_check(car, car.actual_weight, car.actual_length, car.scale, True)
     return redirect(url_for("main.load_detail", load_id=load_id))
 
 
@@ -1773,6 +1883,7 @@ def car_edit(car_id: int):
         db.session.commit()
         ensure_db_backup()
         maybe_run_nmra_weight_check(car, previous_weight, previous_length, previous_scale)
+        maybe_run_nmra_loaded_weight_check(car, previous_weight, previous_length, previous_scale)
         return redirect(url_for("main.car_detail", car_id=car.id))
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
@@ -1813,6 +1924,7 @@ def car_new():
         db.session.commit()
         ensure_db_backup()
         maybe_run_nmra_weight_check(car, None, None, None)
+        maybe_run_nmra_loaded_weight_check(car, None, None, None)
         return redirect(url_for("main.car_detail", car_id=car.id))
     prefill = {
         "reporting_mark": request.args.get("reporting_mark", "").strip(),
