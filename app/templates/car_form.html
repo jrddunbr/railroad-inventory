@@ -181,6 +181,18 @@
               </div>
             </div>
           </div>
+          {% if common_scale_gauge %}
+            <div class="field">
+              <label class="label">Quick Sets</label>
+              <div class="buttons">
+                {% for combo in common_scale_gauge %}
+                  <button type="button" class="button is-small is-light scale-gauge-quick" data-scale="{{ combo.scale }}" data-gauge="{{ combo.gauge }}">
+                    {{ combo.label }}
+                  </button>
+                {% endfor %}
+              </div>
+            </div>
+          {% endif %}
         </div>
         <h3 class="title is-5">Prototype Specifications</h3>
         <div class="grid">
@@ -373,6 +385,27 @@
     </form>
   </div>
   <script>
+    const scaleSelect = document.getElementById('scale');
+    const gaugeSelect = document.getElementById('gauge');
+    const setSelectValue = (select, value) => {
+      if (!select) return;
+      const option = Array.from(select.options).find((item) => item.value === value);
+      if (!option && value) {
+        const newOption = document.createElement('option');
+        newOption.value = value;
+        newOption.textContent = value;
+        select.appendChild(newOption);
+      }
+      select.value = value || '';
+    };
+
+    document.querySelectorAll('.scale-gauge-quick').forEach((button) => {
+      button.addEventListener('click', () => {
+        setSelectValue(scaleSelect, button.dataset.scale || '');
+        setSelectValue(gaugeSelect, button.dataset.gauge || '');
+      });
+    });
+
     const removeRailroadButton = document.getElementById('remove-railroad');
     if (removeRailroadButton) {
       removeRailroadButton.addEventListener('click', () => {

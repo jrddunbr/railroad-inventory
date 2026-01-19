@@ -318,6 +318,30 @@ def format_gauge_label(value: str | None) -> str | None:
     return value
 
 
+def get_common_scale_gauge_pairs(limit: int = 3) -> list[dict[str, str | int]]:
+    counts: dict[tuple[str, str], int] = {}
+    for car in Car.query.all():
+        scale = normalize_scale_input(car.scale)
+        gauge = normalize_gauge_input(car.gauge)
+        if not scale or not gauge:
+            continue
+        counts[(scale, gauge)] = counts.get((scale, gauge), 0) + 1
+    common = sorted(counts.items(), key=lambda item: item[1], reverse=True)[:limit]
+    results: list[dict[str, str | int]] = []
+    for (scale, gauge), count in common:
+        scale_label = format_scale_label(scale) or scale
+        gauge_label = format_gauge_label(gauge) or gauge
+        results.append(
+            {
+                "scale": scale,
+                "gauge": gauge,
+                "label": f"{scale_label} / {gauge_label}",
+                "count": count,
+            }
+        )
+    return results
+
+
 def parse_actual_weight(value: str | None) -> tuple[str, str]:
     if not value:
         return "", ""
@@ -1986,6 +2010,7 @@ def car_edit(car_id: int):
         actual_weight_unit=actual_weight_unit,
         actual_length_value=actual_length_value,
         actual_length_unit=actual_length_unit,
+        common_scale_gauge=get_common_scale_gauge_pairs(),
         form_action=url_for("main.car_edit", car_id=car.id),
     )
 
@@ -2045,6 +2070,7 @@ def car_new():
         actual_weight_unit=actual_weight_unit,
         actual_length_value=actual_length_value,
         actual_length_unit=actual_length_unit,
+        common_scale_gauge=get_common_scale_gauge_pairs(),
         form_action=url_for("main.car_new"),
     )
 
