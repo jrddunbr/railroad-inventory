@@ -27,6 +27,16 @@ Configuration
 
 Then open `http://127.0.0.1:5000/inventory`.
 
+## Containers
+```bash
+docker compose up --build
+```
+
+Podman users can run:
+```bash
+podman compose up --build
+```
+
 ## Notes
 - CouchDB runs in a Podman container named `modelinventory-couchdb`.
 - The CouchDB data volume lives at `data/couchdb`.

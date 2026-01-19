@@ -1,0 +1,31 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env
+    environment:
+      COUCHDB_HOST: couchdb
+      COUCHDB_PORT: "5984"
+      COUCHDB_DATABASE: ${COUCHDB_DATABASE:-model_inventory}
+    depends_on:
+      - couchdb
+    volumes:
+      - app-data:/app/data
+      - app-uploads:/app/app/static/uploads
+
+  couchdb:
+    image: couchdb:3
+    environment:
+      COUCHDB_USER: ${COUCHDB_USER:-admin}
+      COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:-change-me}
+    ports:
+      - "5984:5984"
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+
+volumes:
+  couchdb-data:
+  app-data:
+  app-uploads:
