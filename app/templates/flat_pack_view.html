@@ -130,12 +130,6 @@
           </div>
         {% endif %}
       </div>
-      <article class="message is-info" style="margin-top: 16px;">
-        <div class="message-body">
-          <p><strong>Debug JSON</strong></p>
-          <pre style="white-space: pre-wrap; font-size: 0.75rem;">{{ pack_result | tojson(indent=2) }}</pre>
-        </div>
-      </article>
       {% if pack_result.unplaced %}
         <article class="message is-warning" style="margin-top: 16px;">
           <div class="message-body">
