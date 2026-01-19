@@ -7,7 +7,7 @@ from flask import Flask, g
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.5.0"
+SCHEMA_VERSION = "2.8.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 

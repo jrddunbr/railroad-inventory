@@ -71,6 +71,128 @@
         <button type="submit" class="button is-small is-primary is-light">Save Scale &amp; Gauge</button>
       </div>
     </form>
+    <h2 class="title is-4">Foam Block Sizes</h2>
+    <article class="message is-info">
+      <div class="message-body">
+        <p><strong>Note:</strong> Foam length is used to pack cars linearly. Compression is the amount the foam can be crushed.</p>
+      </div>
+    </article>
+    <form method="post" action="{{ url_for('main.settings_foam_blocks') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="foam block settings">
+      <input type="hidden" id="foam_blocks" name="foam_blocks" value="{{ foam_blocks_text | e }}" data-confirm-include="true" data-confirm-label="Foam Blocks" />
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="foam_length_value">Length</label>
+          <div class="control">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="foam_length_value" placeholder="Length" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="foam_length_unit">
+                    {% for unit in length_units %}
+                      <option value="{{ unit }}" {% if unit == default_length_unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="foam_width_value">Width</label>
+          <div class="control">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="foam_width_value" placeholder="Width" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="foam_width_unit">
+                    {% for unit in length_units %}
+                      <option value="{{ unit }}" {% if unit == default_length_unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="foam_height_value">Height</label>
+          <div class="control">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="foam_height_value" placeholder="Height" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="foam_height_unit">
+                    {% for unit in length_units %}
+                      <option value="{{ unit }}" {% if unit == default_length_unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="foam_weight_value">Weight</label>
+          <div class="control">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="foam_weight_value" placeholder="Weight" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="foam_weight_unit">
+                    {% for unit in weight_units %}
+                      <option value="{{ unit }}" {% if unit == default_weight_unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="foam_compression_value">Compression</label>
+          <div class="control">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="foam_compression_value" placeholder="Compression" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="foam_compression_unit">
+                    {% for unit in length_units %}
+                      <option value="{{ unit }}" {% if unit == default_length_unit %}selected{% endif %}>{{ unit }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="button" class="button is-small is-light" id="foam-add">Add Block</button>
+      </div>
+      <table class="table is-fullwidth is-striped" id="foam-table">
+        <thead>
+          <tr>
+            <th>Length</th>
+            <th>Width</th>
+            <th>Height</th>
+            <th>Weight</th>
+            <th>Compression</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </form>
     <h2 class="title is-4">Inspection Types</h2>
     <p class="keyboard-hint">Types: {{ inspection_types|length }}</p>
     <div class="actions buttons">
@@ -104,4 +226,132 @@
       </tbody>
     </table>
   </div>
+  <script>
+    const foamBlocksInput = document.getElementById('foam_blocks');
+    const foamTableBody = document.querySelector('#foam-table tbody');
+    const foamAddButton = document.getElementById('foam-add');
+    const foamFields = {
+      lengthValue: document.getElementById('foam_length_value'),
+      lengthUnit: document.getElementById('foam_length_unit'),
+      widthValue: document.getElementById('foam_width_value'),
+      widthUnit: document.getElementById('foam_width_unit'),
+      heightValue: document.getElementById('foam_height_value'),
+      heightUnit: document.getElementById('foam_height_unit'),
+      weightValue: document.getElementById('foam_weight_value'),
+      weightUnit: document.getElementById('foam_weight_unit'),
+      compressionValue: document.getElementById('foam_compression_value'),
+      compressionUnit: document.getElementById('foam_compression_unit'),
+    };
+
+    const parseFoamBlocks = () => {
+      if (!foamBlocksInput || !foamBlocksInput.value) return [];
+      try {
+        const parsed = JSON.parse(foamBlocksInput.value);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (error) {
+        return [];
+      }
+    };
+
+    const serializeFoamBlocks = (blocks) => {
+      if (!foamBlocksInput) return;
+      foamBlocksInput.value = JSON.stringify(blocks);
+    };
+
+    const renderFoamBlocks = (blocks) => {
+      if (!foamTableBody) return;
+      foamTableBody.innerHTML = '';
+      blocks.forEach((block, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${block.length || '-'}</td>
+          <td>${block.width || '-'}</td>
+          <td>${block.height || '-'}</td>
+          <td>${block.weight || '-'}</td>
+          <td>${block.compression || '-'}</td>
+          <td>
+            <button type="button" class="button is-small is-danger is-light" data-action="remove" data-index="${index}">Remove</button>
+          </td>
+        `;
+        foamTableBody.appendChild(row);
+      });
+    };
+
+    const getFoamBlocks = () => {
+      return parseFoamBlocks();
+    };
+
+    const setFoamBlocks = (blocks) => {
+      serializeFoamBlocks(blocks);
+      renderFoamBlocks(blocks);
+    };
+
+    const buildValue = (value, unit) => {
+      if (!value) return '';
+      return `${value} ${unit}`.trim();
+    };
+
+    const clearFoamInputs = () => {
+      Object.values(foamFields).forEach((field) => {
+        if (!field) return;
+        if (field.tagName === 'SELECT') return;
+        field.value = '';
+      });
+    };
+
+    if (foamAddButton) {
+      foamAddButton.addEventListener('click', () => {
+        const lengthValue = foamFields.lengthValue.value.trim();
+        const widthValue = foamFields.widthValue.value.trim();
+        const heightValue = foamFields.heightValue.value.trim();
+        const weightValue = foamFields.weightValue.value.trim();
+        const compressionValue = foamFields.compressionValue.value.trim();
+        if (!lengthValue) return;
+        const block = {
+          length: buildValue(lengthValue, foamFields.lengthUnit.value),
+          width: buildValue(widthValue, foamFields.widthUnit.value),
+          height: buildValue(heightValue, foamFields.heightUnit.value),
+          weight: buildValue(weightValue, foamFields.weightUnit.value),
+          compression: buildValue(compressionValue, foamFields.compressionUnit.value),
+        };
+        const blocks = getFoamBlocks();
+        blocks.push(block);
+        setFoamBlocks(blocks);
+        clearFoamInputs();
+        const form = foamAddButton.closest('form');
+        if (form) {
+          if (form.requestSubmit) {
+            form.requestSubmit();
+          } else {
+            form.submit();
+          }
+        }
+      });
+    }
+
+    if (foamTableBody) {
+      foamTableBody.addEventListener('click', (event) => {
+        const button = event.target.closest('button[data-action]');
+        if (!button) return;
+        const action = button.dataset.action;
+        const index = Number(button.dataset.index);
+        const blocks = getFoamBlocks();
+        if (Number.isNaN(index) || index < 0 || index >= blocks.length) return;
+        if (action === 'remove') {
+          blocks.splice(index, 1);
+        }
+        setFoamBlocks(blocks);
+        const form = foamTableBody.closest('form');
+        if (form) {
+          if (form.requestSubmit) {
+            form.requestSubmit();
+          } else {
+            form.submit();
+          }
+        }
+      });
+    }
+
+    setFoamBlocks(parseFoamBlocks());
+  </script>
 {% endblock %}

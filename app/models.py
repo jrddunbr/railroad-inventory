@@ -103,6 +103,17 @@ class Location(BaseModel):
     location_type: str | None = None
     parent_id: int | None = None
     _parent_ref: Location | None = field(default=None, repr=False, compare=False)
+    external_length: str | None = None
+    external_width: str | None = None
+    external_height: str | None = None
+    external_weight: str | None = None
+    flat_scale: str | None = None
+    flat_gauge: str | None = None
+    flat_length: str | None = None
+    flat_height: str | None = None
+    flat_row_width: str | None = None
+    flat_weight: str | None = None
+    flat_rows: int | None = None
 
     @property
     def parent(self) -> Location | None:
@@ -282,6 +293,7 @@ class AppSettings(BaseModel):
     gauge_options: str | None = None
     default_length_unit: str | None = None
     default_weight_unit: str | None = None
+    foam_blocks: str | None = None
     passed: bool | None = None
 
 

@@ -5,6 +5,9 @@
     <div class="actions buttons">
       <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
       <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
+      {% if location.location_type == "flat" or location.flat_length or location.flat_rows %}
+        <a class="button is-small is-link" href="{{ url_for('main.flat_pack', location_id=location.id) }}">Pack Flat</a>
+      {% endif %}
       <form method="post" action="{{ url_for('main.location_delete', location_id=location.id) }}" data-action="delete" data-table="locations" data-id="{{ location.id }}" data-id-field="id" data-entity-label="location {{ location.name }}">
         <button type="submit" class="button is-small is-danger">Delete</button>
       </form>
@@ -20,6 +23,45 @@
           <a href="{{ url_for('main.location_detail', location_id=child.id) }}">{{ child.name }}</a>{% if not loop.last %}, {% endif %}
         {% endfor %}
       </p>
+    {% endif %}
+    {% if location.external_length or location.external_width or location.external_height or location.external_weight %}
+      <h3 class="title is-5">External Dimensions</h3>
+      {% if location.external_length %}
+        <p><strong>Length:</strong> {{ location.external_length }}</p>
+      {% endif %}
+      {% if location.external_width %}
+        <p><strong>Width:</strong> {{ location.external_width }}</p>
+      {% endif %}
+      {% if location.external_height %}
+        <p><strong>Height:</strong> {{ location.external_height }}</p>
+      {% endif %}
+      {% if location.external_weight %}
+        <p><strong>Weight (Empty):</strong> {{ location.external_weight }}</p>
+      {% endif %}
+    {% endif %}
+    {% if location.flat_length or location.flat_rows or location.flat_scale or location.flat_gauge or location.flat_height or location.flat_row_width or location.flat_weight %}
+      <h3 class="title is-5">Flat Packing Details</h3>
+      {% if location.flat_length %}
+        <p><strong>Flat Length:</strong> {{ location.flat_length }}</p>
+      {% endif %}
+      {% if location.flat_rows %}
+        <p><strong>Rows:</strong> {{ location.flat_rows }}</p>
+      {% endif %}
+      {% if location.flat_row_width %}
+        <p><strong>Row Width:</strong> {{ location.flat_row_width }}</p>
+      {% endif %}
+      {% if location.flat_height %}
+        <p><strong>Flat Height:</strong> {{ location.flat_height }}</p>
+      {% endif %}
+      {% if location.flat_weight %}
+        <p><strong>Flat Weight (Empty):</strong> {{ location.flat_weight }}</p>
+      {% endif %}
+      {% if location.flat_scale %}
+        <p><strong>Scale:</strong> {{ location.flat_scale }}</p>
+      {% endif %}
+      {% if location.flat_gauge %}
+        <p><strong>Gauge:</strong> {{ location.flat_gauge }}</p>
+      {% endif %}
     {% endif %}
     <h3 class="title is-5">Cars</h3>
     <p class="keyboard-hint">Results: {{ cars_pagination.total }}</p>

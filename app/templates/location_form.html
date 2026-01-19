@@ -39,6 +39,240 @@
           </div>
         </div>
       </div>
+      <div class="box" style="margin-top: 16px;">
+        <h2 class="title is-4">External Dimensions &amp; Weight</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="external_length_value">External Length</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="external_length_value" name="external_length_value" value="{{ external_length_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="external_length_unit" name="external_length_unit">
+                      <option value="in" {% if external_length_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if external_length_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if external_length_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if external_length_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if external_length_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="external_width_value">External Width</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="external_width_value" name="external_width_value" value="{{ external_width_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="external_width_unit" name="external_width_unit">
+                      <option value="in" {% if external_width_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if external_width_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if external_width_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if external_width_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if external_width_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="external_height_value">External Height</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="external_height_value" name="external_height_value" value="{{ external_height_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="external_height_unit" name="external_height_unit">
+                      <option value="in" {% if external_height_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if external_height_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if external_height_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if external_height_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if external_height_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="external_weight_value">External Weight (Empty)</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="external_weight_value" name="external_weight_value" value="{{ external_weight_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="external_weight_unit" name="external_weight_unit">
+                      <option value="g" {% if external_weight_unit == 'g' %}selected{% endif %}>g</option>
+                      <option value="kg" {% if external_weight_unit == 'kg' %}selected{% endif %}>kg</option>
+                      <option value="lb" {% if external_weight_unit == 'lb' %}selected{% endif %}>lb</option>
+                      <option value="oz" {% if external_weight_unit == 'oz' %}selected{% endif %}>oz</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="box" style="margin-top: 16px;">
+        <h2 class="title is-4">Flat Packing Details</h2>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="flat_length_value">Flat Length</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="flat_length_value" name="flat_length_value" value="{{ flat_length_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="flat_length_unit" name="flat_length_unit">
+                      <option value="in" {% if flat_length_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if flat_length_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if flat_length_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if flat_length_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if flat_length_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="flat_rows">Rows</label>
+            <div class="control">
+              <input class="input" id="flat_rows" name="flat_rows" type="number" min="1" value="{{ flat_rows_value }}" />
+            </div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="flat_height_value">Flat Height</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="flat_height_value" name="flat_height_value" value="{{ flat_height_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="flat_height_unit" name="flat_height_unit">
+                      <option value="in" {% if flat_height_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if flat_height_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if flat_height_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if flat_height_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if flat_height_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="flat_row_width_value">Flat Row Width</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="flat_row_width_value" name="flat_row_width_value" value="{{ flat_row_width_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="flat_row_width_unit" name="flat_row_width_unit">
+                      <option value="in" {% if flat_row_width_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if flat_row_width_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if flat_row_width_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if flat_row_width_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if flat_row_width_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="flat_weight_value">Flat Weight (Empty)</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="flat_weight_value" name="flat_weight_value" value="{{ flat_weight_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="flat_weight_unit" name="flat_weight_unit">
+                      <option value="g" {% if flat_weight_unit == 'g' %}selected{% endif %}>g</option>
+                      <option value="kg" {% if flat_weight_unit == 'kg' %}selected{% endif %}>kg</option>
+                      <option value="lb" {% if flat_weight_unit == 'lb' %}selected{% endif %}>lb</option>
+                      <option value="oz" {% if flat_weight_unit == 'oz' %}selected{% endif %}>oz</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="grid">
+          {% set scale_state = namespace(found=false) %}
+          {% for option in scale_options %}
+            {% if option.value == flat_scale_value %}
+              {% set scale_state.found = true %}
+            {% endif %}
+          {% endfor %}
+          <div class="field">
+            <label class="label" for="flat_scale">Scale</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id="flat_scale" name="flat_scale">
+                  <option value="" {% if not flat_scale_value %}selected{% endif %}>Unset</option>
+                  {% if flat_scale_value and not scale_state.found %}
+                    <option value="{{ flat_scale_value }}" selected>{{ flat_scale_value }}</option>
+                  {% endif %}
+                  {% for option in scale_options %}
+                    <option value="{{ option.value }}" {% if option.value == flat_scale_value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+          {% set gauge_state = namespace(found=false) %}
+          {% for option in gauge_options %}
+            {% if option.value == flat_gauge_value %}
+              {% set gauge_state.found = true %}
+            {% endif %}
+          {% endfor %}
+          <div class="field">
+            <label class="label" for="flat_gauge">Gauge</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                <select id="flat_gauge" name="flat_gauge">
+                  <option value="" {% if not flat_gauge_value %}selected{% endif %}>Unset</option>
+                  {% if flat_gauge_value and not gauge_state.found %}
+                    <option value="{{ flat_gauge_value }}" selected>{{ flat_gauge_value }}</option>
+                  {% endif %}
+                  {% for option in gauge_options %}
+                    <option value="{{ option.value }}" {% if option.value == flat_gauge_value %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="actions buttons">
         <button type="submit" class="button is-small is-primary">Save</button>
         {% if location %}

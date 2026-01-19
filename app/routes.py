@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import os
 import re
@@ -278,6 +279,42 @@ def get_gauge_options() -> list[dict[str, str | None]]:
     return build_gauge_options(get_gauge_options_text())
 
 
+def get_foam_blocks_text() -> str:
+    settings = get_app_settings()
+    return settings.foam_blocks or ""
+
+
+def parse_foam_blocks(text: str) -> list[dict[str, str]]:
+    if not text:
+        return []
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    blocks: list[dict[str, str]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        length = str(item.get("length", "")).strip()
+        if not length:
+            continue
+        block = {
+            "length": length,
+            "width": str(item.get("width", "")).strip(),
+            "height": str(item.get("height", "")).strip(),
+            "weight": str(item.get("weight", "")).strip(),
+            "compression": str(item.get("compression", "")).strip(),
+        }
+        blocks.append(block)
+    return blocks
+
+
+def get_foam_blocks() -> list[dict[str, str]]:
+    return parse_foam_blocks(get_foam_blocks_text())
+
+
 def normalize_scale_input(value: str | None) -> str:
     if not value:
         return ""
@@ -442,6 +479,17 @@ def format_ounces(value: float) -> str:
 
 def format_linear_density(value: float) -> str:
     return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def format_length_value(value: float) -> str:
+    return f"{value:.2f}".rstrip("0").rstrip(".")
+
+
+def inches_to_unit(value: float, unit: str) -> float | None:
+    factor = LENGTH_UNIT_TO_IN.get(unit)
+    if factor is None or factor == 0:
+        return None
+    return value / factor
 
 
 def maybe_run_nmra_weight_check(
@@ -710,6 +758,177 @@ def prefetch_car_relations(cars: list[Car]) -> None:
             car._car_class_ref = classes.get(car.car_class_id)
         if car.location_id:
             car._location_ref = locations.get(car.location_id)
+
+
+def parse_number(value: str) -> float | None:
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def parse_length_value(value: str, unit: str, fallback_unit: str) -> tuple[float | None, str]:
+    cleaned = value.strip()
+    resolved_unit = (unit or fallback_unit).strip().lower()
+    if not cleaned:
+        return None, resolved_unit
+    amount = parse_number(cleaned)
+    if amount is None or resolved_unit not in LENGTH_UNIT_TO_IN:
+        return None, resolved_unit
+    return amount, resolved_unit
+
+
+def plan_fill_with_compression(
+    target_units: int,
+    options: list[dict[str, int]],
+) -> tuple[list[dict[str, int]], int]:
+    if target_units <= 0 or not options:
+        return [], max(target_units, 0)
+    min_units = min(option["min_units"] for option in options if option["min_units"] > 0) if options else 0
+    if min_units <= 0:
+        return [], target_units
+    max_compress = max(option["compress_units"] for option in options) if options else 0
+    max_blocks = int(math.ceil(target_units / min_units)) + 2
+    max_nominal = target_units + (max_blocks * max_compress)
+    dp: list[dict[str, int] | None] = [None] * (max_nominal + 1)
+    dp[0] = {"count": 0, "pref": 0, "compress": 0}
+    plans: list[list[int] | None] = [None] * (max_nominal + 1)
+    plans[0] = []
+
+    for total in range(1, max_nominal + 1):
+        best_entry = None
+        best_plan = None
+        for option in options:
+            nominal = option["nominal_units"]
+            if nominal > total:
+                continue
+            prev = dp[total - nominal]
+            if prev is None:
+                continue
+            count = prev["count"] + 1
+            pref = prev["pref"] + option["pref"]
+            compress = prev["compress"] + option["compress_units"]
+            candidate = {"count": count, "pref": pref, "compress": compress}
+            if (
+                best_entry is None
+                or count < best_entry["count"]
+                or (count == best_entry["count"] and compress < best_entry["compress"])
+                or (count == best_entry["count"] and compress == best_entry["compress"] and pref < best_entry["pref"])
+            ):
+                best_entry = candidate
+                prev_plan = plans[total - nominal] or []
+                best_plan = prev_plan + [option["key"]]
+        dp[total] = best_entry
+        plans[total] = best_plan
+
+    best_fit_total = None
+    best_fit_entry = None
+    best_fit_plan: list[int] | None = None
+    for total in range(target_units, max_nominal + 1):
+        entry = dp[total]
+        if entry is None:
+            continue
+        if total - entry["compress"] > target_units:
+            continue
+        plan = plans[total] or []
+        required_compress = max(total - target_units, 0)
+        if (
+            best_fit_entry is None
+            or entry["count"] < best_fit_entry["count"]
+            or (
+                entry["count"] == best_fit_entry["count"]
+                and required_compress < max(best_fit_total - target_units, 0)  # type: ignore[operator]
+            )
+            or (
+                entry["count"] == best_fit_entry["count"]
+                and required_compress == max(best_fit_total - target_units, 0)  # type: ignore[operator]
+                and entry["pref"] < best_fit_entry["pref"]
+            )
+            or (
+                entry["count"] == best_fit_entry["count"]
+                and required_compress == max(best_fit_total - target_units, 0)  # type: ignore[operator]
+                and entry["pref"] == best_fit_entry["pref"]
+                and total < best_fit_total  # type: ignore[operator]
+            )
+        ):
+            best_fit_entry = entry
+            best_fit_total = total
+            best_fit_plan = plan
+
+    if best_fit_entry is None or best_fit_total is None or best_fit_plan is None:
+        fallback_total = None
+        fallback_entry = None
+        fallback_plan = None
+        for total in range(target_units, -1, -1):
+            entry = dp[total]
+            if entry is None:
+                continue
+            fallback_total = total
+            fallback_entry = entry
+            fallback_plan = plans[total] or []
+            break
+        if fallback_entry is None or fallback_total is None or fallback_plan is None:
+            return [], target_units
+        best_fit_total = fallback_total
+        best_fit_entry = fallback_entry
+        best_fit_plan = fallback_plan
+
+    remaining_compress = max(best_fit_total - target_units, 0)
+    segments: list[dict[str, int]] = []
+    for key in best_fit_plan:
+        option = next((opt for opt in options if opt["key"] == key), None)
+        if option is None:
+            continue
+        compress_used = min(option["compress_units"], remaining_compress)
+        remaining_compress -= compress_used
+        segments.append({"key": key, "units": option["nominal_units"] - compress_used})
+
+    used_units = sum(segment["units"] for segment in segments)
+    leftover = max(target_units - used_units, 0)
+    return segments, leftover
+
+
+def build_foam_dp(max_units: int, sizes_units: list[int]) -> list[tuple[int, list[int]] | None]:
+    dp: list[tuple[int, list[int]] | None] = [None] * (max_units + 1)
+    dp[0] = (0, [])
+    for value in range(1, max_units + 1):
+        best: tuple[int, list[int]] | None = None
+        for size in sizes_units:
+            if size > value or dp[value - size] is None:
+                continue
+            count, plan = dp[value - size]
+            candidate = (count + 1, plan + [size])
+            if best is None or candidate[0] < best[0]:
+                best = candidate
+        dp[value] = best
+    return dp
+
+
+def select_foam_plan(
+    target_units: int,
+    dp: list[tuple[int, list[int]] | None],
+) -> tuple[int, list[int], int]:
+    if target_units <= 0:
+        return 0, [], 0
+    if target_units < len(dp) and dp[target_units] is not None:
+        count, plan = dp[target_units]
+        return count, plan, 0
+    best: tuple[int, int, list[int]] | None = None
+    for value in range(min(target_units, len(dp) - 1), -1, -1):
+        if dp[value] is None:
+            continue
+        leftover = target_units - value
+        count, plan = dp[value]
+        candidate = (leftover, count, plan)
+        if best is None or candidate[:2] < best[:2]:
+            best = candidate
+            if leftover == 0:
+                break
+    if best is None:
+        return 0, [], target_units
+    return best[1], best[2], best[0]
 
 def get_or_create_location(name: str) -> Optional[Location]:
     if not name:
@@ -1179,18 +1398,93 @@ def location_new():
         parent_id = request.form.get("parent_id", "").strip()
         if parent_id and parent_id.isdigit():
             location.parent = Location.query.get(int(parent_id))
+        external_length_value = request.form.get("external_length_value", "").strip()
+        external_length_unit = request.form.get("external_length_unit", "").strip().lower()
+        if external_length_value and external_length_unit:
+            location.external_length = f"{external_length_value} {external_length_unit}"
+        else:
+            location.external_length = external_length_value or None
+        external_width_value = request.form.get("external_width_value", "").strip()
+        external_width_unit = request.form.get("external_width_unit", "").strip().lower()
+        if external_width_value and external_width_unit:
+            location.external_width = f"{external_width_value} {external_width_unit}"
+        else:
+            location.external_width = external_width_value or None
+        external_height_value = request.form.get("external_height_value", "").strip()
+        external_height_unit = request.form.get("external_height_unit", "").strip().lower()
+        if external_height_value and external_height_unit:
+            location.external_height = f"{external_height_value} {external_height_unit}"
+        else:
+            location.external_height = external_height_value or None
+        external_weight_value = request.form.get("external_weight_value", "").strip()
+        external_weight_unit = request.form.get("external_weight_unit", "").strip().lower()
+        if external_weight_value and external_weight_unit:
+            location.external_weight = f"{external_weight_value} {external_weight_unit}"
+        else:
+            location.external_weight = external_weight_value or None
+        flat_length_value = request.form.get("flat_length_value", "").strip()
+        flat_length_unit = request.form.get("flat_length_unit", "").strip().lower()
+        if flat_length_value and flat_length_unit:
+            location.flat_length = f"{flat_length_value} {flat_length_unit}"
+        else:
+            location.flat_length = flat_length_value or None
+        flat_rows = request.form.get("flat_rows", "").strip()
+        location.flat_rows = int(flat_rows) if flat_rows.isdigit() else None
+        flat_height_value = request.form.get("flat_height_value", "").strip()
+        flat_height_unit = request.form.get("flat_height_unit", "").strip().lower()
+        if flat_height_value and flat_height_unit:
+            location.flat_height = f"{flat_height_value} {flat_height_unit}"
+        else:
+            location.flat_height = flat_height_value or None
+        flat_row_width_value = request.form.get("flat_row_width_value", "").strip()
+        flat_row_width_unit = request.form.get("flat_row_width_unit", "").strip().lower()
+        if flat_row_width_value and flat_row_width_unit:
+            location.flat_row_width = f"{flat_row_width_value} {flat_row_width_unit}"
+        else:
+            location.flat_row_width = flat_row_width_value or None
+        flat_weight_value = request.form.get("flat_weight_value", "").strip()
+        flat_weight_unit = request.form.get("flat_weight_unit", "").strip().lower()
+        if flat_weight_value and flat_weight_unit:
+            location.flat_weight = f"{flat_weight_value} {flat_weight_unit}"
+        else:
+            location.flat_weight = flat_weight_value or None
+        location.flat_scale = request.form.get("flat_scale", "").strip() or None
+        location.flat_gauge = request.form.get("flat_gauge", "").strip() or None
         db.session.add(location)
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.location_detail", location_id=location.id))
     locations = Location.query.order_by("name").all()
     location_types = current_app.config.get("LOCATION_TYPES", [])
+    flat_length_unit = get_default_length_unit()
+    flat_weight_unit = get_default_weight_unit()
     return render_template(
         "location_form.html",
         location=None,
         locations=locations,
         descendant_ids=set(),
         location_types=location_types,
+        external_length_value="",
+        external_length_unit=flat_length_unit,
+        external_width_value="",
+        external_width_unit=flat_length_unit,
+        external_height_value="",
+        external_height_unit=flat_length_unit,
+        external_weight_value="",
+        external_weight_unit=flat_weight_unit,
+        flat_length_value="",
+        flat_length_unit=flat_length_unit,
+        flat_rows_value="",
+        flat_height_value="",
+        flat_height_unit=flat_length_unit,
+        flat_row_width_value="",
+        flat_row_width_unit=flat_length_unit,
+        flat_weight_value="",
+        flat_weight_unit=flat_weight_unit,
+        flat_scale_value="",
+        flat_gauge_value="",
+        scale_options=get_scale_options(),
+        gauge_options=get_gauge_options(),
     )
 
 
@@ -1412,6 +1706,156 @@ def draw_centered_text(draw, text, x, y, width, font) -> None:
         return
     text_width = draw.textlength(text, font=font)
     draw.text((x + max((width - text_width) / 2, 0), y), text, fill="#111111", font=font)
+
+
+CODE128_PATTERNS = [
+    "212222",
+    "222122",
+    "222221",
+    "121223",
+    "121322",
+    "131222",
+    "122213",
+    "122312",
+    "132212",
+    "221213",
+    "221312",
+    "231212",
+    "112232",
+    "122132",
+    "122231",
+    "113222",
+    "123122",
+    "123221",
+    "223211",
+    "221132",
+    "221231",
+    "213212",
+    "223112",
+    "312131",
+    "311222",
+    "321122",
+    "321221",
+    "312212",
+    "322112",
+    "322211",
+    "212123",
+    "212321",
+    "232121",
+    "111323",
+    "131123",
+    "131321",
+    "112313",
+    "132113",
+    "132311",
+    "211313",
+    "231113",
+    "231311",
+    "112133",
+    "112331",
+    "132131",
+    "113123",
+    "113321",
+    "133121",
+    "313121",
+    "211331",
+    "231131",
+    "213113",
+    "213311",
+    "213131",
+    "311123",
+    "311321",
+    "331121",
+    "312113",
+    "312311",
+    "332111",
+    "314111",
+    "221411",
+    "431111",
+    "111224",
+    "111422",
+    "121124",
+    "121421",
+    "141122",
+    "141221",
+    "112214",
+    "112412",
+    "122114",
+    "122411",
+    "142112",
+    "142211",
+    "241211",
+    "221114",
+    "413111",
+    "241112",
+    "134111",
+    "111242",
+    "121142",
+    "121241",
+    "114212",
+    "124112",
+    "124211",
+    "411212",
+    "421112",
+    "421211",
+    "212141",
+    "214121",
+    "412121",
+    "111143",
+    "111341",
+    "131141",
+    "114113",
+    "114311",
+    "411113",
+    "411311",
+    "113141",
+    "114131",
+    "311141",
+    "411131",
+    "211412",
+    "211214",
+    "211232",
+    "2331112",
+]
+
+
+def code128_values(text: str) -> list[int]:
+    values = []
+    for char in text:
+        code = ord(char) - 32
+        if 0 <= code <= 95:
+            values.append(code)
+    return values
+
+
+def draw_code128(draw, text: str, x: int, y: int, height: int, max_width: int, center: bool = False) -> int:
+    values = code128_values(text)
+    if not values or height <= 0 or max_width <= 0:
+        return 0
+    start_code = 104
+    checksum = start_code
+    for idx, value in enumerate(values, start=1):
+        checksum += value * idx
+    checksum %= 103
+    codes = [start_code] + values + [checksum, 106]
+    patterns = [CODE128_PATTERNS[code] for code in codes]
+    modules = sum(sum(int(digit) for digit in pattern) for pattern in patterns)
+    if modules <= 0:
+        return 0
+    module_width = max(1, min(2, max_width // modules))
+    total_width = modules * module_width
+    cursor = x
+    if center and max_width > total_width:
+        cursor = x + (max_width - total_width) // 2
+    for pattern in patterns:
+        is_bar = True
+        for digit in pattern:
+            width = int(digit) * module_width
+            if is_bar:
+                draw.rectangle([cursor, y, cursor + width, y + height], fill="#111111")
+            cursor += width
+            is_bar = not is_bar
+    return total_width
 
 
 @main_bp.route("/tools/prr-home-shop-repair", methods=["GET", "POST"])
@@ -1777,6 +2221,1040 @@ def car_class_edit(class_id: int):
     return render_template("car_class_form.html", car_class=car_class)
 
 
+def build_car_label(car: Car) -> str:
+    reporting_mark = car.railroad.reporting_mark if car.railroad else car.reporting_mark_override
+    if reporting_mark and car.car_number:
+        return f"{reporting_mark} {car.car_number}"
+    if reporting_mark:
+        return reporting_mark
+    if car.car_number:
+        return car.car_number
+    return f"Car {car.id}"
+
+
+def build_car_type_class(car: Car) -> str:
+    car_class = car.car_class
+    if not car_class and car.car_class_id:
+        class_id = int(car.car_class_id) if isinstance(car.car_class_id, (int, str)) and str(car.car_class_id).isdigit() else None
+        if class_id is not None:
+            car_class = CarClass.query.get(class_id)
+    car_type = car.car_type_override or (car_class.car_type if car_class else "")
+    class_code = car_class.code if car_class else ""
+    if class_code and car_type and car_type != class_code:
+        return f"{class_code} / {car_type}"
+    if class_code:
+        return class_code
+    if car_type:
+        return car_type
+    return ""
+
+
+def build_flat_pack_plan(
+    cars: list[dict],
+    rows_count: int,
+    flat_length_in: float,
+    flat_unit: str,
+    foam_options: list[dict[str, int | str]],
+    packing_mode: str,
+    end_foam_key: int | None,
+    compression_enabled: bool,
+    foam_label_map: dict[int, str],
+    foam_color_map: dict[int, str],
+    precision: int = 100,
+) -> dict:
+    capacity_units = int(round(flat_length_in * precision))
+    end_foam_units = 0
+    end_foam_min_units = 0
+    end_foam_nominal_units = 0
+    if end_foam_key is not None:
+        end_foam_units = end_foam_key
+        end_option = next((opt for opt in foam_options if opt["key"] == end_foam_key), None)
+        if end_option:
+            end_foam_nominal_units = int(end_option["nominal_units"])
+            end_foam_min_units = int(end_option["min_units"]) if compression_enabled else end_foam_nominal_units
+
+    rows: list[dict] = []
+    unplaced: list[dict] = []
+    cars_sorted = sorted(cars, key=lambda item: item["length_units"], reverse=True)
+
+    for car in cars_sorted:
+        best_row = None
+        best_score = None
+        best_required = 0
+        for row in rows:
+            row_end_units = row.get("end_foam_units", end_foam_nominal_units)
+            remaining_units = capacity_units - row["used_units"]
+            additional_units = car["length_units"] + (row_end_units if row["cars"] else (2 * row_end_units))
+            if additional_units > remaining_units and compression_enabled and end_foam_min_units:
+                min_row_end = min(row_end_units, end_foam_min_units)
+                if min_row_end < row_end_units:
+                    row_count = len(row["cars"])
+                    reduction = (row_end_units - min_row_end) * (row_count + 1)
+                    adjusted_used = row["used_units"] - reduction
+                    adjusted_remaining = capacity_units - adjusted_used
+                    min_additional = car["length_units"] + (
+                        min_row_end if row["cars"] else (2 * min_row_end)
+                    )
+                    if min_additional <= adjusted_remaining:
+                        row["used_units"] = adjusted_used
+                        row["end_foam_units"] = min_row_end
+                        row_end_units = min_row_end
+                        remaining_units = adjusted_remaining
+                        additional_units = min_additional
+            if additional_units > remaining_units:
+                continue
+            new_remaining = remaining_units - additional_units
+            foam_count = 0
+            leftover_units = new_remaining
+            if packing_mode == "dense" and foam_options:
+                plan, leftover_units = plan_fill_with_compression(new_remaining, foam_options)
+                foam_count = len(plan)
+            elif packing_mode == "fill" and foam_options:
+                sizes_units = [int(opt["nominal_units"]) for opt in foam_options]
+                foam_dp = build_foam_dp(capacity_units, sizes_units) if sizes_units else None
+                if foam_dp:
+                    foam_count, _, leftover_units = select_foam_plan(new_remaining, foam_dp)
+            score = (leftover_units, foam_count, new_remaining)
+            if best_score is None or score < best_score:
+                best_score = score
+                best_row = row
+                best_required = additional_units
+        if best_row is not None:
+            best_row["cars"].append(car)
+            best_row["used_units"] += best_required
+        elif len(rows) < rows_count:
+            row_end_units = end_foam_nominal_units
+            base_units = car["length_units"] + (2 * row_end_units)
+            if base_units > capacity_units and compression_enabled and end_foam_min_units:
+                row_end_units = end_foam_min_units
+                base_units = car["length_units"] + (2 * row_end_units)
+            if base_units <= capacity_units:
+                rows.append({"cars": [car], "used_units": base_units, "end_foam_units": row_end_units})
+            else:
+                unplaced.append(car)
+        else:
+            unplaced.append(car)
+
+    total_foam_blocks = 0
+    total_gap_in = 0.0
+    total_foam_in = 0.0
+    foam_counts: dict[int, int] = {}
+    row_entries: list[dict] = []
+
+    for index, row in enumerate(rows, start=1):
+        used_units = row["used_units"]
+        remaining_units = max(capacity_units - used_units, 0)
+        foam_plan: list[dict[str, int]] = []
+        foam_count = 0
+        leftover_units = remaining_units
+        if packing_mode == "dense" and foam_options:
+            foam_plan, leftover_units = plan_fill_with_compression(remaining_units, foam_options)
+            foam_count = len(foam_plan)
+        elif packing_mode == "fill" and foam_options:
+            sizes_units = [int(opt["nominal_units"]) for opt in foam_options]
+            foam_dp = build_foam_dp(capacity_units, sizes_units) if sizes_units else None
+            if foam_dp:
+                foam_count, plan_units, leftover_units = select_foam_plan(remaining_units, foam_dp)
+                foam_plan = [{"key": key, "units": key} for key in plan_units]
+        foam_segments = [
+            (segment["units"] / precision, segment["key"])
+            for segment in foam_plan
+            if segment["units"] > 0
+        ]
+        foam_length_in = sum(length for length, _ in foam_segments)
+        gap_in = max(leftover_units / precision, 0.0)
+        if gap_in < (0.5 / precision):
+            gap_in = 0.0
+        row_end_units = row.get("end_foam_units", end_foam_min_units)
+        end_foam_blocks = (len(row["cars"]) + 1) if end_foam_units and row["cars"] else 0
+        end_foam_length_in = (row_end_units / precision) * end_foam_blocks if end_foam_units else 0.0
+        total_foam_blocks += foam_count + end_foam_blocks
+        total_foam_in += foam_length_in + end_foam_length_in
+        total_gap_in += gap_in
+        if end_foam_units and end_foam_blocks:
+            foam_counts[end_foam_units] = foam_counts.get(end_foam_units, 0) + end_foam_blocks
+        for segment in foam_plan:
+            key = segment["key"]
+            foam_counts[key] = foam_counts.get(key, 0) + 1
+
+        segments = []
+        foam_label = ""
+        foam_width_percent = 0.0
+        if end_foam_units and row["cars"]:
+            foam_display = inches_to_unit(row_end_units / precision, flat_unit)
+            foam_label = foam_label_map.get(end_foam_units, "Foam")
+            if not foam_label and foam_display is not None:
+                foam_label = f"{format_length_value(foam_display)} {flat_unit}"
+            foam_width_percent = ((row_end_units / precision) / flat_length_in) * 100 if flat_length_in else 0
+            segments.append(
+                {
+                    "type": "foam",
+                    "label": foam_label,
+                    "color": foam_color_map.get(end_foam_units, ""),
+                    "foam_key": end_foam_units,
+                    "width_percent": foam_width_percent,
+                }
+            )
+        for idx, car in enumerate(row["cars"]):
+            length_in = car["length_in"]
+            display_length = inches_to_unit(length_in, flat_unit)
+            primary_label_short = car["label"]
+            primary_label = primary_label_short
+            secondary_label = car.get("type_class") or ""
+            if display_length is not None:
+                primary_label = f"{primary_label} ({format_length_value(display_length)} {flat_unit})"
+            label = f"{primary_label} | {secondary_label}" if secondary_label else primary_label
+            segments.append(
+                {
+                    "type": "car",
+                    "label": label,
+                    "primary_label": primary_label,
+                    "primary_label_short": primary_label_short,
+                    "secondary_label": secondary_label,
+                    "type_class": car.get("type_class") or "",
+                    "car_id": car.get("id"),
+                    "width_percent": (length_in / flat_length_in) * 100 if flat_length_in else 0,
+                }
+            )
+            if end_foam_units and idx < len(row["cars"]) - 1:
+                segments.append(
+                    {
+                        "type": "foam",
+                        "label": foam_label,
+                        "color": foam_color_map.get(end_foam_units, ""),
+                        "foam_key": end_foam_units,
+                        "width_percent": foam_width_percent,
+                    }
+                )
+        if end_foam_units and row["cars"]:
+            segments.append(
+                {
+                    "type": "foam",
+                    "label": foam_label,
+                    "color": foam_color_map.get(end_foam_units, ""),
+                    "foam_key": end_foam_units,
+                    "width_percent": foam_width_percent,
+                }
+            )
+        for length_in, key in foam_segments:
+            display_length = inches_to_unit(length_in, flat_unit)
+            display_label = foam_label_map.get(key, "Foam")
+            if display_length is not None and display_label:
+                display_label = display_label or f"{format_length_value(display_length)} {flat_unit}"
+            segments.append(
+                {
+                    "type": "foam",
+                    "label": display_label,
+                    "color": foam_color_map.get(key, ""),
+                    "foam_key": key,
+                    "width_percent": (length_in / flat_length_in) * 100 if flat_length_in else 0,
+                }
+            )
+        if gap_in > 0:
+            gap_display = inches_to_unit(gap_in, flat_unit)
+            gap_label = "Gap"
+            if gap_display is not None:
+                gap_label = f"Gap {format_length_value(gap_display)} {flat_unit}"
+            segments.append(
+                {
+                    "type": "gap",
+                    "label": gap_label,
+                    "width_percent": (gap_in / flat_length_in) * 100 if flat_length_in else 0,
+                }
+            )
+
+        used_in = used_units / precision
+        used_display = inches_to_unit(used_in, flat_unit)
+        remaining_display = inches_to_unit(remaining_units / precision, flat_unit)
+
+        row_entries.append(
+            {
+                "index": index,
+                "segments": segments,
+                "foam_blocks": foam_count,
+                "used_display": format_length_value(used_display) if used_display is not None else "",
+                "remaining_display": format_length_value(remaining_display) if remaining_display is not None else "",
+            }
+        )
+
+    for index in range(len(rows) + 1, rows_count + 1):
+        gap_label = f"Gap {format_length_value(inches_to_unit(flat_length_in, flat_unit) or flat_length_in)} {flat_unit}"
+        row_entries.append(
+            {
+                "index": index,
+                "segments": [
+                    {
+                        "type": "gap",
+                        "label": gap_label,
+                        "width_percent": 100,
+                    }
+                ],
+                "foam_blocks": 0,
+                "used_display": "",
+                "remaining_display": format_length_value(
+                    inches_to_unit(flat_length_in, flat_unit) or flat_length_in
+                ),
+            }
+        )
+
+    return {
+        "rows": row_entries,
+        "unplaced": unplaced,
+        "total_foam_blocks": total_foam_blocks,
+        "total_gap_in": total_gap_in,
+        "total_foam_in": total_foam_in,
+        "foam_counts": foam_counts,
+    }
+
+
+@main_bp.route("/locations/<int:location_id>/flat-pack", methods=["GET", "POST"])
+def flat_pack(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    cars = Car.query.filter_by(location_id=location.id).order_by("id").all()
+    prefetch_car_relations(cars)
+    default_length_unit = get_default_length_unit()
+    foam_blocks = get_foam_blocks()
+
+    flat_length_value, flat_length_unit = parse_actual_length(location.flat_length)
+    if flat_length_value and not flat_length_unit:
+        flat_length_unit = default_length_unit
+    flat_rows = location.flat_rows
+    flat_scale_value = location.flat_scale or ""
+    flat_gauge_value = location.flat_gauge or ""
+    flat_height_value = location.flat_height or ""
+    flat_row_width_value = location.flat_row_width or ""
+    flat_weight_value = location.flat_weight or ""
+    missing_flat_settings = not (flat_length_value and flat_rows)
+
+    selected_ids = {car.id for car in cars}
+    selected_foam_ids: list[int] = []
+    print_width_value = "11"
+    print_width_unit = "in"
+    print_height_value = "8.5"
+    print_height_unit = "in"
+    packing_mode = "frugal"
+    compression_enabled = True
+    errors: list[str] = []
+    pack_result = None
+
+    if request.method == "POST":
+        selected_ids = {int(value) for value in request.form.getlist("car_ids") if value.isdigit()} or selected_ids
+        selected_foam_ids = [
+            int(value) for value in request.form.getlist("foam_block_ids") if value.isdigit()
+        ]
+        packing_mode = request.form.get("packing_mode", "").strip() or packing_mode
+        if packing_mode not in {"frugal", "fill", "dense"}:
+            packing_mode = "frugal"
+        compression_enabled = request.form.get("compression_enabled") == "on"
+        print_width_value = request.form.get("print_width_value", "").strip() or print_width_value
+        print_width_unit = request.form.get("print_width_unit", "").strip().lower() or print_width_unit
+        print_height_value = request.form.get("print_height_value", "").strip() or print_height_value
+        print_height_unit = request.form.get("print_height_unit", "").strip().lower() or print_height_unit
+
+    if request.method != "POST":
+        ext_width_value, ext_width_unit = parse_actual_length(location.external_width)
+        ext_width_unit = ext_width_unit or default_length_unit
+        ext_width_in = length_to_inches(ext_width_value, ext_width_unit) if ext_width_value else None
+        if ext_width_in is not None and ext_width_in < 9.5:
+            height_in = max(ext_width_in - 1.0, 0.0)
+            height_value = inches_to_unit(height_in, ext_width_unit)
+            if height_value is not None:
+                print_height_value = format_length_value(height_value)
+                print_height_unit = ext_width_unit
+
+    flat_length_in = None
+    if flat_length_value:
+        flat_length_in = length_to_inches(flat_length_value, flat_length_unit or default_length_unit)
+    if request.method == "POST":
+        if flat_length_in is None or flat_length_in <= 0:
+            errors.append("Flat length is required.")
+        if not flat_rows or flat_rows <= 0:
+            errors.append("Row count is required.")
+
+    foam_block_options = []
+    for index, block in enumerate(foam_blocks):
+        length_value, length_unit = parse_actual_length(block.get("length"))
+        length_unit = length_unit or default_length_unit
+        length_in = length_to_inches(length_value, length_unit) if length_value else None
+        if length_in is None or length_in <= 0:
+            continue
+        compression_value, compression_unit = parse_actual_length(block.get("compression"))
+        compression_unit = compression_unit or length_unit
+        compression_in = length_to_inches(compression_value, compression_unit) if compression_value else 0.0
+        compression_in = max(0.0, min(compression_in or 0.0, length_in))
+        foam_block_options.append(
+            {
+                "id": index,
+                "length_label": block.get("length") or "",
+                "width_label": block.get("width") or "",
+                "height_label": block.get("height") or "",
+                "compression_label": block.get("compression") or "",
+                "label": " x ".join(
+                    part
+                    for part in [
+                        block.get("length") or "",
+                        block.get("width") or "",
+                        block.get("height") or "",
+                    ]
+                    if part
+                )
+                + (f" ({block.get('weight')})" if block.get("weight") else ""),
+                "length_in": length_in,
+                "compression_in": compression_in,
+            }
+        )
+
+    foam_block_map = {block["id"]: block for block in foam_block_options}
+    if not selected_foam_ids:
+        selected_foam_ids = [block["id"] for block in foam_block_options]
+    selected_foam_ids = [value for value in selected_foam_ids if value in foam_block_map]
+    selected_foam_blocks = [foam_block_map[value] for value in selected_foam_ids]
+    foam_palette = [
+        "#e8b07a",
+        "#c9a777",
+        "#d98c6b",
+        "#b9c4a5",
+        "#c7a4c4",
+        "#a3b2cc",
+        "#e1c67a",
+        "#b7b09a",
+    ]
+    foam_label_map: dict[int, str] = {}
+    foam_color_map: dict[int, str] = {}
+    foam_meta_map: dict[int, dict[str, str]] = {}
+    foam_options: list[dict[str, int]] = []
+    for idx, block in enumerate(selected_foam_blocks):
+        units_key = int(round(block["length_in"] * 100))
+        compress_units = int(round(block.get("compression_in", 0.0) * 100))
+        compress_units = min(compress_units, units_key)
+        foam_label_map[units_key] = block.get("length_label") or block.get("label") or "Foam"
+        foam_color_map[units_key] = foam_palette[idx % len(foam_palette)]
+        foam_meta_map[units_key] = {
+            "length": block.get("length_label") or "",
+            "width": block.get("width_label") or "",
+            "height": block.get("height_label") or "",
+        }
+        foam_options.append(
+            {
+                "key": units_key,
+                "nominal_units": units_key,
+                "min_units": max(units_key - compress_units, 0),
+                "compress_units": compress_units,
+                "pref": idx,
+            }
+        )
+
+    car_entries = []
+    missing_length = []
+    for car in cars:
+        label = build_car_label(car)
+        length_value, length_unit = parse_actual_length(car.actual_length)
+        length_unit = length_unit or default_length_unit
+        length_in = length_to_inches(length_value, length_unit) if length_value and length_unit else None
+        length_display = f"{length_value} {length_unit}" if length_value else ""
+        entry = {
+            "id": car.id,
+            "label": label,
+            "type_class": build_car_type_class(car),
+            "length_display": length_display or "-",
+            "length_in": length_in,
+        }
+        if length_in is None or length_in <= 0:
+            missing_length.append(entry)
+        car_entries.append(entry)
+
+    if request.method == "POST" and not errors and flat_length_in:
+        selected_entries = [entry for entry in car_entries if entry["id"] in selected_ids and entry["length_in"]]
+        cars_for_pack = []
+        for entry in selected_entries:
+            length_in = float(entry["length_in"])
+            cars_for_pack.append(
+                {
+                    "id": entry["id"],
+                    "label": entry["label"],
+                    "type_class": entry["type_class"],
+                    "length_in": length_in,
+                    "length_units": int(round(length_in * 100)),
+                }
+            )
+        if not cars_for_pack:
+            errors.append("No cars selected with valid lengths.")
+        else:
+            pack_result = build_flat_pack_plan(
+                cars_for_pack,
+                flat_rows or 0,
+                flat_length_in,
+                flat_length_unit,
+                foam_options,
+                packing_mode,
+                foam_options[0]["key"] if foam_options else None,
+                compression_enabled,
+                foam_label_map,
+                foam_color_map,
+            )
+            foam_display = inches_to_unit(pack_result["total_foam_in"], flat_length_unit)
+            gap_display = inches_to_unit(pack_result["total_gap_in"], flat_length_unit)
+            pack_result["total_foam_display"] = (
+                format_length_value(foam_display) if foam_display is not None else ""
+            )
+            pack_result["total_gap_display"] = (
+                format_length_value(gap_display) if gap_display is not None else ""
+            )
+            pack_result["flat_unit"] = flat_length_unit
+            foam_counts = pack_result.get("foam_counts", {})
+            pack_result["foam_legend"] = [
+                {
+                    "length": foam_meta_map.get(key, {}).get("length", "") or foam_label_map.get(key, "Foam"),
+                    "width": foam_meta_map.get(key, {}).get("width", ""),
+                    "height": foam_meta_map.get(key, {}).get("height", ""),
+                    "color": foam_color_map.get(key, ""),
+                    "count": foam_counts.get(key, 0),
+                }
+                for key in foam_label_map
+            ]
+
+    return render_template(
+        "flat_pack.html",
+        location=location,
+        car_entries=car_entries,
+        missing_length=missing_length,
+        selected_ids=selected_ids,
+        flat_length_value=flat_length_value,
+        flat_length_unit=flat_length_unit or default_length_unit,
+        flat_rows_value=str(flat_rows) if flat_rows is not None else "",
+        flat_scale_value=flat_scale_value,
+        flat_gauge_value=flat_gauge_value,
+        flat_height_value=flat_height_value,
+        flat_row_width_value=flat_row_width_value,
+        flat_weight_value=flat_weight_value,
+        foam_block_options=foam_block_options,
+        selected_foam_blocks=selected_foam_blocks,
+        selected_foam_ids=selected_foam_ids,
+        packing_mode=packing_mode,
+        compression_enabled=compression_enabled,
+        missing_flat_settings=missing_flat_settings,
+        print_width_value=print_width_value,
+        print_width_unit=print_width_unit,
+        print_height_value=print_height_value,
+        print_height_unit=print_height_unit,
+        errors=errors,
+        pack_result=pack_result,
+    )
+
+
+@main_bp.route("/locations/<int:location_id>/flat-pack/view", methods=["POST"])
+def flat_pack_view(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    cars = Car.query.filter_by(location_id=location.id).order_by("id").all()
+    prefetch_car_relations(cars)
+    default_length_unit = get_default_length_unit()
+    foam_blocks = get_foam_blocks()
+
+    selected_ids = [int(value) for value in request.form.getlist("car_ids") if value.isdigit()]
+    selected_foam_ids = [int(value) for value in request.form.getlist("foam_block_ids") if value.isdigit()]
+    packing_mode = request.form.get("packing_mode", "").strip() or "frugal"
+    if packing_mode not in {"frugal", "fill", "dense"}:
+        packing_mode = "frugal"
+    compression_enabled = request.form.get("compression_enabled") == "on"
+    print_width_value = request.form.get("print_width_value", "").strip() or "11"
+    print_width_unit = request.form.get("print_width_unit", "").strip().lower() or "in"
+    print_height_value = request.form.get("print_height_value", "").strip() or "8.5"
+    print_height_unit = request.form.get("print_height_unit", "").strip().lower() or "in"
+
+    flat_length_value, flat_length_unit = parse_actual_length(location.flat_length)
+    if flat_length_value and not flat_length_unit:
+        flat_length_unit = default_length_unit
+    flat_length_in = length_to_inches(flat_length_value, flat_length_unit) if flat_length_value else None
+    flat_rows = location.flat_rows
+    errors: list[str] = []
+    pack_result = None
+
+    if flat_length_in is None or flat_length_in <= 0:
+        errors.append("Flat length is required.")
+    if not flat_rows or flat_rows <= 0:
+        errors.append("Row count is required.")
+
+    foam_block_options = []
+    for index, block in enumerate(foam_blocks):
+        length_value, length_unit = parse_actual_length(block.get("length"))
+        length_unit = length_unit or default_length_unit
+        length_in = length_to_inches(length_value, length_unit) if length_value else None
+        if length_in is None or length_in <= 0:
+            continue
+        compression_value, compression_unit = parse_actual_length(block.get("compression"))
+        compression_unit = compression_unit or length_unit
+        compression_in = length_to_inches(compression_value, compression_unit) if compression_value else 0.0
+        compression_in = max(0.0, min(compression_in or 0.0, length_in))
+        foam_block_options.append(
+            {
+                "id": index,
+                "length_in": length_in,
+                "length_label": block.get("length") or "",
+                "width_label": block.get("width") or "",
+                "height_label": block.get("height") or "",
+                "compression_label": block.get("compression") or "",
+                "compression_in": compression_in,
+            }
+        )
+    foam_block_map = {block["id"]: block for block in foam_block_options}
+    if not selected_foam_ids:
+        selected_foam_ids = [block["id"] for block in foam_block_options]
+    selected_foam_ids = [value for value in selected_foam_ids if value in foam_block_map]
+    foam_palette = [
+        "#e8b07a",
+        "#c9a777",
+        "#d98c6b",
+        "#b9c4a5",
+        "#c7a4c4",
+        "#a3b2cc",
+        "#e1c67a",
+        "#b7b09a",
+    ]
+    foam_label_map: dict[int, str] = {}
+    foam_color_map: dict[int, str] = {}
+    foam_meta_map: dict[int, dict[str, str]] = {}
+    foam_options: list[dict[str, int]] = []
+    for idx, block_id in enumerate(selected_foam_ids):
+        block = foam_block_map[block_id]
+        units_key = int(round(block["length_in"] * 100))
+        compress_units = int(round(block.get("compression_in", 0.0) * 100))
+        compress_units = min(compress_units, units_key)
+        foam_label_map[units_key] = foam_block_map[block_id].get("length_label") or "Foam"
+        foam_color_map[units_key] = foam_palette[idx % len(foam_palette)]
+        foam_meta_map[units_key] = {
+            "length": foam_block_map[block_id].get("length_label") or "",
+            "width": foam_block_map[block_id].get("width_label") or "",
+            "height": foam_block_map[block_id].get("height_label") or "",
+        }
+        foam_options.append(
+            {
+                "key": units_key,
+                "nominal_units": units_key,
+                "min_units": max(units_key - compress_units, 0),
+                "compress_units": compress_units,
+                "pref": idx,
+            }
+        )
+
+    cars_for_pack = []
+    for car in cars:
+        if selected_ids and car.id not in selected_ids:
+            continue
+        length_value, length_unit = parse_actual_length(car.actual_length)
+        length_unit = length_unit or default_length_unit
+        length_in = length_to_inches(length_value, length_unit) if length_value and length_unit else None
+        if length_in is None or length_in <= 0:
+            continue
+        cars_for_pack.append(
+            {
+                "id": car.id,
+                "label": build_car_label(car),
+                "type_class": build_car_type_class(car),
+                "length_in": length_in,
+                "length_units": int(round(length_in * 100)),
+            }
+        )
+    if not cars_for_pack:
+        errors.append("No cars selected with valid lengths.")
+
+    if not errors and flat_length_in:
+        pack_result = build_flat_pack_plan(
+            cars_for_pack,
+            flat_rows or 0,
+            flat_length_in,
+            flat_length_unit,
+            foam_options,
+            packing_mode,
+            foam_options[0]["key"] if foam_options else None,
+            compression_enabled,
+            foam_label_map,
+            foam_color_map,
+        )
+        foam_display = inches_to_unit(pack_result["total_foam_in"], flat_length_unit)
+        gap_display = inches_to_unit(pack_result["total_gap_in"], flat_length_unit)
+        pack_result["total_foam_display"] = format_length_value(foam_display) if foam_display is not None else ""
+        pack_result["total_gap_display"] = format_length_value(gap_display) if gap_display is not None else ""
+        pack_result["flat_unit"] = flat_length_unit
+        foam_counts = pack_result.get("foam_counts", {})
+        pack_result["foam_legend"] = [
+            {
+                "length": foam_meta_map.get(key, {}).get("length", "") or foam_label_map.get(key, "Foam"),
+                "width": foam_meta_map.get(key, {}).get("width", ""),
+                "height": foam_meta_map.get(key, {}).get("height", ""),
+                "color": foam_color_map.get(key, ""),
+                "count": foam_counts.get(key, 0),
+            }
+            for key in foam_label_map
+        ]
+
+    if not request.form.get("print_height_value", "").strip():
+        ext_width_value, ext_width_unit = parse_actual_length(location.external_width)
+        ext_width_unit = ext_width_unit or default_length_unit
+        ext_width_in = length_to_inches(ext_width_value, ext_width_unit) if ext_width_value else None
+        if ext_width_in is not None and ext_width_in < 9.5:
+            height_in = max(ext_width_in - 1.0, 0.0)
+            height_value = inches_to_unit(height_in, ext_width_unit)
+            if height_value is not None:
+                print_height_value = format_length_value(height_value)
+                print_height_unit = ext_width_unit
+
+    return render_template(
+        "flat_pack_view.html",
+        location=location,
+        errors=errors,
+        pack_result=pack_result,
+        selected_ids=selected_ids,
+        selected_foam_ids=selected_foam_ids,
+        packing_mode=packing_mode,
+        compression_enabled=compression_enabled,
+        print_width_value=print_width_value,
+        print_width_unit=print_width_unit,
+        print_height_value=print_height_value,
+        print_height_unit=print_height_unit,
+    )
+
+
+@main_bp.route("/locations/<int:location_id>/flat-pack/pdf", methods=["POST"])
+def flat_pack_pdf(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    cars = Car.query.filter_by(location_id=location.id).order_by("id").all()
+    prefetch_car_relations(cars)
+    default_length_unit = get_default_length_unit()
+    foam_blocks = get_foam_blocks()
+
+    selected_ids = {int(value) for value in request.form.getlist("car_ids") if value.isdigit()}
+    selected_foam_ids = [int(value) for value in request.form.getlist("foam_block_ids") if value.isdigit()]
+    packing_mode = request.form.get("packing_mode", "").strip() or "frugal"
+    if packing_mode not in {"frugal", "fill", "dense"}:
+        packing_mode = "frugal"
+    print_width_value = request.form.get("print_width_value", "").strip() or "11"
+    print_width_unit = request.form.get("print_width_unit", "").strip().lower() or "in"
+    print_height_value = request.form.get("print_height_value", "").strip() or "8.5"
+    print_height_unit = request.form.get("print_height_unit", "").strip().lower() or "in"
+    wireframe = request.form.get("wireframe") == "1"
+
+    flat_length_value, flat_length_unit = parse_actual_length(location.flat_length)
+    if flat_length_value and not flat_length_unit:
+        flat_length_unit = default_length_unit
+    flat_length_in = length_to_inches(flat_length_value, flat_length_unit) if flat_length_value else None
+    flat_rows = location.flat_rows
+    if flat_length_in is None or flat_length_in <= 0:
+        return "Flat length is required.", 400
+    if not flat_rows or flat_rows <= 0:
+        return "Row count is required.", 400
+
+    foam_block_options = []
+    for index, block in enumerate(foam_blocks):
+        length_value, length_unit = parse_actual_length(block.get("length"))
+        length_unit = length_unit or default_length_unit
+        length_in = length_to_inches(length_value, length_unit) if length_value else None
+        if length_in is None or length_in <= 0:
+            continue
+        compression_value, compression_unit = parse_actual_length(block.get("compression"))
+        compression_unit = compression_unit or length_unit
+        compression_in = length_to_inches(compression_value, compression_unit) if compression_value else 0.0
+        compression_in = max(0.0, min(compression_in or 0.0, length_in))
+        foam_block_options.append(
+            {
+                "id": index,
+                "length_in": length_in,
+                "length_label": block.get("length") or "",
+                "width_label": block.get("width") or "",
+                "height_label": block.get("height") or "",
+                "compression_label": block.get("compression") or "",
+                "compression_in": compression_in,
+            }
+        )
+    foam_block_map = {block["id"]: block for block in foam_block_options}
+    if not selected_foam_ids:
+        selected_foam_ids = [block["id"] for block in foam_block_options]
+    selected_foam_ids = [value for value in selected_foam_ids if value in foam_block_map]
+    foam_palette = [
+        "#e8b07a",
+        "#c9a777",
+        "#d98c6b",
+        "#b9c4a5",
+        "#c7a4c4",
+        "#a3b2cc",
+        "#e1c67a",
+        "#b7b09a",
+    ]
+    foam_label_map: dict[int, str] = {}
+    foam_color_map: dict[int, str] = {}
+    foam_meta_map: dict[int, dict[str, str]] = {}
+    foam_options: list[dict[str, int]] = []
+    for idx, block_id in enumerate(selected_foam_ids):
+        block = foam_block_map[block_id]
+        units_key = int(round(block["length_in"] * 100))
+        compress_units = int(round(block.get("compression_in", 0.0) * 100))
+        compress_units = min(compress_units, units_key)
+        foam_label_map[units_key] = foam_block_map[block_id].get("length_label") or "Foam"
+        foam_color_map[units_key] = foam_palette[idx % len(foam_palette)]
+        foam_meta_map[units_key] = {
+            "length": foam_block_map[block_id].get("length_label") or "",
+            "width": foam_block_map[block_id].get("width_label") or "",
+            "height": foam_block_map[block_id].get("height_label") or "",
+        }
+        foam_options.append(
+            {
+                "key": units_key,
+                "nominal_units": units_key,
+                "min_units": max(units_key - compress_units, 0),
+                "compress_units": compress_units,
+                "pref": idx,
+            }
+        )
+
+    cars_for_pack = []
+    for car in cars:
+        if selected_ids and car.id not in selected_ids:
+            continue
+        length_value, length_unit = parse_actual_length(car.actual_length)
+        length_unit = length_unit or default_length_unit
+        length_in = length_to_inches(length_value, length_unit) if length_value and length_unit else None
+        if length_in is None or length_in <= 0:
+            continue
+        cars_for_pack.append(
+            {
+                "id": car.id,
+                "label": build_car_label(car),
+                "type_class": build_car_type_class(car),
+                "length_in": length_in,
+                "length_units": int(round(length_in * 100)),
+            }
+        )
+    if not cars_for_pack:
+        return "No cars selected with valid lengths.", 400
+
+    compression_enabled = request.form.get("compression_enabled") == "on"
+    pack_result = build_flat_pack_plan(
+        cars_for_pack,
+        flat_rows,
+        flat_length_in,
+        flat_length_unit,
+        foam_options,
+        packing_mode,
+        foam_options[0]["key"] if foam_options else None,
+        compression_enabled,
+        foam_label_map,
+        foam_color_map,
+    )
+    foam_counts = pack_result.get("foam_counts", {})
+    pack_result["foam_legend"] = [
+        {
+            "length": foam_meta_map.get(key, {}).get("length", "") or foam_label_map.get(key, "Foam"),
+            "width": foam_meta_map.get(key, {}).get("width", ""),
+            "height": foam_meta_map.get(key, {}).get("height", ""),
+            "color": foam_color_map.get(key, ""),
+            "count": foam_counts.get(key, 0),
+        }
+        for key in foam_label_map
+    ]
+
+    print_width_amount, print_width_unit = parse_length_value(
+        print_width_value,
+        print_width_unit,
+        "in",
+    )
+    print_height_amount, print_height_unit = parse_length_value(
+        print_height_value,
+        print_height_unit,
+        "in",
+    )
+    diagram_width_in = length_to_inches(str(print_width_amount), print_width_unit) if print_width_amount else 11
+    diagram_height_in = length_to_inches(str(print_height_amount), print_height_unit) if print_height_amount else 8.5
+
+    dpi = 150
+    page_width_in = 11.0
+    page_height_in = 8.5
+    width_px = max(int(round(page_width_in * dpi)), 300)
+    height_px = max(int(round(page_height_in * dpi)), 300)
+    margin = int(0.35 * dpi)
+    row_gap = int(0.15 * dpi)
+
+    image = Image.new("RGB", (width_px, height_px), "white")
+    draw = ImageDraw.Draw(image)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", size=21)
+        font_small = ImageFont.truetype("DejaVuSans.ttf", size=18)
+        font_small_bold = ImageFont.truetype("DejaVuSans-Bold.ttf", size=18)
+        font_tiny = ImageFont.truetype("DejaVuSans.ttf", size=15)
+    except OSError:
+        font = ImageFont.load_default()
+        font_small = font
+        font_small_bold = font
+        font_tiny = font
+
+    title = f"Flat Packing: {location.name}"
+    max_width_px = max(width_px - (margin * 2), 1)
+    max_height_px = max(height_px - (margin * 2), 1)
+    diagram_width_px = int(round(min(diagram_width_in * dpi, max_width_px)))
+    diagram_height_px = int(round(min(diagram_height_in * dpi, max_height_px)))
+    title_bbox = font.getbbox(title) if hasattr(font, "getbbox") else (0, 0, 0, int(font.size * 1.2))
+    title_height = title_bbox[3] - title_bbox[1]
+    title_width = title_bbox[2] - title_bbox[0]
+    origin_x = margin + max((max_width_px - diagram_width_px) // 2, 0)
+    origin_y = margin + max((max_height_px - diagram_height_px) // 2, 0)
+    title_x = origin_x
+    title_y = max(origin_y - title_height - row_gap, margin / 2)
+    draw.text((title_x, title_y), title, fill="#111111", font=font)
+    barcode_x = int(title_x + title_width + (0.15 * dpi))
+    barcode_y = int(title_y)
+    barcode_height = int(max(title_height, dpi * 0.3))
+    max_barcode_width = int(max_width_px + margin - barcode_x)
+    draw_code128(draw, location.name or "", barcode_x, barcode_y, barcode_height, max_barcode_width)
+    available_height = diagram_height_px - row_gap
+    row_height = (
+        (available_height - (row_gap * max(flat_rows - 1, 0))) / flat_rows if flat_rows else available_height
+    )
+    row_width = diagram_width_px
+
+    current_y = origin_y + row_gap
+    colors = {"car": "#6c8ebf", "foam": "#d4a373", "gap": "#cccccc"}
+    foam_keys = list(foam_color_map.keys())
+    foam_hatch_angles: dict[int, int] = {}
+    if wireframe and len(foam_keys) <= 2:
+        for idx, key in enumerate(foam_keys):
+            foam_hatch_angles[key] = 45 if idx % 2 == 0 else -45
+
+    def draw_hatch(target_image: Image.Image, x0: int, y0: int, width: int, height: int, angle: int) -> None:
+        if width <= 0 or height <= 0:
+            return
+        spacing = max(int(min(width, height) / 4), 6)
+        hatch = Image.new("RGB", (width, height), "white")
+        hatch_draw = ImageDraw.Draw(hatch)
+        if angle == 45:
+            for offset in range(-height, width, spacing):
+                hatch_draw.line((offset, height, offset + height, 0), fill="#000000", width=1)
+        else:
+            for offset in range(-height, width, spacing):
+                hatch_draw.line((offset, 0, offset + height, height), fill="#000000", width=1)
+        target_image.paste(hatch, (x0, y0))
+    for row in pack_result["rows"]:
+        x = origin_x
+        draw.rectangle([x, current_y, x + row_width, current_y + row_height], outline="#444444", width=1)
+        for segment in row["segments"]:
+            seg_width = row_width * (segment["width_percent"] / 100.0)
+            if seg_width <= 0:
+                continue
+            if wireframe:
+                draw.rectangle(
+                    [x, current_y, x + seg_width, current_y + row_height],
+                    outline="#000000",
+                    width=1,
+                )
+                if segment["type"] == "foam":
+                    foam_key = segment.get("foam_key")
+                    angle = foam_hatch_angles.get(foam_key)
+                    if angle:
+                        draw_hatch(
+                            image,
+                            int(x),
+                            int(current_y),
+                            int(seg_width),
+                            int(row_height),
+                            angle,
+                        )
+            else:
+                fill_color = segment.get("color") or colors.get(segment["type"], "#dddddd")
+                draw.rectangle(
+                    [x, current_y, x + seg_width, current_y + row_height],
+                    fill=fill_color,
+                    outline="#444444",
+                    width=1,
+                )
+            label = segment["label"]
+            primary_label = segment.get("primary_label_short") or segment.get("primary_label")
+            secondary_label = segment.get("secondary_label") or segment.get("type_class")
+            if (not secondary_label) and label and " | " in label:
+                parts = label.split(" | ", 1)
+                if parts:
+                    primary_label = primary_label or parts[0]
+                    secondary_label = parts[1] if len(parts) > 1 else secondary_label
+            if segment["type"] == "car" and primary_label:
+                primary_font = font_small_bold
+                secondary_font = font_tiny
+                line_gap = 4
+                primary_box = draw.textbbox((0, 0), primary_label, font=primary_font)
+                primary_w = primary_box[2] - primary_box[0]
+                primary_h = primary_box[3] - primary_box[1]
+                secondary_w = 0
+                secondary_h = 0
+                if secondary_label:
+                    secondary_box = draw.textbbox((0, 0), secondary_label, font=secondary_font)
+                    secondary_w = secondary_box[2] - secondary_box[0]
+                    secondary_h = secondary_box[3] - secondary_box[1]
+                total_w = max(primary_w, secondary_w)
+                total_h = primary_h + (secondary_h + line_gap if secondary_label else 0)
+                text_x = x + max((seg_width - total_w) / 2, 0)
+                text_y = current_y + max((row_height - total_h) / 2, 0)
+                draw.text((text_x, text_y), primary_label, fill="#111111", font=primary_font)
+                if secondary_label:
+                    draw.text(
+                        (text_x, text_y + primary_h + line_gap),
+                        secondary_label,
+                        fill="#111111",
+                        font=secondary_font,
+                    )
+                car_id = segment.get("car_id")
+                if car_id is not None:
+                    barcode_label = f"C{car_id}"
+                    label_font = font_tiny
+                    label_box = draw.textbbox((0, 0), barcode_label, font=label_font)
+                    label_w = label_box[2] - label_box[0]
+                    label_h = label_box[3] - label_box[1]
+                    barcode_height = int(min(row_height * 0.2, dpi * 0.25))
+                    barcode_height = max(barcode_height, int(dpi * 0.15))
+                    barcode_width = int(max(seg_width - 6, 10))
+                    barcode_width = min(barcode_width, int(seg_width))
+                    barcode_total_h = barcode_height + label_h + 2
+                    barcode_top = text_y + total_h + 4
+                    max_barcode_top = current_y + row_height - barcode_total_h - 2
+                    barcode_top = min(barcode_top, max_barcode_top)
+                    barcode_top = max(barcode_top, current_y + 2)
+                    barcode_x = int(x + max((seg_width - barcode_width) / 2, 0))
+                    if barcode_height > 0 and barcode_width > 0:
+                        draw_code128(
+                            draw,
+                            barcode_label,
+                            barcode_x,
+                            int(barcode_top),
+                            barcode_height,
+                            barcode_width,
+                            center=True,
+                        )
+                        label_x = x + max((seg_width - label_w) / 2, 0)
+                        label_y = barcode_top + barcode_height + 2
+                        draw.text((label_x, label_y), barcode_label, fill="#111111", font=label_font)
+            elif label:
+                bbox = draw.textbbox((0, 0), label, font=font)
+                text_w = bbox[2] - bbox[0]
+                text_h = bbox[3] - bbox[1]
+                if text_w <= seg_width and text_h <= row_height:
+                    text_x = x + max((seg_width - text_w) / 2, 0)
+                    text_y = current_y + max((row_height - text_h) / 2, 0)
+                    draw.text((text_x, text_y), label, fill="#111111", font=font)
+            x += seg_width
+        current_y += row_height + row_gap
+
+    output = io.BytesIO()
+    pdf_image = image.convert("RGBA")
+    pdf_image.save(
+        output,
+        format="PDF",
+        resolution=dpi,
+        quality=100,
+        subsampling=0,
+    )
+    output.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f"flat-pack-{location.id}-{timestamp}.pdf"
+    return Response(
+        output.getvalue(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
 @main_bp.route("/locations/<int:location_id>")
 def location_detail(location_id: int):
     location = Location.query.get_or_404(location_id)
@@ -1867,17 +3345,114 @@ def location_edit(location_id: int):
             location.parent = Location.query.get(parent_id_value)
         else:
             location.parent = None
+        external_length_value = request.form.get("external_length_value", "").strip()
+        external_length_unit = request.form.get("external_length_unit", "").strip().lower()
+        if external_length_value and external_length_unit:
+            location.external_length = f"{external_length_value} {external_length_unit}"
+        else:
+            location.external_length = external_length_value or None
+        external_width_value = request.form.get("external_width_value", "").strip()
+        external_width_unit = request.form.get("external_width_unit", "").strip().lower()
+        if external_width_value and external_width_unit:
+            location.external_width = f"{external_width_value} {external_width_unit}"
+        else:
+            location.external_width = external_width_value or None
+        external_height_value = request.form.get("external_height_value", "").strip()
+        external_height_unit = request.form.get("external_height_unit", "").strip().lower()
+        if external_height_value and external_height_unit:
+            location.external_height = f"{external_height_value} {external_height_unit}"
+        else:
+            location.external_height = external_height_value or None
+        external_weight_value = request.form.get("external_weight_value", "").strip()
+        external_weight_unit = request.form.get("external_weight_unit", "").strip().lower()
+        if external_weight_value and external_weight_unit:
+            location.external_weight = f"{external_weight_value} {external_weight_unit}"
+        else:
+            location.external_weight = external_weight_value or None
+        flat_length_value = request.form.get("flat_length_value", "").strip()
+        flat_length_unit = request.form.get("flat_length_unit", "").strip().lower()
+        if flat_length_value and flat_length_unit:
+            location.flat_length = f"{flat_length_value} {flat_length_unit}"
+        else:
+            location.flat_length = flat_length_value or None
+        flat_rows = request.form.get("flat_rows", "").strip()
+        location.flat_rows = int(flat_rows) if flat_rows.isdigit() else None
+        flat_height_value = request.form.get("flat_height_value", "").strip()
+        flat_height_unit = request.form.get("flat_height_unit", "").strip().lower()
+        if flat_height_value and flat_height_unit:
+            location.flat_height = f"{flat_height_value} {flat_height_unit}"
+        else:
+            location.flat_height = flat_height_value or None
+        flat_row_width_value = request.form.get("flat_row_width_value", "").strip()
+        flat_row_width_unit = request.form.get("flat_row_width_unit", "").strip().lower()
+        if flat_row_width_value and flat_row_width_unit:
+            location.flat_row_width = f"{flat_row_width_value} {flat_row_width_unit}"
+        else:
+            location.flat_row_width = flat_row_width_value or None
+        flat_weight_value = request.form.get("flat_weight_value", "").strip()
+        flat_weight_unit = request.form.get("flat_weight_unit", "").strip().lower()
+        if flat_weight_value and flat_weight_unit:
+            location.flat_weight = f"{flat_weight_value} {flat_weight_unit}"
+        else:
+            location.flat_weight = flat_weight_value or None
+        location.flat_scale = request.form.get("flat_scale", "").strip() or None
+        location.flat_gauge = request.form.get("flat_gauge", "").strip() or None
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.location_detail", location_id=location.id))
     locations = Location.query.order_by("name").all()
     location_types = current_app.config.get("LOCATION_TYPES", [])
+    external_length_value, external_length_unit = parse_actual_length(location.external_length)
+    if external_length_value and not external_length_unit:
+        external_length_unit = get_default_length_unit()
+    external_width_value, external_width_unit = parse_actual_length(location.external_width)
+    if external_width_value and not external_width_unit:
+        external_width_unit = get_default_length_unit()
+    external_height_value, external_height_unit = parse_actual_length(location.external_height)
+    if external_height_value and not external_height_unit:
+        external_height_unit = get_default_length_unit()
+    external_weight_value, external_weight_unit = parse_actual_weight(location.external_weight)
+    if external_weight_value and not external_weight_unit:
+        external_weight_unit = get_default_weight_unit()
+    flat_length_value, flat_length_unit = parse_actual_length(location.flat_length)
+    if flat_length_value and not flat_length_unit:
+        flat_length_unit = get_default_length_unit()
+    flat_height_value, flat_height_unit = parse_actual_length(location.flat_height)
+    if flat_height_value and not flat_height_unit:
+        flat_height_unit = get_default_length_unit()
+    flat_row_width_value, flat_row_width_unit = parse_actual_length(location.flat_row_width)
+    if flat_row_width_value and not flat_row_width_unit:
+        flat_row_width_unit = get_default_length_unit()
+    flat_weight_value, flat_weight_unit = parse_actual_weight(location.flat_weight)
+    if flat_weight_value and not flat_weight_unit:
+        flat_weight_unit = get_default_weight_unit()
     return render_template(
         "location_form.html",
         location=location,
         locations=locations,
         descendant_ids=descendant_ids,
         location_types=location_types,
+        external_length_value=external_length_value,
+        external_length_unit=external_length_unit or get_default_length_unit(),
+        external_width_value=external_width_value,
+        external_width_unit=external_width_unit or get_default_length_unit(),
+        external_height_value=external_height_value,
+        external_height_unit=external_height_unit or get_default_length_unit(),
+        external_weight_value=external_weight_value,
+        external_weight_unit=external_weight_unit or get_default_weight_unit(),
+        flat_length_value=flat_length_value,
+        flat_length_unit=flat_length_unit or get_default_length_unit(),
+        flat_rows_value=str(location.flat_rows) if location.flat_rows is not None else "",
+        flat_height_value=flat_height_value,
+        flat_height_unit=flat_height_unit or get_default_length_unit(),
+        flat_row_width_value=flat_row_width_value,
+        flat_row_width_unit=flat_row_width_unit or get_default_length_unit(),
+        flat_weight_value=flat_weight_value,
+        flat_weight_unit=flat_weight_unit or get_default_weight_unit(),
+        flat_scale_value=location.flat_scale or "",
+        flat_gauge_value=location.flat_gauge or "",
+        scale_options=get_scale_options(),
+        gauge_options=get_gauge_options(),
     )
 
 
@@ -1965,9 +3540,18 @@ def car_by_number():
     number = request.args.get("number", "").strip()
     if not number:
         return redirect(url_for("main.inventory"))
+    normalized = number.strip()
+    if normalized.lower().startswith("c") and normalized[1:].isdigit():
+        car = Car.query.get(int(normalized[1:]))
+        if car:
+            return redirect(url_for("main.car_detail", car_id=car.id))
     cars = Car.query.filter_by(car_number=number).order_by("id", reverse=True).all()
     if len(cars) == 1:
         return redirect(url_for("main.car_detail", car_id=cars[0].id))
+    if not cars and number.isdigit():
+        car = Car.query.get(int(number))
+        if car:
+            return redirect(url_for("main.car_detail", car_id=car.id))
     return render_template("car_number_list.html", number=number, cars=cars)
 
 
@@ -2111,6 +3695,10 @@ def car_new():
 @main_bp.route("/search")
 def search():
     query = request.args.get("q", "").strip()
+    if query.lower().startswith("c") and query[1:].isdigit():
+        car = Car.query.get(int(query[1:]))
+        if car:
+            return redirect(url_for("main.car_detail", car_id=car.id))
     cars = search_cars(query)
     return render_template("search.html", cars=cars, query=query)
 
@@ -2213,6 +3801,8 @@ def search_cars(query: str) -> list[Car]:
             car.actual_length,
             car.scale,
             car.gauge,
+            str(car.id),
+            f"c{car.id}",
         ]
         if car.car_class:
             values.extend([car.car_class.code, car.car_class.car_type])
@@ -2481,6 +4071,8 @@ def settings():
     page_size = get_page_size()
     scale_options_text = get_scale_options_text()
     gauge_options_text = get_gauge_options_text()
+    foam_blocks = get_foam_blocks()
+    foam_blocks_text = get_foam_blocks_text()
     default_length_unit = get_default_length_unit()
     default_weight_unit = get_default_weight_unit()
     options = [
@@ -2493,6 +4085,8 @@ def settings():
         page_size_options=options,
         scale_options_text=scale_options_text,
         gauge_options_text=gauge_options_text,
+        foam_blocks=foam_blocks,
+        foam_blocks_text=foam_blocks_text,
         default_length_unit=default_length_unit,
         default_weight_unit=default_weight_unit,
         length_units=LENGTH_UNITS,
@@ -2541,6 +4135,38 @@ def settings_units():
     settings = get_app_settings()
     settings.default_length_unit = length_unit
     settings.default_weight_unit = weight_unit
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/settings/foam-blocks", methods=["POST"])
+def settings_foam_blocks():
+    raw = request.form.get("foam_blocks", "").strip()
+    try:
+        parsed = json.loads(raw) if raw else []
+    except json.JSONDecodeError:
+        return "Invalid foam block data.", 400
+    if not isinstance(parsed, list):
+        return "Invalid foam block data.", 400
+    cleaned: list[dict[str, str]] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        length = str(item.get("length", "")).strip()
+        if not length:
+            continue
+        cleaned.append(
+            {
+                "length": length,
+                "width": str(item.get("width", "")).strip(),
+                "height": str(item.get("height", "")).strip(),
+                "weight": str(item.get("weight", "")).strip(),
+                "compression": str(item.get("compression", "")).strip(),
+            }
+        )
+    settings = get_app_settings()
+    settings.foam_blocks = json.dumps(cleaned)
     db.session.commit()
     ensure_db_backup()
     return redirect(url_for("main.settings"))

@@ -41,6 +41,17 @@ This document describes the current database schema and common alternate names u
 - `name` (string)
 - `location_type` (string) values: `bag`, `carrier`, `flat`, `staging_track`, `yard_track`
 - `parent_id` (integer, self-reference, optional)
+- `external_length` (string, optional)
+- `external_width` (string, optional)
+- `external_height` (string, optional)
+- `external_weight` (string, optional)
+- `flat_scale` (string, optional)
+- `flat_gauge` (string, optional)
+- `flat_length` (string, optional)
+- `flat_height` (string, optional)
+- `flat_row_width` (string, optional)
+- `flat_weight` (string, optional)
+- `flat_rows` (integer, optional)
 
 ## Cars (`cars`)
 - `id` (integer, primary key)
@@ -128,6 +139,7 @@ This document describes the current database schema and common alternate names u
 - `gauge_options` (text, optional)
 - `default_length_unit` (string, optional)
 - `default_weight_unit` (string, optional)
+- `foam_blocks` (text, optional)
 
 ## Railroad Color Schemes (`railroad_color_schemes`)
 - `id` (integer, primary key)
