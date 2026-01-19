@@ -267,6 +267,7 @@
       <a href="{{ url_for('main.car_classes') }}" class="{% if request.path == '/car-classes' %}active{% endif %}">Car Classes</a>
       <a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>
       <a href="{{ url_for('main.loads') }}" class="{% if request.path == '/loads' %}active{% endif %}">Loads</a>
+      <a href="{{ url_for('main.consists') }}" class="{% if request.path.startswith('/consists') %}active{% endif %}">Consists</a>
       <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Tools</a>
       <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
       <a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>

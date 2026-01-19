@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Consist Wizard</h1>
+    <p class="subtitle is-6">Provide an era, power type, and primary railroad to build a consist.</p>
+    <div class="notification is-warning">
+      <div class="content">
+        <p class="has-text-weight-semibold">Limitations</p>
+        <ul>
+          <li>Does not understand special-use cars or MOW equipment.</li>
+          <li>Does not identify cabooses or determine whether a caboose is required.</li>
+          <li>Does not account for EOT devices or end-of-train requirements.</li>
+          <li>Does not validate MU compatibility beyond power type.</li>
+          <li>Uses simple era matching that depends on accurate class data.</li>
+          <li>Ignores length/weight balance, tonnage, grades, and route constraints.</li>
+          <li>Does not enforce car order/placement rules (hazmat, interchange, blocking).</li>
+          <li>Does not consider loads/empties, availability, or maintenance status.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% if form_errors %}
+    <div class="notification is-warning">
+      <ul>
+        {% for error in form_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  <div class="box">
+    <form method="post" action="{{ url_for('main.consist_wizard') }}">
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="wizard_name">Consist Name</label>
+          <div class="control">
+            <input class="input" id="wizard_name" name="name" value="{{ wizard_form.name }}" placeholder="Optional" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="wizard_era">Era</label>
+          <div class="control">
+            <input class="input" id="wizard_era" name="era" value="{{ wizard_form.era }}" placeholder="e.g., 1970s" required />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="wizard_power_type">Power Type</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="wizard_power_type" name="power_type" required>
+                <option value="">-</option>
+                {% for power_type in power_type_options %}
+                  <option value="{{ power_type }}" {% if wizard_form.power_type == power_type %}selected{% endif %}>{{ power_type }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="wizard_primary_railroad_id">Primary Railroad</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="wizard_primary_railroad_id" name="primary_railroad_id" required>
+                <option value="">-</option>
+                {% for railroad in railroads %}
+                  <option value="{{ railroad.id }}" {% if wizard_form.primary_railroad_id == railroad.id|string %}selected{% endif %}>
+                    {{ railroad.reporting_mark or railroad.name or ("Railroad " ~ railroad.id) }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="help">The wizard selects up to 2 locomotives and 10 cars from the primary railroad.</p>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-link">Run Wizard</button>
+        <a class="button is-small is-light" href="{{ url_for('main.consists') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

@@ -86,6 +86,20 @@
               <input class="input" id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
             </div>
           </div>
+          <div class="field">
+            <label class="label" for="power_type">Power Type</label>
+            <div class="control">
+              <div class="select is-fullwidth">
+                {% set power_type_value = car.power_type_override if car and car.power_type_override else (car.car_class.power_type if car and car.car_class else prefill.get('power_type', '')) %}
+                <select id="power_type" name="power_type">
+                  <option value="" {% if not power_type_value %}selected{% endif %}>-</option>
+                  {% for power_type in power_type_options %}
+                    <option value="{{ power_type }}" {% if power_type_value == power_type %}selected{% endif %}>{{ power_type }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
         <h3 class="title is-5">Car Measurements</h3>
         <div class="grid">
@@ -515,6 +529,7 @@
       internalWidth: document.getElementById('internal_width'),
       internalHeight: document.getElementById('internal_height'),
       carType: document.getElementById('car_type'),
+      powerType: document.getElementById('power_type'),
       locomotive: document.getElementById('is_locomotive'),
     };
 
@@ -536,6 +551,12 @@
       input.value = '';
       input.dataset.isDefault = 'false';
       input.style.color = '';
+    };
+
+    const setSelectDefault = (select, value) => {
+      if (!select || !value) return;
+      if (select.value) return;
+      setSelectValue(select, value);
     };
 
     const wheelField = document.getElementById('class_wheel_arrangement')?.closest('div');
@@ -561,6 +582,9 @@
       setGrayDefault(classFields.internalHeight, carClass.internal_height);
       if (classFields.carType) {
         setGrayDefault(classFields.carType, carClass.car_type);
+      }
+      if (classFields.powerType) {
+        setSelectDefault(classFields.powerType, carClass.power_type);
       }
       if (classFields.locomotive && carClass.is_locomotive !== null && carClass.is_locomotive !== undefined) {
         classFields.locomotive.checked = !!carClass.is_locomotive;

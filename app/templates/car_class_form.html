@@ -29,6 +29,19 @@
           <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car_class.is_locomotive %}checked{% endif %} />
         </div>
         <div>
+          <label class="label" for="power_type">Power Type</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="power_type" name="power_type">
+                <option value="" {% if not car_class.power_type %}selected{% endif %}>-</option>
+                {% for power_type in power_type_options %}
+                  <option value="{{ power_type }}" {% if car_class.power_type == power_type %}selected{% endif %}>{{ power_type }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div>
           <label class="label" for="capacity">Capacity</label>
           <input class="input" id="capacity" name="capacity" value="{{ car_class.capacity or '' }}" />
         </div>

@@ -14,11 +14,13 @@
     {% if car.car_class %}
       {% set copy_car_class = car.car_class.code or '' %}
       {% set copy_car_type = car.car_class.car_type or '' %}
+      {% set copy_power_type = car.car_class.power_type or '' %}
       {% set copy_capacity = car.car_class.capacity or '' %}
       {% set copy_weight = car.car_class.weight or '' %}
       {% set copy_load_limit = car.car_class.load_limit or '' %}
       {% set copy_aar_plate = car.car_class.aar_plate or '' %}
       {% set copy_override_car_type = car.car_type_override or '' %}
+      {% set copy_override_power_type = car.power_type_override or '' %}
       {% set copy_override_capacity = car.capacity_override or '' %}
       {% set copy_override_weight = car.weight_override or '' %}
       {% set copy_override_load_limit = car.load_limit_override or '' %}
@@ -26,11 +28,13 @@
     {% else %}
       {% set copy_car_class = '' %}
       {% set copy_car_type = car.car_type_override or '' %}
+      {% set copy_power_type = car.power_type_override or '' %}
       {% set copy_capacity = car.capacity_override or '' %}
       {% set copy_weight = car.weight_override or '' %}
       {% set copy_load_limit = car.load_limit_override or '' %}
       {% set copy_aar_plate = car.aar_plate_override or '' %}
       {% set copy_override_car_type = copy_car_type %}
+      {% set copy_override_power_type = copy_power_type %}
       {% set copy_override_capacity = copy_capacity %}
       {% set copy_override_weight = copy_weight %}
       {% set copy_override_load_limit = copy_load_limit %}
@@ -56,6 +60,7 @@
       <div>
         <h3 class="title is-5">Identity</h3>
         <p><strong>Type:</strong> {{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</p>
+        <p><strong>Power Type:</strong> {{ car.power_type_override or (car.car_class.power_type if car.car_class else "-") }}</p>
         <p><strong>Class:</strong>
           {% if car.car_class %}
             <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
@@ -278,7 +283,7 @@
           <strong>Copy to New Car</strong> copies the railroad, class, and core lettering details.
           Use this when you want a quick new entry that matches the class defaults.
           <div class="actions buttons" style="margin-top: 12px;">
-            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate, actual_weight=copy_actual_weight, actual_length=copy_actual_length, scale=copy_scale, gauge=copy_gauge) }}">Copy to New Car</a>
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_car_type, power_type=copy_power_type, capacity=copy_capacity, weight=copy_weight, load_limit=copy_load_limit, aar_plate=copy_aar_plate, actual_weight=copy_actual_weight, actual_length=copy_actual_length, scale=copy_scale, gauge=copy_gauge) }}">Copy to New Car</a>
           </div>
         </div>
       </article>
@@ -287,7 +292,7 @@
           <strong>Copy to New Car (Overrides)</strong> keeps any overrides you set for this car
           (type, capacity, weight, load limit, AAR plate) instead of class defaults.
           <div class="actions buttons" style="margin-top: 12px;">
-            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, actual_weight=copy_actual_weight, actual_length=copy_actual_length, scale=copy_scale, gauge=copy_gauge) }}">Copy to New Car (Overrides)</a>
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, power_type=copy_override_power_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, actual_weight=copy_actual_weight, actual_length=copy_actual_length, scale=copy_scale, gauge=copy_gauge) }}">Copy to New Car (Overrides)</a>
           </div>
         </div>
       </article>
@@ -296,7 +301,7 @@
           <strong>Copy to New Car (Clone)</strong> brings over everything, including built date,
           brand, price, and MSRP for a near-duplicate entry.
           <div class="actions buttons" style="margin-top: 12px;">
-            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, actual_weight=copy_actual_weight, actual_length=copy_actual_length, scale=copy_scale, gauge=copy_gauge, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
+            <a class="button is-small is-success" href="{{ url_for('main.car_new', reporting_mark=copy_reporting_mark, railroad_name=copy_railroad_name, car_class=copy_car_class, car_type=copy_override_car_type, power_type=copy_override_power_type, capacity=copy_override_capacity, weight=copy_override_weight, load_limit=copy_override_load_limit, aar_plate=copy_override_aar_plate, actual_weight=copy_actual_weight, actual_length=copy_actual_length, scale=copy_scale, gauge=copy_gauge, built=copy_built, brand=copy_brand, price=copy_price, msrp=copy_msrp) }}">Copy to New Car (Clone)</a>
           </div>
         </div>
       </article>

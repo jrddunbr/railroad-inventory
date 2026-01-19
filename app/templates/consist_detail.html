@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">{{ consist.name or ("Consist " ~ consist.id) }}</h1>
+    <div class="grid">
+      <div class="field">
+        <label class="label">Primary Railroad</label>
+        <div class="control">
+          {% if consist.primary_railroad %}
+            <p>{{ consist.primary_railroad.reporting_mark or consist.primary_railroad.name }}</p>
+          {% else %}
+            <p>-</p>
+          {% endif %}
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Era</label>
+        <div class="control">
+          <p>{{ consist.era or "-" }}</p>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label">Power Type</label>
+        <div class="control">
+          <p>{{ consist.power_type or "-" }}</p>
+        </div>
+      </div>
+    </div>
+    {% if consist.notes %}
+      <div class="field">
+        <label class="label">Notes</label>
+        <div class="control">
+          <p>{{ consist.notes }}</p>
+        </div>
+      </div>
+    {% endif %}
+    <div class="actions buttons">
+      <a class="button is-small is-info" href="{{ url_for('main.consist_edit', consist_id=consist.id) }}">Edit</a>
+      <a class="button is-small is-light" href="{{ url_for('main.consists') }}">Back to Consists</a>
+      <form method="post" action="{{ url_for('main.consist_delete', consist_id=consist.id) }}">
+        <button type="submit" class="button is-small is-danger" onclick="return confirm('Delete this consist?');">Delete</button>
+      </form>
+    </div>
+  </div>
+  <div class="box">
+    <h2 class="title is-4">Cars</h2>
+    {% if cars %}
+      <table class="table is-fullwidth is-striped">
+        <thead>
+          <tr>
+            <th>Car</th>
+            <th>Class</th>
+            <th>Railroad</th>
+            <th>Location</th>
+            <th>Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for car in cars %}
+            {% set reporting_mark = car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "") %}
+            {% set car_label = (reporting_mark ~ " " ~ (car.car_number or "")).strip() %}
+            {% set car_label = car_label if car_label else ("Car " ~ car.id) %}
+            {% set railroad_label = "-" %}
+            {% if car.railroad %}
+              {% set railroad_label = car.railroad.reporting_mark or car.railroad.name or ("Railroad " ~ car.railroad.id) %}
+            {% endif %}
+            <tr>
+              <td>{{ car_label }}</td>
+              <td>{{ car.car_class.code if car.car_class else "-" }}</td>
+              <td>{{ railroad_label }}</td>
+              <td>{{ car.location.name if car.location else "-" }}</td>
+              <td><a class="button is-small is-light" href="{{ url_for('main.car_detail', car_id=car.id) }}">View</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No cars saved on this consist.</p>
+    {% endif %}
+  </div>
+{% endblock %}

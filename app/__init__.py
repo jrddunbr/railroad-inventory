@@ -7,7 +7,7 @@ from flask import Flask, g
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.8.0"
+SCHEMA_VERSION = "2.9.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
@@ -32,6 +32,7 @@ def create_app() -> Flask:
             "car_classes",
             "locations",
             "cars",
+            "consists",
             "loads",
             "load_placements",
             "car_inspections",
@@ -46,6 +47,7 @@ def create_app() -> Flask:
             {"doc_type": "car_class", "counter_key": "car_classes"},
             {"doc_type": "location", "counter_key": "locations"},
             {"doc_type": "car", "counter_key": "cars"},
+            {"doc_type": "consist", "counter_key": "consists"},
             {"doc_type": "load", "counter_key": "loads"},
             {"doc_type": "load_placement", "counter_key": "load_placements"},
             {"doc_type": "car_inspection", "counter_key": "car_inspections"},

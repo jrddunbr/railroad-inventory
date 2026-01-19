@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Consists</h1>
+    <div class="actions buttons">
+      <a class="button is-small is-primary" href="{{ url_for('main.consist_new') }}">Create Manual Consist</a>
+      <a class="button is-small is-link" href="{{ url_for('main.consist_wizard') }}">Consist Wizard</a>
+    </div>
+    <p class="keyboard-hint">Results: {{ pagination.total }}</p>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Primary Railroad</th>
+          <th>Era</th>
+          <th>Power Type</th>
+          <th>Cars</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for consist in consists %}
+          {% set railroad = consist.primary_railroad %}
+          {% set railroad_label = "-" %}
+          {% if railroad %}
+            {% set railroad_label = railroad.reporting_mark or railroad.name or ("Railroad " ~ railroad.id) %}
+          {% endif %}
+          <tr>
+            <td><a href="{{ url_for('main.consist_detail', consist_id=consist.id) }}">{{ consist.name or ("Consist " ~ consist.id) }}</a></td>
+            <td>{{ railroad_label }}</td>
+            <td>{{ consist.era or "-" }}</td>
+            <td>{{ consist.power_type or "-" }}</td>
+            <td>{{ (consist.car_ids or [])|length }}</td>
+            <td class="has-text-right">
+              <form method="post" action="{{ url_for('main.consist_delete', consist_id=consist.id) }}">
+                <button type="submit" class="button is-small is-danger" onclick="return confirm('Delete this consist?');">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="6">No consists yet. Create one to get started.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if pagination %}
+      <div class="pagination">
+        <div class="pagination-info">
+          {% if pagination.total %}
+            Showing {{ pagination.start }}-{{ pagination.end }} of {{ pagination.total }}
+          {% else %}
+            No results.
+          {% endif %}
+        </div>
+        {% if pagination.pages > 1 %}
+          <div class="pagination-controls">
+            {% if pagination.prev_url %}
+              <a class="button is-small is-light" href="{{ pagination.prev_url }}">Prev</a>
+            {% else %}
+              <span class="button is-small is-static">Prev</span>
+            {% endif %}
+            <span class="pagination-label">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+            {% if pagination.next_url %}
+              <a class="button is-small is-light" href="{{ pagination.next_url }}">Next</a>
+            {% else %}
+              <span class="button is-small is-static">Next</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

@@ -70,6 +70,7 @@ class CarClass(BaseModel):
     wheel_arrangement: str | None = None
     tender_axles: str | None = None
     is_locomotive: bool | None = None
+    power_type: str | None = None
     era: str | None = None
     load_limit: str | None = None
     aar_plate: str | None = None
@@ -167,6 +168,7 @@ class Car(BaseModel):
     wheel_arrangement_override: str | None = None
     tender_axles_override: str | None = None
     is_locomotive_override: bool | None = None
+    power_type_override: str | None = None
     capacity_override: str | None = None
     weight_override: str | None = None
     load_limit_override: str | None = None
@@ -255,6 +257,37 @@ class Car(BaseModel):
             self.car_class_id = self._car_class_ref.id
         if self._location_ref and not self.location_id and self._location_ref.id:
             self.location_id = self._location_ref.id
+
+
+@dataclass
+class Consist(BaseModel):
+    doc_type = "consist"
+    counter_key = "consists"
+    query = QueryDescriptor()
+
+    name: str | None = None
+    era: str | None = None
+    power_type: str | None = None
+    primary_railroad_id: int | None = None
+    car_ids: list[int] = field(default_factory=list)
+    notes: str | None = None
+
+    @property
+    def primary_railroad(self) -> Railroad | None:
+        if not self._store or not self.primary_railroad_id:
+            return None
+        return self._store.get(Railroad, self.primary_railroad_id)
+
+    @property
+    def cars(self) -> list[Car]:
+        if not self._store:
+            return []
+        cars: list[Car] = []
+        for car_id in self.car_ids or []:
+            car = self._store.get(Car, car_id)
+            if car:
+                cars.append(car)
+        return cars
 
 
 @dataclass
@@ -451,6 +484,7 @@ __all__ = [
     "Car",
     "CarInspection",
     "CarClass",
+    "Consist",
     "InspectionType",
     "LoadPlacement",
     "LoadType",

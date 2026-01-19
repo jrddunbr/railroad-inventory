@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">{{ form_title }}</h1>
+    <p class="subtitle is-6">Manage consist details and cars.</p>
+  </div>
+  {% if form_errors %}
+    <div class="notification is-warning">
+      <ul>
+        {% for error in form_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+  <div class="box">
+    <form method="post" action="{{ form_action }}">
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="consist_name">Consist Name</label>
+          <div class="control">
+            <input class="input" id="consist_name" name="name" value="{{ form_data.name }}" placeholder="Optional" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="consist_era">Era</label>
+          <div class="control">
+            <input class="input" id="consist_era" name="era" value="{{ form_data.era }}" placeholder="e.g., 1950s" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="consist_power_type">Power Type</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="consist_power_type" name="power_type">
+                <option value="">-</option>
+                {% for power_type in power_type_options %}
+                  <option value="{{ power_type }}" {% if form_data.power_type == power_type %}selected{% endif %}>{{ power_type }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="consist_primary_railroad_id">Primary Railroad</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="consist_primary_railroad_id" name="primary_railroad_id">
+                <option value="">-</option>
+                {% for railroad in railroads %}
+                  <option value="{{ railroad.id }}" {% if form_data.primary_railroad_id == railroad.id|string %}selected{% endif %}>
+                    {{ railroad.reporting_mark or railroad.name or ("Railroad " ~ railroad.id) }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label class="label" for="consist_car_ids">Cars</label>
+          <div class="control">
+            <div class="select is-multiple is-fullwidth">
+              <select id="consist_car_ids" name="car_ids" multiple size="12">
+                {% for car in cars %}
+                  {% set reporting_mark = car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "") %}
+                  {% set car_label = (reporting_mark ~ " " ~ (car.car_number or "")).strip() %}
+                  {% set car_label = car_label if car_label else ("Car " ~ car.id) %}
+                  <option value="{{ car.id }}" {% if car.id in selected_ids %}selected{% endif %}>
+                    {{ car_label }}{% if car.car_class %} ({{ car.car_class.code }}){% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <p class="help">Hold Ctrl (Windows) or Command (Mac) to select multiple cars.</p>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label class="label" for="consist_notes">Notes</label>
+          <div class="control">
+            <textarea class="textarea" id="consist_notes" name="notes" rows="3" placeholder="Optional">{{ form_data.notes }}</textarea>
+          </div>
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">{{ submit_label }}</button>
+        <a class="button is-small is-light" href="{{ cancel_url }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

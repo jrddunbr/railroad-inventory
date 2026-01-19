@@ -7,6 +7,7 @@
       <thead>
         <tr>
           <th>Code</th>
+          <th>Power Type</th>
           <th>Era</th>
           <th>Wheel Arrangement</th>
           <th>Tender Axles</th>
@@ -17,6 +18,7 @@
         {% for car_class in locomotive_classes %}
         <tr>
           <td><a href="{{ url_for('main.car_class_detail', class_id=car_class.id) }}">{{ car_class.code }}</a></td>
+          <td>{{ car_class.power_type or "-" }}</td>
           <td>{{ car_class.era or "-" }}</td>
           <td>{{ car_class.wheel_arrangement or "-" }}</td>
           <td>{{ car_class.tender_axles or "-" }}</td>
@@ -24,7 +26,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="5">No locomotive classes yet. Add a locomotive to create one automatically.</td>
+          <td colspan="6">No locomotive classes yet. Add a locomotive to create one automatically.</td>
         </tr>
         {% endfor %}
       </tbody>

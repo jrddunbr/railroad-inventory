@@ -20,6 +20,7 @@ from app.models import (
     Car,
     CarInspection,
     CarClass,
+    Consist,
     InspectionType,
     Location,
     LoadPlacement,
@@ -1681,6 +1682,353 @@ def aar_plate_viewer():
     return render_template("aar_plate_viewer.html")
 
 
+CONSIST_POWER_TYPES = ["steam", "diesel", "electric", "gas turbine", "unpowered", "other"]
+DEFAULT_CONSIST_LOCO_COUNT = 2
+DEFAULT_CONSIST_CAR_COUNT = 10
+
+
+def normalize_car_ids(values: list[str]) -> list[int]:
+    seen: set[int] = set()
+    car_ids: list[int] = []
+    for value in values:
+        value = value.strip()
+        if not value or not value.isdigit():
+            continue
+        car_id = int(value)
+        if car_id in seen:
+            continue
+        seen.add(car_id)
+        car_ids.append(car_id)
+    return car_ids
+
+
+def is_locomotive(car: Car) -> bool:
+    if car.is_locomotive_override is not None:
+        return bool(car.is_locomotive_override)
+    if car.car_class and car.car_class.is_locomotive is not None:
+        return bool(car.car_class.is_locomotive)
+    return False
+
+
+def matches_power_type(car: Car, power_type: str) -> bool:
+    if not power_type:
+        return True
+    target = power_type.lower()
+    candidates = []
+    if car.power_type_override:
+        candidates.append(car.power_type_override)
+    if car.car_class and car.car_class.power_type:
+        candidates.append(car.car_class.power_type)
+    return any(target == candidate.lower() for candidate in candidates)
+
+
+def matches_era(car: Car, era: str) -> bool:
+    if not era:
+        return True
+    if not car.car_class or not car.car_class.era:
+        return False
+    target_range = parse_era_range(era)
+    class_range = parse_era_range(car.car_class.era)
+    if target_range and class_range:
+        target_start, target_end = target_range
+        class_start, class_end = class_range
+        if class_end is None:
+            class_end = target_end
+        if target_end is None:
+            target_end = class_end
+        return not (
+            class_start is None
+            or target_start is None
+            or (class_end is not None and target_start > class_end)
+            or (target_end is not None and class_start > target_end)
+        )
+    return era.lower() in car.car_class.era.lower()
+
+
+def parse_era_range(value: str) -> tuple[int | None, int | None] | None:
+    if not value:
+        return None
+    text = value.lower()
+    years = [int(year) for year in re.findall(r"\b(\d{4})\b", text)]
+    if years:
+        if "present" in text or "current" in text or "today" in text:
+            return years[0], None
+        if len(years) >= 2:
+            start, end = years[0], years[1]
+            if end < start:
+                start, end = end, start
+            return start, end
+        return years[0], years[0]
+    decade_match = re.search(r"\b(\d{3})0s\b", text)
+    if decade_match:
+        start = int(decade_match.group(1) + "0")
+        return start, start + 9
+    return None
+
+
+def pick_cars(candidates: list[Car], count: int, selected_ids: set[int]) -> list[Car]:
+    picks: list[Car] = []
+    for car in candidates:
+        if car.id is None or car.id in selected_ids:
+            continue
+        selected_ids.add(car.id)
+        picks.append(car)
+        if len(picks) >= count:
+            break
+    return picks
+
+
+def build_wizard_consist(era: str, power_type: str, primary_railroad_id: int) -> list[Car]:
+    all_cars = Car.query.order_by("id").all()
+    primary_cars = [car for car in all_cars if car.railroad_id == primary_railroad_id]
+    if not primary_cars:
+        return []
+    selected_ids: set[int] = set()
+
+    locomotives = [car for car in primary_cars if is_locomotive(car)]
+    filtered_locos = [car for car in locomotives if matches_power_type(car, power_type) and matches_era(car, era)]
+    if not filtered_locos:
+        return []
+    chosen_locos = pick_cars(filtered_locos, DEFAULT_CONSIST_LOCO_COUNT, selected_ids)
+    if len(chosen_locos) < DEFAULT_CONSIST_LOCO_COUNT:
+        chosen_locos += pick_cars(locomotives, DEFAULT_CONSIST_LOCO_COUNT - len(chosen_locos), selected_ids)
+
+    rolling_stock = [car for car in all_cars if not is_locomotive(car)]
+    same_era_cars = [car for car in rolling_stock if matches_era(car, era)]
+    primary_era_cars = [car for car in same_era_cars if car.railroad_id == primary_railroad_id]
+    other_era_cars = [car for car in same_era_cars if car.railroad_id != primary_railroad_id]
+    other_target = max(0, int(round(DEFAULT_CONSIST_CAR_COUNT * 0.2)))
+    primary_target = max(0, DEFAULT_CONSIST_CAR_COUNT - other_target)
+    chosen_cars: list[Car] = []
+    chosen_cars += pick_cars(primary_era_cars, primary_target, selected_ids)
+    chosen_cars += pick_cars(other_era_cars, other_target, selected_ids)
+    if len(chosen_cars) < DEFAULT_CONSIST_CAR_COUNT:
+        chosen_cars += pick_cars(primary_era_cars, DEFAULT_CONSIST_CAR_COUNT - len(chosen_cars), selected_ids)
+    if len(chosen_cars) < DEFAULT_CONSIST_CAR_COUNT:
+        chosen_cars += pick_cars(same_era_cars, DEFAULT_CONSIST_CAR_COUNT - len(chosen_cars), selected_ids)
+
+    return chosen_locos + chosen_cars
+
+
+def build_consist_name(railroad: Railroad | None, power_type: str, era: str) -> str:
+    segments: list[str] = []
+    if railroad:
+        segments.append(railroad.name or railroad.reporting_mark or "Unknown Railroad")
+    if power_type:
+        segments.append(power_type.title())
+    segments.append("Consist")
+    if era:
+        segments.append(f"({era})")
+    return " ".join(segments)
+
+
+@main_bp.route("/tools/consist-creation")
+def consist_creation():
+    return redirect(url_for("main.consists"))
+
+
+@main_bp.route("/consists")
+def consists():
+    consists = Consist.query.order_by("name").all()
+    page_size = get_page_size()
+    page = get_page_number()
+    paged_consists, pagination = paginate_list(consists, page, page_size, "main.consists", {})
+    return render_template("consists.html", consists=paged_consists, pagination=pagination)
+
+
+@main_bp.route("/consists/new", methods=["GET", "POST"])
+def consist_new():
+    railroads = Railroad.query.order_by("reporting_mark").all()
+    cars = Car.query.order_by("id").all()
+    form_errors: list[str] = []
+    form_data = {"name": "", "era": "", "power_type": "", "primary_railroad_id": "", "notes": ""}
+    selected_ids: list[int] = []
+
+    if request.method == "POST":
+        form_data = {
+            "name": request.form.get("name", "").strip(),
+            "era": request.form.get("era", "").strip(),
+            "power_type": request.form.get("power_type", "").strip(),
+            "primary_railroad_id": request.form.get("primary_railroad_id", "").strip(),
+            "notes": request.form.get("notes", "").strip(),
+        }
+        selected_ids = normalize_car_ids(request.form.getlist("car_ids"))
+        primary_railroad_id = int(form_data["primary_railroad_id"]) if form_data["primary_railroad_id"].isdigit() else None
+        if not selected_ids:
+            form_errors.append("Select at least one car for the consist.")
+        if not form_errors:
+            consist_name = form_data["name"] or f"Consist {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+            consist = Consist(
+                name=consist_name,
+                era=form_data["era"] or None,
+                power_type=form_data["power_type"] or None,
+                primary_railroad_id=primary_railroad_id,
+                car_ids=selected_ids,
+                notes=form_data["notes"] or None,
+            )
+            db.session.add(consist)
+            db.session.commit()
+            ensure_db_backup()
+            return redirect(url_for("main.consist_detail", consist_id=consist.id))
+
+    return render_template(
+        "consist_form.html",
+        consist=None,
+        form_data=form_data,
+        railroads=railroads,
+        cars=cars,
+        form_errors=form_errors,
+        selected_ids=selected_ids,
+        power_type_options=CONSIST_POWER_TYPES,
+        form_title="Create Manual Consist",
+        form_action=url_for("main.consist_new"),
+        submit_label="Save Consist",
+        cancel_url=url_for("main.consists"),
+    )
+
+
+@main_bp.route("/consists/wizard", methods=["GET", "POST"])
+def consist_wizard():
+    railroads = Railroad.query.order_by("reporting_mark").all()
+    form_errors: list[str] = []
+    wizard_form = {"name": "", "era": "", "power_type": "", "primary_railroad_id": ""}
+    if request.method == "POST":
+        wizard_form = {
+            "name": request.form.get("name", "").strip(),
+            "era": request.form.get("era", "").strip(),
+            "power_type": request.form.get("power_type", "").strip(),
+            "primary_railroad_id": request.form.get("primary_railroad_id", "").strip(),
+        }
+        if not wizard_form["era"]:
+            form_errors.append("Enter a time era for the wizard.")
+        if not wizard_form["power_type"]:
+            form_errors.append("Choose a power type for the wizard.")
+        if not wizard_form["primary_railroad_id"].isdigit():
+            form_errors.append("Choose a primary railroad for the wizard.")
+        if not form_errors:
+            primary_railroad_id = int(wizard_form["primary_railroad_id"])
+            primary_cars = [car for car in Car.query.order_by("id").all() if car.railroad_id == primary_railroad_id]
+            primary_locos = [car for car in primary_cars if is_locomotive(car)]
+            filtered_locos = [
+                car
+                for car in primary_cars
+                if is_locomotive(car)
+                and matches_power_type(car, wizard_form["power_type"])
+                and matches_era(car, wizard_form["era"])
+            ]
+            if not filtered_locos:
+                form_errors.append("No locomotives found for that power type and era on the primary railroad.")
+            else:
+                selected_cars = build_wizard_consist(
+                    wizard_form["era"],
+                    wizard_form["power_type"],
+                    primary_railroad_id,
+                )
+                if not selected_cars:
+                    form_errors.append("No matching cars found for the wizard inputs.")
+                else:
+                    railroad = Railroad.query.get(primary_railroad_id)
+                    consist_name = wizard_form["name"] or build_consist_name(
+                        railroad, wizard_form["power_type"], wizard_form["era"]
+                    )
+                    consist = Consist(
+                        name=consist_name,
+                        era=wizard_form["era"],
+                        power_type=wizard_form["power_type"],
+                        primary_railroad_id=primary_railroad_id,
+                        car_ids=[car.id for car in selected_cars if car.id],
+                    )
+                    db.session.add(consist)
+                    db.session.commit()
+                    ensure_db_backup()
+                    return redirect(url_for("main.consist_detail", consist_id=consist.id))
+
+    return render_template(
+        "consist_wizard.html",
+        railroads=railroads,
+        wizard_form=wizard_form,
+        form_errors=form_errors,
+        power_type_options=CONSIST_POWER_TYPES,
+    )
+
+
+@main_bp.route("/consists/<int:consist_id>")
+def consist_detail(consist_id: int):
+    consist = Consist.query.get_or_404(consist_id)
+    cars = consist.cars
+    return render_template("consist_detail.html", consist=consist, cars=cars)
+
+
+@main_bp.route("/consists/<int:consist_id>/edit", methods=["GET", "POST"])
+def consist_edit(consist_id: int):
+    consist = Consist.query.get_or_404(consist_id)
+    railroads = Railroad.query.order_by("reporting_mark").all()
+    cars = Car.query.order_by("id").all()
+    form_errors: list[str] = []
+    form_data = {
+        "name": consist.name or "",
+        "era": consist.era or "",
+        "power_type": consist.power_type or "",
+        "primary_railroad_id": str(consist.primary_railroad_id or ""),
+        "notes": consist.notes or "",
+    }
+    selected_ids = consist.car_ids or []
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        era = request.form.get("era", "").strip()
+        power_type = request.form.get("power_type", "").strip()
+        primary_railroad_id_value = request.form.get("primary_railroad_id", "").strip()
+        notes = request.form.get("notes", "").strip()
+        selected_ids = normalize_car_ids(request.form.getlist("car_ids"))
+        primary_railroad_id = int(primary_railroad_id_value) if primary_railroad_id_value.isdigit() else None
+
+        if not selected_ids:
+            form_errors.append("Select at least one car for the consist.")
+
+        if not form_errors:
+            consist.name = name or None
+            consist.era = era or None
+            consist.power_type = power_type or None
+            consist.primary_railroad_id = primary_railroad_id
+            consist.notes = notes or None
+            consist.car_ids = selected_ids
+            db.session.commit()
+            ensure_db_backup()
+            return redirect(url_for("main.consist_detail", consist_id=consist.id))
+        form_data = {
+            "name": name,
+            "era": era,
+            "power_type": power_type,
+            "primary_railroad_id": primary_railroad_id_value,
+            "notes": notes,
+        }
+
+    return render_template(
+        "consist_form.html",
+        consist=consist,
+        form_data=form_data,
+        railroads=railroads,
+        cars=cars,
+        form_errors=form_errors,
+        selected_ids=selected_ids,
+        power_type_options=CONSIST_POWER_TYPES,
+        form_title="Edit Consist",
+        form_action=url_for("main.consist_edit", consist_id=consist.id),
+        submit_label="Save Changes",
+        cancel_url=url_for("main.consist_detail", consist_id=consist.id),
+    )
+
+
+@main_bp.route("/consists/<int:consist_id>/delete", methods=["POST"])
+def consist_delete(consist_id: int):
+    consist = Consist.query.get_or_404(consist_id)
+    db.session.delete(consist)
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.consists"))
+
+
 def draw_wrapped_text(draw, text, x, y, max_width, font, line_height) -> None:
     if not text:
         return
@@ -2207,6 +2555,7 @@ def car_class_edit(class_id: int):
         car_class.wheel_arrangement = request.form.get("wheel_arrangement", "").strip()
         car_class.tender_axles = request.form.get("tender_axles", "").strip()
         car_class.is_locomotive = request.form.get("is_locomotive") == "on"
+        car_class.power_type = request.form.get("power_type", "").strip()
         car_class.capacity = request.form.get("capacity", "").strip()
         car_class.weight = request.form.get("weight", "").strip()
         car_class.load_limit = request.form.get("load_limit", "").strip()
@@ -2218,7 +2567,7 @@ def car_class_edit(class_id: int):
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.car_class_detail", class_id=car_class.id))
-    return render_template("car_class_form.html", car_class=car_class)
+    return render_template("car_class_form.html", car_class=car_class, power_type_options=CONSIST_POWER_TYPES)
 
 
 def build_car_label(car: Car) -> str:
@@ -3610,6 +3959,7 @@ def car_edit(car_id: int):
         load_height_value=load_height_value,
         load_height_unit=load_height_unit,
         common_scale_gauge=get_common_scale_gauge_pairs(),
+        power_type_options=CONSIST_POWER_TYPES,
         form_action=url_for("main.car_edit", car_id=car.id),
     )
 
@@ -3630,6 +3980,7 @@ def car_new():
         "railroad_name": request.args.get("railroad_name", "").strip(),
         "car_class": request.args.get("car_class", "").strip(),
         "car_type": request.args.get("car_type", "").strip(),
+        "power_type": request.args.get("power_type", "").strip(),
         "aar_plate": request.args.get("aar_plate", "").strip(),
         "capacity": request.args.get("capacity", "").strip(),
         "weight": request.args.get("weight", "").strip(),
@@ -3688,6 +4039,7 @@ def car_new():
         load_height_value=load_height_value,
         load_height_unit=load_height_unit,
         common_scale_gauge=get_common_scale_gauge_pairs(),
+        power_type_options=CONSIST_POWER_TYPES,
         form_action=url_for("main.car_new"),
     )
 
@@ -3756,6 +4108,7 @@ def api_car_classes():
             "code": c.code,
             "car_type": c.car_type,
             "is_locomotive": c.is_locomotive,
+            "power_type": c.power_type,
             "era": c.era,
             "wheel_arrangement": c.wheel_arrangement,
             "tender_axles": c.tender_axles,
@@ -3901,6 +4254,7 @@ def apply_car_form(car: Car, form) -> None:
             car.reporting_mark_override = None
 
     car_type_value = form.get("car_type", "").strip()
+    power_type_value = form.get("power_type", "").strip()
     car.car_number = form.get("car_number", "").strip()
     car.brand = form.get("brand", "").strip()
     car.upc = form.get("upc", "").strip()
@@ -3964,6 +4318,8 @@ def apply_car_form(car: Car, form) -> None:
             car_class.tender_axles = class_tender
         if car_type_value and not car_class.car_type:
             car_class.car_type = car_type_value
+        if power_type_value and not car_class.power_type:
+            car_class.power_type = power_type_value
         if car_class.is_locomotive is None:
             car_class.is_locomotive = class_is_locomotive
 
@@ -3991,6 +4347,7 @@ def apply_car_form(car: Car, form) -> None:
             car.load_limit_override = None
             car.aar_plate_override = None
             car.car_type_override = None
+            car.power_type_override = None
             car.wheel_arrangement_override = None
             car.tender_axles_override = None
             car.is_locomotive_override = None
@@ -4028,6 +4385,11 @@ def apply_car_form(car: Car, form) -> None:
             car.car_type_override = (
                 car_type_value if car_type_value and car_class.car_type and car_type_value != car_class.car_type else None
             )
+            car.power_type_override = (
+                power_type_value
+                if power_type_value and car_class.power_type and power_type_value != car_class.power_type
+                else None
+            )
             car.wheel_arrangement_override = (
                 class_wheel
                 if class_wheel and car_class.wheel_arrangement and class_wheel != car_class.wheel_arrangement
@@ -4050,6 +4412,7 @@ def apply_car_form(car: Car, form) -> None:
         car.load_limit_override = load_limit_value or None
         car.aar_plate_override = aar_plate_value or None
         car.car_type_override = car_type_value or None
+        car.power_type_override = power_type_value or None
         car.wheel_arrangement_override = form.get("class_wheel_arrangement", "").strip() or None
         car.tender_axles_override = form.get("class_tender_axles", "").strip() or None
         car.is_locomotive_override = True if form.get("is_locomotive") == "on" else None
@@ -4237,12 +4600,14 @@ def serialize_car(car: Car) -> dict:
     class_internal_width = car.car_class.internal_width if car.car_class else None
     class_internal_height = car.car_class.internal_height if car.car_class else None
     class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
+    class_power_type = car.car_class.power_type if car.car_class else None
     is_locomotive = (
         car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
     )
     return {
         "id": car.id,
         "car_type": car.car_type_override or (car.car_class.car_type if car.car_class else None),
+        "power_type": car.power_type_override or class_power_type,
         "car_number": car.car_number,
         "reporting_mark": car.railroad.reporting_mark if car.railroad else car.reporting_mark_override,
         "railroad": car.railroad.name if car.railroad else None,
@@ -4288,6 +4653,7 @@ def serialize_car(car: Car) -> dict:
         "internal_width_override": car.internal_width_override,
         "internal_height_override": car.internal_height_override,
         "car_type_override": car.car_type_override,
+        "power_type_override": car.power_type_override,
         "wheel_arrangement_override": car.wheel_arrangement_override,
         "tender_axles_override": car.tender_axles_override,
         "is_locomotive_override": car.is_locomotive_override,
