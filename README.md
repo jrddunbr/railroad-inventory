@@ -37,6 +37,27 @@ Podman users can run:
 podman compose up --build
 ```
 
+## Kubernetes
+Build and load the image into your cluster (example uses the local tag):
+```bash
+docker build -t modelinventory:latest .
+```
+
+Apply the manifests:
+```bash
+kubectl apply -k k8s
+```
+
+Update secrets in `k8s/secrets.yaml`, then re-apply when you change them:
+```bash
+kubectl apply -f k8s/secrets.yaml
+```
+
+Port-forward the app service:
+```bash
+kubectl port-forward service/modelinventory 5000:5000
+```
+
 ## Notes
 - CouchDB runs in a Podman container named `modelinventory-couchdb`.
 - The CouchDB data volume lives at `data/couchdb`.

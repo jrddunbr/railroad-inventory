@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: couchdb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: modelinventory
+      component: couchdb
+  template:
+    metadata:
+      labels:
+        app: modelinventory
+        component: couchdb
+    spec:
+      containers:
+        - name: couchdb
+          image: couchdb:3
+          ports:
+            - containerPort: 5984
+          env:
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: modelinventory-secrets
+                  key: COUCHDB_USER
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: modelinventory-secrets
+                  key: COUCHDB_PASSWORD
+          volumeMounts:
+            - name: couchdb-data
+              mountPath: /opt/couchdb/data
+      volumes:
+        - name: couchdb-data
+          persistentVolumeClaim:
+            claimName: couchdb-data

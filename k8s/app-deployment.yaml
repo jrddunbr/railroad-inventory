@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: modelinventory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: modelinventory
+      component: app
+  template:
+    metadata:
+      labels:
+        app: modelinventory
+        component: app
+    spec:
+      containers:
+        - name: app
+          image: modelinventory:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+          env:
+            - name: COUCHDB_HOST
+              value: couchdb
+            - name: COUCHDB_PORT
+              value: "5984"
+            - name: COUCHDB_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: modelinventory-config
+                  key: COUCHDB_DATABASE
+            - name: COUCHDB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: modelinventory-secrets
+                  key: COUCHDB_USER
+            - name: COUCHDB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: modelinventory-secrets
+                  key: COUCHDB_PASSWORD
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: modelinventory-secrets
+                  key: SECRET_KEY
+          volumeMounts:
+            - name: app-data
+              mountPath: /app/data
+            - name: app-uploads
+              mountPath: /app/app/static/uploads
+      volumes:
+        - name: app-data
+          persistentVolumeClaim:
+            claimName: app-data
+        - name: app-uploads
+          persistentVolumeClaim:
+            claimName: app-uploads
