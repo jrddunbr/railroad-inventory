@@ -1995,6 +1995,15 @@ def car_edit(car_id: int):
         actual_weight_unit = get_default_weight_unit()
     if not actual_length_unit:
         actual_length_unit = get_default_length_unit()
+    load_length_value, load_length_unit = parse_actual_length(car.load_length)
+    load_width_value, load_width_unit = parse_actual_length(car.load_width)
+    load_height_value, load_height_unit = parse_actual_length(car.load_height)
+    if not load_length_unit:
+        load_length_unit = get_default_length_unit()
+    if not load_width_unit:
+        load_width_unit = get_default_length_unit()
+    if not load_height_unit:
+        load_height_unit = get_default_length_unit()
     return render_template(
         "car_form.html",
         car=car,
@@ -2010,6 +2019,12 @@ def car_edit(car_id: int):
         actual_weight_unit=actual_weight_unit,
         actual_length_value=actual_length_value,
         actual_length_unit=actual_length_unit,
+        load_length_value=load_length_value,
+        load_length_unit=load_length_unit,
+        load_width_value=load_width_value,
+        load_width_unit=load_width_unit,
+        load_height_value=load_height_value,
+        load_height_unit=load_height_unit,
         common_scale_gauge=get_common_scale_gauge_pairs(),
         form_action=url_for("main.car_edit", car_id=car.id),
     )
@@ -2039,6 +2054,9 @@ def car_new():
         "actual_length": request.args.get("actual_length", "").strip(),
         "scale": request.args.get("scale", "").strip(),
         "gauge": request.args.get("gauge", "").strip(),
+        "load_length": request.args.get("load_length", "").strip(),
+        "load_width": request.args.get("load_width", "").strip(),
+        "load_height": request.args.get("load_height", "").strip(),
         "built": request.args.get("built", "").strip(),
         "brand": request.args.get("brand", "").strip(),
         "price": request.args.get("price", "").strip(),
@@ -2055,6 +2073,15 @@ def car_new():
         actual_weight_unit = get_default_weight_unit()
     if not actual_length_unit:
         actual_length_unit = get_default_length_unit()
+    load_length_value, load_length_unit = parse_actual_length(prefill.get("load_length", ""))
+    load_width_value, load_width_unit = parse_actual_length(prefill.get("load_width", ""))
+    load_height_value, load_height_unit = parse_actual_length(prefill.get("load_height", ""))
+    if not load_length_unit:
+        load_length_unit = get_default_length_unit()
+    if not load_width_unit:
+        load_width_unit = get_default_length_unit()
+    if not load_height_unit:
+        load_height_unit = get_default_length_unit()
     return render_template(
         "car_form.html",
         car=None,
@@ -2070,6 +2097,12 @@ def car_new():
         actual_weight_unit=actual_weight_unit,
         actual_length_value=actual_length_value,
         actual_length_unit=actual_length_unit,
+        load_length_value=load_length_value,
+        load_length_unit=load_length_unit,
+        load_width_value=load_width_value,
+        load_width_unit=load_width_unit,
+        load_height_value=load_height_value,
+        load_height_unit=load_height_unit,
         common_scale_gauge=get_common_scale_gauge_pairs(),
         form_action=url_for("main.car_new"),
     )
@@ -2299,6 +2332,16 @@ def apply_car_form(car: Car, form) -> None:
         car.actual_length = f"{actual_length_value} {actual_length_unit}"
     else:
         car.actual_length = actual_length_value or None
+    def read_measurement(value_key: str, unit_key: str) -> str | None:
+        value = form.get(value_key, "").strip()
+        unit = form.get(unit_key, "").strip()
+        if value and unit:
+            return f"{value} {unit}"
+        return value or None
+
+    car.load_length = read_measurement("load_length_value", "load_length_unit")
+    car.load_width = read_measurement("load_width_value", "load_width_unit")
+    car.load_height = read_measurement("load_height_value", "load_height_unit")
     scale_value = normalize_scale_input(form.get("scale", ""))
     gauge_value = normalize_gauge_input(form.get("gauge", ""))
     car.scale = scale_value or None
@@ -2591,6 +2634,9 @@ def serialize_car(car: Car) -> dict:
         "load_limit": car.load_limit_override or class_load_limit,
         "actual_weight": car.actual_weight,
         "actual_length": car.actual_length,
+        "load_length": car.load_length,
+        "load_width": car.load_width,
+        "load_height": car.load_height,
         "scale": car.scale,
         "gauge": car.gauge,
         "aar_plate": car.aar_plate_override or class_aar_plate,

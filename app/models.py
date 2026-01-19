@@ -175,6 +175,9 @@ class Car(BaseModel):
     load: str | None = None
     repairs_required: str | None = None
     notes: str | None = None
+    load_length: str | None = None
+    load_width: str | None = None
+    load_height: str | None = None
     internal_length_override: str | None = None
     internal_width_override: str | None = None
     internal_height_override: str | None = None

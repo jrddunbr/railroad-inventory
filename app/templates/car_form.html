@@ -67,7 +67,6 @@
 
       <div class="box" style="margin-bottom: 16px;">
         <h2 class="title is-4">Car Info</h2>
-        <p class="keyboard-hint">CAPY - Load Capacity; LD LMT - Load Limit; LT WT - Car Weight</p>
         <h3 class="title is-5">Basics</h3>
         <div class="grid">
           <div class="field">
@@ -87,6 +86,9 @@
               <input class="input" id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
             </div>
           </div>
+        </div>
+        <h3 class="title is-5">Car Measurements</h3>
+        <div class="grid">
           <div class="field">
             <label class="label" for="actual_weight_value">Actual Weight</label>
             <div class="control">
@@ -135,6 +137,75 @@
               </div>
             </div>
           </div>
+        </div>
+        <h4 class="title is-6">Load Dimensions</h4>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="load_length_value">Load Length</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="load_length_value" name="load_length_value" value="{{ load_length_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="load_length_unit" name="load_length_unit">
+                      <option value="in" {% if load_length_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if load_length_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if load_length_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if load_length_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if load_length_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="load_width_value">Load Width</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="load_width_value" name="load_width_value" value="{{ load_width_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="load_width_unit" name="load_width_unit">
+                      <option value="in" {% if load_width_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if load_width_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if load_width_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if load_width_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if load_width_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="load_height_value">Load Height</label>
+            <div class="control">
+              <div class="field has-addons">
+                <div class="control is-expanded">
+                  <input class="input" id="load_height_value" name="load_height_value" value="{{ load_height_value }}" />
+                </div>
+                <div class="control">
+                  <div class="select">
+                    <select id="load_height_unit" name="load_height_unit">
+                      <option value="in" {% if load_height_unit == 'in' %}selected{% endif %}>in</option>
+                      <option value="ft" {% if load_height_unit == 'ft' %}selected{% endif %}>ft</option>
+                      <option value="mm" {% if load_height_unit == 'mm' %}selected{% endif %}>mm</option>
+                      <option value="cm" {% if load_height_unit == 'cm' %}selected{% endif %}>cm</option>
+                      <option value="m" {% if load_height_unit == 'm' %}selected{% endif %}>m</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <h4 class="title is-6">Scale &amp; Gauge</h4>
+        <div class="grid">
           {% set scale_value = scale_value if scale_value is defined else (car.scale if car else prefill.get('scale', '')) %}
           {% set scale_state = namespace(found=false) %}
           {% for option in scale_options %}
@@ -194,6 +265,19 @@
             </div>
           {% endif %}
         </div>
+      </div>
+
+      <div class="box" style="margin-bottom: 16px;">
+        <h2 class="title is-4">Car Prototype</h2>
+        <article class="message is-info" style="margin-bottom: 16px;">
+          <div class="message-body">
+            <ul>
+              <li>CAPY - Load Capacity</li>
+              <li>LD LMT - Load Limit</li>
+              <li>LT WT - Car Weight</li>
+            </ul>
+          </div>
+        </article>
         <h3 class="title is-5">Prototype Specifications</h3>
         <div class="grid">
           {% set aar_plate_value = car.aar_plate_override if car and car.aar_plate_override else (prefill.get('aar_plate', '') if not car else '') %}
@@ -235,22 +319,22 @@
             </div>
           </div>
         </div>
-        <h3 class="title is-5">Internal Dimensions</h3>
+        <h3 class="title is-5">Prototype Dimensions</h3>
         <div class="grid">
           <div class="field">
-            <label class="label" for="internal_length">Internal Length</label>
+            <label class="label" for="internal_length">Prototype Length</label>
             <div class="control">
               <input class="input" id="internal_length" name="internal_length" value="{{ car.internal_length_override if car and car.internal_length_override else (prefill.get('internal_length', '') if not car else '') }}" data-gray-default="true" />
             </div>
           </div>
           <div class="field">
-            <label class="label" for="internal_width">Internal Width</label>
+            <label class="label" for="internal_width">Prototype Width</label>
             <div class="control">
               <input class="input" id="internal_width" name="internal_width" value="{{ car.internal_width_override if car and car.internal_width_override else (prefill.get('internal_width', '') if not car else '') }}" data-gray-default="true" />
             </div>
           </div>
           <div class="field">
-            <label class="label" for="internal_height">Internal Height</label>
+            <label class="label" for="internal_height">Prototype Height</label>
             <div class="control">
               <input class="input" id="internal_height" name="internal_height" value="{{ car.internal_height_override if car and car.internal_height_override else (prefill.get('internal_height', '') if not car else '') }}" data-gray-default="true" />
             </div>
@@ -283,7 +367,7 @@
             </div>
           </div>
         </div>
-        <h3 class="title is-5">Other Info</h3>
+        <h3 class="title is-5">Lettering &amp; Options</h3>
         <div class="grid">
           <div class="field">
             <label class="label" for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>

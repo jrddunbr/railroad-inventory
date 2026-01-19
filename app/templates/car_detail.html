@@ -139,9 +139,12 @@
             {{ car.car_class.aar_plate if car.car_class else "-" }}
           {% endif %}
         </p>
-        <p><strong>Internal Length:</strong> {{ car.internal_length_override or (car.car_class.internal_length if car.car_class else "-") }}</p>
-        <p><strong>Internal Width:</strong> {{ car.internal_width_override or (car.car_class.internal_width if car.car_class else "-") }}</p>
-        <p><strong>Internal Height:</strong> {{ car.internal_height_override or (car.car_class.internal_height if car.car_class else "-") }}</p>
+        <p><strong>Load Length:</strong> {{ car.load_length or "-" }}</p>
+        <p><strong>Load Width:</strong> {{ car.load_width or "-" }}</p>
+        <p><strong>Load Height:</strong> {{ car.load_height or "-" }}</p>
+        <p><strong>Prototype Length:</strong> {{ car.internal_length_override or (car.car_class.internal_length if car.car_class else "-") }}</p>
+        <p><strong>Prototype Width:</strong> {{ car.internal_width_override or (car.car_class.internal_width if car.car_class else "-") }}</p>
+        <p><strong>Prototype Height:</strong> {{ car.internal_height_override or (car.car_class.internal_height if car.car_class else "-") }}</p>
         <p><strong>Built:</strong> {{ car.built or "-" }}</p>
         <p><strong>Alt Date:</strong> {{ car.alt_date or "-" }}</p>
         <p><strong>Reweigh Date:</strong> {{ car.reweight_date or "-" }}</p>
@@ -335,12 +338,15 @@
       { key: 'load_limit', label: 'Load Limit' },
       { key: 'actual_weight', label: 'Actual Weight' },
       { key: 'actual_length', label: 'Actual Length' },
+      { key: 'load_length', label: 'Load Length' },
+      { key: 'load_width', label: 'Load Width' },
+      { key: 'load_height', label: 'Load Height' },
       { key: 'scale', label: 'Scale' },
       { key: 'gauge', label: 'Gauge' },
       { key: 'aar_plate', label: 'AAR Plate' },
-      { key: 'internal_length', label: 'Internal Length' },
-      { key: 'internal_width', label: 'Internal Width' },
-      { key: 'internal_height', label: 'Internal Height' },
+      { key: 'internal_length', label: 'Prototype Length' },
+      { key: 'internal_width', label: 'Prototype Width' },
+      { key: 'internal_height', label: 'Prototype Height' },
       { key: 'built', label: 'Built' },
       { key: 'alt_date', label: 'Alt Date' },
       { key: 'reweight_date', label: 'Reweigh Date' },
