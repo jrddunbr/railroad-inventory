@@ -1410,7 +1410,7 @@ def load_placement_new(load_id: int):
     cars = Car.query.order_by("id", reverse=True).all()
     locations = Location.query.order_by("name").all()
     if request.method == "POST":
-        placement = LoadPlacement(load=load)
+        placement = LoadPlacement(load_id=load.id)
         if not apply_load_placement_form(placement, request.form):
             return "Select a car or location for this load placement.", 400
         db.session.add(placement)
@@ -1438,7 +1438,7 @@ def load_placement_new_generic():
         if not load_id.isdigit():
             return "Select a load type for this placement.", 400
         load = LoadType.query.get_or_404(int(load_id))
-        placement = LoadPlacement(load=load)
+        placement = LoadPlacement(load_id=load.id)
         if not apply_load_placement_form(placement, request.form):
             return "Select a car or location for this load placement.", 400
         db.session.add(placement)
