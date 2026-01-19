@@ -23,3 +23,6 @@ app/static/tools/generated/
 # OS
 .DS_Store
 Thumbs.db
+
+# py-spy (local test build)
+py-spy/
