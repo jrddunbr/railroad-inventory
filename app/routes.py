@@ -822,6 +822,39 @@ def inspections_report():
     )
 
 
+def update_last_inspection_date(car_id: int | None) -> None:
+    if not car_id:
+        return
+    car = Car.query.get(car_id)
+    if not car:
+        return
+    inspections = CarInspection.query.filter_by(car_id=car.id).all()
+    if inspections:
+        inspections.sort(
+            key=lambda inspection: (inspection.inspection_date is None, inspection.inspection_date or ""),
+            reverse=True,
+        )
+        car.last_inspection_date = inspections[0].inspection_date
+    else:
+        car.last_inspection_date = None
+
+
+@main_bp.route("/inspections/<int:inspection_id>/delete", methods=["POST"])
+def inspection_delete(inspection_id: int):
+    inspection = CarInspection.query.get_or_404(inspection_id)
+    car_id = inspection.car_id
+    db.session.delete(inspection)
+    update_last_inspection_date(car_id)
+    db.session.commit()
+    ensure_db_backup()
+    next_url = request.form.get("next", "").strip()
+    if next_url.startswith("/"):
+        return redirect(next_url)
+    if car_id:
+        return redirect(url_for("main.car_detail", car_id=car_id))
+    return redirect(url_for("main.reports"))
+
+
 @main_bp.route("/inventory/export")
 def inventory_export():
     cars = Car.query.order_by("id").all()
@@ -1738,6 +1771,48 @@ def location_detail(location_id: int):
         location=location,
         cars=paged_cars,
         cars_pagination=cars_pagination,
+    )
+
+
+@main_bp.route("/locations/<int:location_id>/inspect", methods=["GET", "POST"])
+def location_inspect(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    inspection_types = InspectionType.query.all()
+    type_rows = inspection_type_tree(inspection_types)
+    if request.method == "POST":
+        inspection_date = request.form.get("inspection_date", "").strip()
+        inspection_details = request.form.get("inspection_details", "").strip()
+        inspection_type_id = request.form.get("inspection_type_id", "").strip()
+        inspection_passed = request.form.get("inspection_passed", "").strip()
+        if not inspection_date:
+            return "Inspection date is required.", 400
+        if not inspection_type_id.isdigit():
+            return "Inspection type is required.", 400
+        if inspection_passed not in {"passed", "failed"}:
+            return "Inspection result is required.", 400
+        cars = Car.query.filter_by(location_id=location.id).all()
+        if not cars:
+            return "No cars in this location to inspect.", 400
+        for car in cars:
+            db.session.add(
+                CarInspection(
+                    car_id=car.id,
+                    inspection_date=inspection_date,
+                    details=inspection_details or None,
+                    inspection_type_id=int(inspection_type_id),
+                    passed=inspection_passed == "passed",
+                )
+            )
+            car.last_inspection_date = inspection_date
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.location_detail", location_id=location.id))
+    cars_count = Car.query.filter_by(location_id=location.id).count()
+    return render_template(
+        "location_inspection_form.html",
+        location=location,
+        inspection_types=type_rows,
+        cars_count=cars_count,
     )
 
 

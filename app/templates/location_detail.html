@@ -4,6 +4,7 @@
     <h1 class="title is-3">Location: {{ location.name }}</h1>
     <div class="actions buttons">
       <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
       <form method="post" action="{{ url_for('main.location_delete', location_id=location.id) }}" data-action="delete" data-table="locations" data-id="{{ location.id }}" data-id-field="id" data-entity-label="location {{ location.name }}">
         <button type="submit" class="button is-small is-danger">Delete</button>
       </form>

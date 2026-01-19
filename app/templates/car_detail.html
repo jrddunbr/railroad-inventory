@@ -162,6 +162,7 @@
           <th>Type</th>
           <th>Result</th>
           <th>Details</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -179,10 +180,16 @@
             {% endif %}
           </td>
           <td>{{ inspection.details or "-" }}</td>
+          <td>
+            <form method="post" action="{{ url_for('main.inspection_delete', inspection_id=inspection.id) }}" data-action="delete" data-table="car_inspections" data-id="{{ inspection.id }}" data-id-field="id" data-entity-label="inspection {{ inspection.id }}" style="display: inline;">
+              <input type="hidden" name="next" value="{{ url_for('main.car_detail', car_id=car.id) }}" />
+              <button type="submit" class="button is-small is-danger">Delete</button>
+            </form>
+          </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="4">No inspections recorded.</td>
+          <td colspan="5">No inspections recorded.</td>
         </tr>
         {% endfor %}
       </tbody>

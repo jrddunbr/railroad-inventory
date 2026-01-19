@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Inspect Location {{ location.name }}</h1>
+    <p class="keyboard-hint">Apply a single inspection to {{ cars_count }} car{{ "" if cars_count == 1 else "s" }} in this location.</p>
+    <form method="post" action="{{ url_for('main.location_inspect', location_id=location.id) }}" data-confirm-skip="true">
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="inspection_date">Inspection Date</label>
+          <div class="control">
+            <input class="input" id="inspection_date" name="inspection_date" type="date" required />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="inspection_type_id">Inspection Type</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="inspection_type_id" name="inspection_type_id" required {% if not inspection_types %}disabled{% endif %}>
+                <option value="">Select...</option>
+                {% for row in inspection_types %}
+                  <option value="{{ row.type.id }}">{{ row.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="inspection_passed">Result</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="inspection_passed" name="inspection_passed" required {% if not inspection_types %}disabled{% endif %}>
+                <option value="">Select...</option>
+                <option value="passed">Passed</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="inspection_details">Comments</label>
+          <div class="control">
+            <textarea class="textarea" id="inspection_details" name="inspection_details" rows="4"></textarea>
+          </div>
+        </div>
+      </div>
+      {% if not inspection_types %}
+        <p class="keyboard-hint">Add inspection types first in <a href="{{ url_for('main.settings') }}">Settings</a>.</p>
+      {% endif %}
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary" {% if not inspection_types or cars_count == 0 %}disabled{% endif %}>Save Inspection</button>
+        <a class="button is-small is-light" href="{{ url_for('main.location_detail', location_id=location.id) }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}
