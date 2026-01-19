@@ -110,6 +110,10 @@ LENGTH_UNIT_TO_M = {
     "ft": 0.3048,
     "in": 0.0254,
 }
+DEFAULT_LENGTH_UNIT = "mm"
+DEFAULT_WEIGHT_UNIT = "g"
+WEIGHT_UNITS = ["g", "kg", "lb", "oz"]
+LENGTH_UNITS = ["mm", "cm", "m", "in", "ft"]
 
 
 def ensure_db_backup() -> None:
@@ -120,7 +124,12 @@ def get_app_settings() -> AppSettings:
     settings = AppSettings.query.get(1)
     if settings:
         return settings
-    settings = AppSettings(id=1, page_size=DEFAULT_PAGE_SIZE)
+    settings = AppSettings(
+        id=1,
+        page_size=DEFAULT_PAGE_SIZE,
+        default_length_unit=DEFAULT_LENGTH_UNIT,
+        default_weight_unit=DEFAULT_WEIGHT_UNIT,
+    )
     db.session.add(settings)
     db.session.commit()
     ensure_db_backup()
@@ -133,6 +142,22 @@ def get_page_size() -> str:
     if size not in PAGINATION_OPTIONS:
         return DEFAULT_PAGE_SIZE
     return size
+
+
+def get_default_length_unit() -> str:
+    settings = get_app_settings()
+    unit = (settings.default_length_unit or DEFAULT_LENGTH_UNIT).lower()
+    if unit not in LENGTH_UNIT_TO_IN:
+        return DEFAULT_LENGTH_UNIT
+    return unit
+
+
+def get_default_weight_unit() -> str:
+    settings = get_app_settings()
+    unit = (settings.default_weight_unit or DEFAULT_WEIGHT_UNIT).lower()
+    if unit not in WEIGHT_UNIT_TO_OZ:
+        return DEFAULT_WEIGHT_UNIT
+    return unit
 
 
 def get_page_number() -> int:
@@ -1357,7 +1382,22 @@ def load_new():
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.load_detail", load_id=load.id))
-    return render_template("load_form.html", load=None, classes=classes, railroads=railroads)
+    default_length_unit = get_default_length_unit()
+    default_weight_unit = get_default_weight_unit()
+    return render_template(
+        "load_form.html",
+        load=None,
+        classes=classes,
+        railroads=railroads,
+        length_value="",
+        length_unit=default_length_unit,
+        width_value="",
+        width_unit=default_length_unit,
+        height_value="",
+        height_unit=default_length_unit,
+        weight_value="",
+        weight_unit=default_weight_unit,
+    )
 
 
 @main_bp.route("/loads/<int:load_id>")
@@ -1392,7 +1432,32 @@ def load_edit(load_id: int):
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.load_detail", load_id=load.id))
-    return render_template("load_form.html", load=load, classes=classes, railroads=railroads)
+    length_value, length_unit = parse_actual_length(load.length)
+    width_value, width_unit = parse_actual_length(load.width)
+    height_value, height_unit = parse_actual_length(load.height)
+    weight_value, weight_unit = parse_actual_weight(load.weight)
+    if not length_unit:
+        length_unit = get_default_length_unit()
+    if not width_unit:
+        width_unit = get_default_length_unit()
+    if not height_unit:
+        height_unit = get_default_length_unit()
+    if not weight_unit:
+        weight_unit = get_default_weight_unit()
+    return render_template(
+        "load_form.html",
+        load=load,
+        classes=classes,
+        railroads=railroads,
+        length_value=length_value,
+        length_unit=length_unit,
+        width_value=width_value,
+        width_unit=width_unit,
+        height_value=height_value,
+        height_unit=height_unit,
+        weight_value=weight_value,
+        weight_unit=weight_unit,
+    )
 
 
 @main_bp.route("/loads/<int:load_id>/delete", methods=["POST"])
@@ -1716,6 +1781,10 @@ def car_edit(car_id: int):
     gauge_value = normalize_gauge_input(car.gauge)
     actual_weight_value, actual_weight_unit = parse_actual_weight(car.actual_weight)
     actual_length_value, actual_length_unit = parse_actual_length(car.actual_length)
+    if not actual_weight_unit:
+        actual_weight_unit = get_default_weight_unit()
+    if not actual_length_unit:
+        actual_length_unit = get_default_length_unit()
     return render_template(
         "car_form.html",
         car=car,
@@ -1770,6 +1839,10 @@ def car_new():
     gauge_value = normalize_gauge_input(prefill.get("gauge", ""))
     actual_weight_value, actual_weight_unit = parse_actual_weight(prefill.get("actual_weight", ""))
     actual_length_value, actual_length_unit = parse_actual_length(prefill.get("actual_length", ""))
+    if not actual_weight_unit:
+        actual_weight_unit = get_default_weight_unit()
+    if not actual_length_unit:
+        actual_length_unit = get_default_length_unit()
     return render_template(
         "car_form.html",
         car=None,
@@ -1914,9 +1987,20 @@ def apply_load_form(load: LoadType, form) -> None:
     load.msrp = form.get("msrp", "").strip()
     load.price = form.get("price", "").strip()
     load.upc = form.get("upc", "").strip()
-    load.length = form.get("length", "").strip()
-    load.width = form.get("width", "").strip()
-    load.height = form.get("height", "").strip()
+    def read_measurement(value_key: str, unit_key: str, fallback_key: str) -> str | None:
+        value = form.get(value_key, "").strip()
+        unit = form.get(unit_key, "").strip()
+        if value and unit:
+            return f"{value} {unit}"
+        if value:
+            return value
+        fallback = form.get(fallback_key, "").strip()
+        return fallback or None
+
+    load.length = read_measurement("length_value", "length_unit", "length")
+    load.width = read_measurement("width_value", "width_unit", "width")
+    load.height = read_measurement("height_value", "height_unit", "height")
+    load.weight = read_measurement("weight_value", "weight_unit", "weight")
     load.repairs_required = form.get("repairs_required", "").strip()
     load.notes = form.get("notes", "").strip()
     class_id = form.get("car_class_id", "").strip()
@@ -2141,6 +2225,8 @@ def settings():
     page_size = get_page_size()
     scale_options_text = get_scale_options_text()
     gauge_options_text = get_gauge_options_text()
+    default_length_unit = get_default_length_unit()
+    default_weight_unit = get_default_weight_unit()
     options = [
         {"value": value, "label": "All" if value == "all" else value} for value in PAGINATION_OPTIONS
     ]
@@ -2151,6 +2237,10 @@ def settings():
         page_size_options=options,
         scale_options_text=scale_options_text,
         gauge_options_text=gauge_options_text,
+        default_length_unit=default_length_unit,
+        default_weight_unit=default_weight_unit,
+        length_units=LENGTH_UNITS,
+        weight_units=WEIGHT_UNITS,
     )
 
 
@@ -2179,6 +2269,22 @@ def settings_scale_gauge():
     settings.gauge_options = "\n".join(
         option["raw"] for option in gauge_options if option.get("raw")
     )
+    db.session.commit()
+    ensure_db_backup()
+    return redirect(url_for("main.settings"))
+
+
+@main_bp.route("/settings/units", methods=["POST"])
+def settings_units():
+    length_unit = request.form.get("default_length_unit", "").strip().lower()
+    weight_unit = request.form.get("default_weight_unit", "").strip().lower()
+    if length_unit not in LENGTH_UNIT_TO_IN:
+        return "Invalid length unit.", 400
+    if weight_unit not in WEIGHT_UNIT_TO_OZ:
+        return "Invalid weight unit.", 400
+    settings = get_app_settings()
+    settings.default_length_unit = length_unit
+    settings.default_weight_unit = weight_unit
     db.session.commit()
     ensure_db_backup()
     return redirect(url_for("main.settings"))

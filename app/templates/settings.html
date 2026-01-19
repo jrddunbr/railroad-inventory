@@ -18,6 +18,38 @@
         <button type="submit" class="button is-small is-primary is-light">Save Pagination</button>
       </div>
     </form>
+    <h2 class="title is-4">Default Measurement Units</h2>
+    <form method="post" action="{{ url_for('main.settings_units') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="default measurement units">
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="default_length_unit">Length</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select name="default_length_unit" id="default_length_unit">
+                {% for unit in length_units %}
+                  <option value="{{ unit }}" {% if unit == default_length_unit %}selected{% endif %}>{{ unit }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="default_weight_unit">Weight</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select name="default_weight_unit" id="default_weight_unit">
+                {% for unit in weight_units %}
+                  <option value="{{ unit }}" {% if unit == default_weight_unit %}selected{% endif %}>{{ unit }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary is-light">Save Units</button>
+      </div>
+    </form>
     <h2 class="title is-4">Scale &amp; Gauge Options</h2>
     <p class="keyboard-hint">One option per line. Use `Scale|Ratio` (example: `HO|1:87`) and `Gauge|Scales` (example: `16.5 mm|HO, HOn3`).</p>
     <form method="post" action="{{ url_for('main.settings_scale_gauge') }}" data-table="app_settings" data-id="1" data-id-field="id" data-entity-label="scale and gauge settings">

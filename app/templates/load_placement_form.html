@@ -47,17 +47,21 @@
           <p class="help">Choose either a car or a location.</p>
         </div>
         <div class="field" id="car-target">
-          <label class="label" for="car_id">Car</label>
+          <label class="label" for="car_lookup">Car</label>
           <div class="control">
-            <div class="select is-fullwidth">
-              <select id="car_id" name="car_id">
-                <option value="">-</option>
-                {% for car in cars %}
-                  {% set car_label = (car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "")) ~ " " ~ (car.car_number or "") %}
-                  <option value="{{ car.id }}" {% if preset_car_id and preset_car_id == car.id|string %}selected{% endif %}>{{ car_label.strip() or ("Car " ~ car.id) }}</option>
-                {% endfor %}
-              </select>
-            </div>
+            {% set selected_label = namespace(value="") %}
+            <input type="hidden" id="car_id" name="car_id" value="{{ preset_car_id }}" />
+            <datalist id="car_options">
+              {% for car in cars %}
+                {% set car_label = (car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or "")) ~ " " ~ (car.car_number or "") %}
+                {% set display_label = car_label.strip() or ("Car " ~ car.id) %}
+                {% if preset_car_id and preset_car_id == car.id|string %}
+                  {% set selected_label.value = display_label %}
+                {% endif %}
+                <option value="{{ display_label }}" data-id="{{ car.id }}"></option>
+              {% endfor %}
+            </datalist>
+            <input class="input" id="car_lookup" name="car_lookup" list="car_options" value="{{ selected_label.value }}" placeholder="Reporting mark + car number" />
           </div>
         </div>
         <div class="field" id="location-target">
@@ -88,8 +92,21 @@
     const targetRadios = Array.from(document.querySelectorAll('input[name="placement_target"]'));
     const carTarget = document.getElementById('car-target');
     const locationTarget = document.getElementById('location-target');
-    const carSelect = document.getElementById('car_id');
+    const carIdInput = document.getElementById('car_id');
+    const carLookup = document.getElementById('car_lookup');
+    const carOptions = document.getElementById('car_options');
     const locationSelect = document.getElementById('location_id');
+
+    const updateCarId = () => {
+      if (!carLookup || !carIdInput || !carOptions) return;
+      const value = carLookup.value.trim();
+      if (!value) {
+        carIdInput.value = '';
+        return;
+      }
+      const option = Array.from(carOptions.options).find((item) => item.value === value);
+      carIdInput.value = option ? option.dataset.id || '' : '';
+    };
 
     const setTarget = (value) => {
       if (!value) {
@@ -104,7 +121,8 @@
       } else {
         carTarget.style.display = 'none';
         locationTarget.style.display = '';
-        if (carSelect) carSelect.value = '';
+        if (carLookup) carLookup.value = '';
+        if (carIdInput) carIdInput.value = '';
       }
     };
 
@@ -121,5 +139,11 @@
         setTarget(event.target.value);
       });
     });
+
+    if (carLookup) {
+      carLookup.addEventListener('input', updateCarId);
+      carLookup.addEventListener('change', updateCarId);
+    }
+    updateCarId();
   </script>
 {% endblock %}

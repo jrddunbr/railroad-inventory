@@ -14,21 +14,86 @@
       <h2 class="title is-4">Dimensions</h2>
       <div class="grid">
         <div class="field">
-          <label class="label" for="length">Length</label>
+          <label class="label" for="length_value">Length</label>
           <div class="control">
-            <input class="input" id="length" name="length" value="{{ load.length if load else '' }}" />
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="length_value" name="length_value" value="{{ length_value }}" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="length_unit" name="length_unit">
+                    <option value="in" {% if length_unit == 'in' %}selected{% endif %}>in</option>
+                    <option value="ft" {% if length_unit == 'ft' %}selected{% endif %}>ft</option>
+                    <option value="mm" {% if length_unit == 'mm' %}selected{% endif %}>mm</option>
+                    <option value="cm" {% if length_unit == 'cm' %}selected{% endif %}>cm</option>
+                    <option value="m" {% if length_unit == 'm' %}selected{% endif %}>m</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="field">
-          <label class="label" for="width">Width</label>
+          <label class="label" for="width_value">Width</label>
           <div class="control">
-            <input class="input" id="width" name="width" value="{{ load.width if load else '' }}" />
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="width_value" name="width_value" value="{{ width_value }}" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="width_unit" name="width_unit">
+                    <option value="in" {% if width_unit == 'in' %}selected{% endif %}>in</option>
+                    <option value="ft" {% if width_unit == 'ft' %}selected{% endif %}>ft</option>
+                    <option value="mm" {% if width_unit == 'mm' %}selected{% endif %}>mm</option>
+                    <option value="cm" {% if width_unit == 'cm' %}selected{% endif %}>cm</option>
+                    <option value="m" {% if width_unit == 'm' %}selected{% endif %}>m</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="field">
-          <label class="label" for="height">Height</label>
+          <label class="label" for="height_value">Height</label>
           <div class="control">
-            <input class="input" id="height" name="height" value="{{ load.height if load else '' }}" />
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="height_value" name="height_value" value="{{ height_value }}" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="height_unit" name="height_unit">
+                    <option value="in" {% if height_unit == 'in' %}selected{% endif %}>in</option>
+                    <option value="ft" {% if height_unit == 'ft' %}selected{% endif %}>ft</option>
+                    <option value="mm" {% if height_unit == 'mm' %}selected{% endif %}>mm</option>
+                    <option value="cm" {% if height_unit == 'cm' %}selected{% endif %}>cm</option>
+                    <option value="m" {% if height_unit == 'm' %}selected{% endif %}>m</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="weight_value">Weight</label>
+          <div class="control">
+            <div class="field has-addons">
+              <div class="control is-expanded">
+                <input class="input" id="weight_value" name="weight_value" value="{{ weight_value }}" />
+              </div>
+              <div class="control">
+                <div class="select">
+                  <select id="weight_unit" name="weight_unit">
+                    <option value="g" {% if weight_unit == 'g' %}selected{% endif %}>g</option>
+                    <option value="kg" {% if weight_unit == 'kg' %}selected{% endif %}>kg</option>
+                    <option value="lb" {% if weight_unit == 'lb' %}selected{% endif %}>lb</option>
+                    <option value="oz" {% if weight_unit == 'oz' %}selected{% endif %}>oz</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="field">

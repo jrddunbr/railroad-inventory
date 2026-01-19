@@ -277,6 +277,8 @@ class AppSettings(BaseModel):
     page_size: str | None = None
     scale_options: str | None = None
     gauge_options: str | None = None
+    default_length_unit: str | None = None
+    default_weight_unit: str | None = None
     passed: bool | None = None
 
 
@@ -377,6 +379,7 @@ class LoadType(BaseModel):
     length: str | None = None
     width: str | None = None
     height: str | None = None
+    weight: str | None = None
     repairs_required: str | None = None
     notes: str | None = None
 

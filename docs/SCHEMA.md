@@ -94,6 +94,7 @@ This document describes the current database schema and common alternate names u
 - `length` (string, optional)
 - `width` (string, optional)
 - `height` (string, optional)
+- `weight` (string, optional)
 - `repairs_required` (string, optional)
 - `notes` (text, optional)
 
@@ -116,6 +117,14 @@ This document describes the current database schema and common alternate names u
 - `id` (integer, primary key)
 - `name` (string)
 - `parent_id` (integer, self-reference, optional)
+
+## App Settings (`app_settings`)
+- `id` (integer, primary key)
+- `page_size` (string, optional)
+- `scale_options` (text, optional)
+- `gauge_options` (text, optional)
+- `default_length_unit` (string, optional)
+- `default_weight_unit` (string, optional)
 
 ## Railroad Color Schemes (`railroad_color_schemes`)
 - `id` (integer, primary key)
