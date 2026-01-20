@@ -1,4 +1,12 @@
 {% extends "base.html" %}
+{% block title %}
+{% if consist %}
+  {% set title_name = consist.name or ("Consist " ~ consist.id) %}
+  {{ form_title }}: {{ title_name }}
+{% else %}
+  {{ form_title }}
+{% endif %}
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">{{ form_title }}</h1>

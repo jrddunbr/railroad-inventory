@@ -1,4 +1,8 @@
 {% extends "base.html" %}
+{% block title %}
+{% set rr_label = railroad.reporting_mark or railroad.name or ("Railroad " ~ railroad.id) %}
+Edit Railroad: {{ rr_label }}
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">Edit Railroad</h1>

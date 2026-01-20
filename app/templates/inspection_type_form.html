@@ -1,4 +1,11 @@
 {% extends "base.html" %}
+{% block title %}
+{% if inspection_type %}
+  Inspection Type: {{ inspection_type.name }}
+{% else %}
+  New Inspection Type
+{% endif %}
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">{{ 'Edit' if inspection_type else 'Add' }} Inspection Type</h1>

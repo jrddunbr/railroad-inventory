@@ -1,4 +1,13 @@
 {% extends "base.html" %}
+{% block title %}
+{% if load %}
+  Placement: {{ load.name }}
+{% elif placement %}
+  Edit Placement
+{% else %}
+  New Placement
+{% endif %}
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">{{ "Edit Placement" if placement else "New Placement" }}</h1>

@@ -1,4 +1,8 @@
 {% extends "base.html" %}
+{% block title %}
+{% set conflict_total = (car_conflicts|length if car_conflicts else 0) + (dcc_conflicts|length if dcc_conflicts else 0) %}
+Conflicts ({{ conflict_total }})
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">Conflicts Report</h1>

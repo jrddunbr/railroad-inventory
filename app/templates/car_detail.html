@@ -1,4 +1,9 @@
 {% extends "base.html" %}
+{% block title %}
+  {% set title_mark = car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or '') %}
+  {% set title_label = (title_mark ~ ' ' ~ (car.car_number or '')).strip() %}
+  {{ title_label if title_label else ("ID " ~ car.id) }}
+{% endblock %}
 {% block content %}
   <div class="box">
     {% set copy_reporting_mark = car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or '') %}

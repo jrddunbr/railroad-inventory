@@ -1,4 +1,13 @@
 {% extends "base.html" %}
+{% block title %}
+{% if car %}
+  {% set title_mark = car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or '') %}
+  {% set title_label = (title_mark ~ ' ' ~ (car.car_number or '')).strip() %}
+  {{ title_label if title_label else ("Car ID " ~ car.id) }}
+{% else %}
+  New Car Entry
+{% endif %}
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">{{ 'Edit Car' if car else 'Add New Car' }}</h1>

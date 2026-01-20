@@ -1,4 +1,10 @@
 {% extends "base.html" %}
+{% block title %}
+{% set rr_mark = railroad.reporting_mark or '' %}
+{% set rr_name = railroad.name or '' %}
+{% set rr_label = (rr_mark ~ ' ' ~ rr_name).strip() %}
+{{ rr_label if rr_label else ("Railroad " ~ railroad.id) }}
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">{{ railroad.reporting_mark or "-" }} - {{ railroad.name }}</h1>

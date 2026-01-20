@@ -1,4 +1,8 @@
 {% extends "base.html" %}
+{% block title %}
+{% set year_count = year_entries|length if year_entries else 0 %}
+Intro Years ({{ year_count }})
+{% endblock %}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">Introduction Years</h1>
