@@ -268,7 +268,9 @@
       <a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>
       <a href="{{ url_for('main.loads') }}" class="{% if request.path == '/loads' %}active{% endif %}">Loads</a>
       <a href="{{ url_for('main.consists') }}" class="{% if request.path.startswith('/consists') %}active{% endif %}">Consists</a>
-      <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Tools</a>
+      <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Software Tools</a>
+      <a href="{{ url_for('main.tool_inventory') }}" class="{% if request.path == '/tool-inventory' %}active{% endif %}">Tool Inventory</a>
+      <a href="{{ url_for('main.parts_inventory') }}" class="{% if request.path == '/parts-inventory' %}active{% endif %}">Parts Inventory</a>
       <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
       <a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>
       <a href="{{ url_for('main.settings') }}" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
@@ -323,6 +325,8 @@
       car_inspections: 'car_inspection',
       inspection_types: 'inspection_type',
       app_settings: 'app_settings',
+      tool_items: 'tool_item',
+      part_items: 'part_item',
     };
 
     const getLabelText = (input) => {

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}
+{% if part %}
+  Edit Part
+{% else %}
+  Add Part
+{% endif %}
+{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">{{ 'Edit Part' if part else 'Add Part' }}</h1>
+    <form method="post" action="{{ form_action }}" data-table="part_items" data-id="{{ part.id if part else '' }}" data-id-field="id">
+      {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}" />
+      {% endif %}
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="part_name">Name</label>
+          <div class="control">
+            <input class="input" id="part_name" name="name" value="{{ part.name if part else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="part_brand">Brand</label>
+          <div class="control">
+            <input class="input" id="part_brand" name="brand" value="{{ part.brand if part else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="part_upc">UPC</label>
+          <div class="control">
+            <input class="input" id="part_upc" name="upc" value="{{ part.upc if part else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="part_quantity">Quantity</label>
+          <div class="control">
+            <input class="input" id="part_quantity" name="quantity" value="{{ part.quantity if part and part.quantity is not none else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="part_location">Location</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="part_location" name="location_id">
+                <option value="">Select a location</option>
+                {% for loc in locations %}
+                  {% set is_selected = (part and part.location_id == loc.id) or (not part and preset_location_id and preset_location_id|int == loc.id) %}
+                  <option value="{{ loc.id }}" {% if is_selected %}selected{% endif %}>{{ loc.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label class="label" for="part_description">Description</label>
+          <div class="control">
+            <textarea class="textarea" id="part_description" name="description" rows="4">{{ part.description if part else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">{{ 'Save Changes' if part else 'Add Part' }}</button>
+        <a class="button is-small is-light" href="{{ next_url or url_for('main.parts_inventory') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

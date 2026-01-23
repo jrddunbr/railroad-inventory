@@ -147,6 +147,75 @@ class Location(BaseModel):
             return []
         return self._store.filter_by(LoadPlacement, location_id=self.id)
 
+    @property
+    def tools(self) -> list[ToolItem]:
+        if not self._store:
+            return []
+        return self._store.filter_by(ToolItem, location_id=self.id)
+
+    @property
+    def parts(self) -> list[PartItem]:
+        if not self._store:
+            return []
+        return self._store.filter_by(PartItem, location_id=self.id)
+
+
+@dataclass
+class ToolItem(BaseModel):
+    doc_type = "tool_item"
+    counter_key = "tool_items"
+    query = QueryDescriptor()
+
+    location_id: int | None = None
+    name: str | None = None
+    description: str | None = None
+    brand: str | None = None
+    quantity: int | None = None
+
+    _location_ref: Location | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def location(self) -> Location | None:
+        if self._location_ref is not None:
+            return self._location_ref
+        if not self._store or not self.location_id:
+            return None
+        return self._store.get(Location, self.location_id)
+
+    @location.setter
+    def location(self, value: Location | None) -> None:
+        self._location_ref = value
+        self.location_id = value.id if value else None
+
+
+@dataclass
+class PartItem(BaseModel):
+    doc_type = "part_item"
+    counter_key = "part_items"
+    query = QueryDescriptor()
+
+    location_id: int | None = None
+    name: str | None = None
+    description: str | None = None
+    brand: str | None = None
+    upc: str | None = None
+    quantity: int | None = None
+
+    _location_ref: Location | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def location(self) -> Location | None:
+        if self._location_ref is not None:
+            return self._location_ref
+        if not self._store or not self.location_id:
+            return None
+        return self._store.get(Location, self.location_id)
+
+    @location.setter
+    def location(self, value: Location | None) -> None:
+        self._location_ref = value
+        self.location_id = value.id if value else None
+
 
 @dataclass
 class Car(BaseModel):
@@ -489,8 +558,10 @@ __all__ = [
     "LoadPlacement",
     "LoadType",
     "Location",
+    "PartItem",
     "Railroad",
     "RailroadColorScheme",
     "RailroadLogo",
     "RailroadSlogan",
+    "ToolItem",
 ]

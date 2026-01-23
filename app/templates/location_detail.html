@@ -7,7 +7,10 @@ Location: {{ location.name }}
     <h1 class="title is-3">Location: {{ location.name }}</h1>
     <div class="actions buttons">
       <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.car_new', location=location.name) }}">Add Car</a>
       <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
+      <a class="button is-small is-link" href="{{ url_for('main.tool_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Tool</a>
+      <a class="button is-small is-link" href="{{ url_for('main.part_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Parts</a>
       <a class="button is-small is-link" href="{{ url_for('main.location_inventory_pdf', location_id=location.id) }}">Inventory PDF</a>
       {% if location.location_type == "flat" or location.flat_length or location.flat_rows %}
         <a class="button is-small is-link" href="{{ url_for('main.flat_pack', location_id=location.id) }}">Pack Flat</a>
@@ -160,6 +163,72 @@ Location: {{ location.name }}
         {% else %}
         <tr>
           <td colspan="3">No loads stored here.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3 class="title is-5">Tools</h3>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Brand</th>
+          <th>Quantity</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tool in tools %}
+        <tr>
+          <td>{{ tool.name or "-" }}</td>
+          <td>{{ tool.description or "-" }}</td>
+          <td>{{ tool.brand or "-" }}</td>
+          <td>{{ tool.quantity if tool.quantity is not none else "-" }}</td>
+          <td>
+            <a class="button is-small is-light" href="{{ url_for('main.tool_edit', tool_id=tool.id, next=url_for('main.location_detail', location_id=location.id)) }}">Edit</a>
+            <form method="post" action="{{ url_for('main.tool_delete', tool_id=tool.id, next=url_for('main.location_detail', location_id=location.id)) }}" data-action="delete" data-table="tool_items" data-id="{{ tool.id }}" data-id-field="id" data-entity-label="tool {{ tool.name or tool.id }}" style="display: inline;">
+              <button type="submit" class="button is-small is-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No tools stored here.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3 class="title is-5">Parts</h3>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Brand</th>
+          <th>UPC</th>
+          <th>Quantity</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for part in parts %}
+        <tr>
+          <td>{{ part.name or "-" }}</td>
+          <td>{{ part.description or "-" }}</td>
+          <td>{{ part.brand or "-" }}</td>
+          <td>{{ part.upc or "-" }}</td>
+          <td>{{ part.quantity if part.quantity is not none else "-" }}</td>
+          <td>
+            <a class="button is-small is-light" href="{{ url_for('main.part_edit', part_id=part.id, next=url_for('main.location_detail', location_id=location.id)) }}">Edit</a>
+            <form method="post" action="{{ url_for('main.part_delete', part_id=part.id, next=url_for('main.location_detail', location_id=location.id)) }}" data-action="delete" data-table="part_items" data-id="{{ part.id }}" data-id-field="id" data-entity-label="part {{ part.name or part.id }}" style="display: inline;">
+              <button type="submit" class="button is-small is-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">No parts stored here.</td>
         </tr>
         {% endfor %}
       </tbody>

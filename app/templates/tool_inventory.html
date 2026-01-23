@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Tool Inventory{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Tool Inventory</h1>
+    <div class="actions buttons">
+      <a class="button is-small is-primary" href="{{ url_for('main.tool_new') }}">Add Tool</a>
+    </div>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Brand</th>
+          <th>Quantity</th>
+          <th>Location</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tool in tools %}
+        <tr>
+          <td>{{ tool.name or "-" }}</td>
+          <td>{{ tool.description or "-" }}</td>
+          <td>{{ tool.brand or "-" }}</td>
+          <td>{{ tool.quantity if tool.quantity is not none else "-" }}</td>
+          <td>
+            {% if tool.location %}
+              <a href="{{ url_for('main.location_detail', location_id=tool.location.id) }}">{{ tool.location.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            <a class="button is-small is-light" href="{{ url_for('main.tool_edit', tool_id=tool.id, next=url_for('main.tool_inventory')) }}">Edit</a>
+            <form method="post" action="{{ url_for('main.tool_delete', tool_id=tool.id, next=url_for('main.tool_inventory')) }}" data-action="delete" data-table="tool_items" data-id="{{ tool.id }}" data-id-field="id" data-entity-label="tool {{ tool.name or tool.id }}" style="display: inline;">
+              <button type="submit" class="button is-small is-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">No tools in inventory yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

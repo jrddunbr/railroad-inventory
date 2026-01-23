@@ -7,7 +7,7 @@ from flask import Flask, g
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.9.0"
+SCHEMA_VERSION = "2.10.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
@@ -41,6 +41,8 @@ def create_app() -> Flask:
             "railroad_logos",
             "railroad_slogans",
             "app_settings",
+            "tool_items",
+            "part_items",
         ],
         COUCHDB_TOTALS=[
             {"doc_type": "railroad", "counter_key": "railroads"},
@@ -56,6 +58,8 @@ def create_app() -> Flask:
             {"doc_type": "railroad_logo", "counter_key": "railroad_logos"},
             {"doc_type": "railroad_slogan", "counter_key": "railroad_slogans"},
             {"doc_type": "app_settings", "counter_key": "app_settings"},
+            {"doc_type": "tool_item", "counter_key": "tool_items"},
+            {"doc_type": "part_item", "counter_key": "part_items"},
         ],
         SCHEMA_VERSION=SCHEMA_VERSION,
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),

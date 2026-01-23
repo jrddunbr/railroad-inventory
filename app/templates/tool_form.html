@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}
+{% if tool %}
+  Edit Tool
+{% else %}
+  Add Tool
+{% endif %}
+{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">{{ 'Edit Tool' if tool else 'Add Tool' }}</h1>
+    <form method="post" action="{{ form_action }}" data-table="tool_items" data-id="{{ tool.id if tool else '' }}" data-id-field="id">
+      {% if next_url %}
+        <input type="hidden" name="next" value="{{ next_url }}" />
+      {% endif %}
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="tool_name">Name</label>
+          <div class="control">
+            <input class="input" id="tool_name" name="name" value="{{ tool.name if tool else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="tool_brand">Brand</label>
+          <div class="control">
+            <input class="input" id="tool_brand" name="brand" value="{{ tool.brand if tool else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="tool_quantity">Quantity</label>
+          <div class="control">
+            <input class="input" id="tool_quantity" name="quantity" value="{{ tool.quantity if tool and tool.quantity is not none else '' }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="tool_location">Location</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="tool_location" name="location_id">
+                <option value="">Select a location</option>
+                {% for loc in locations %}
+                  {% set is_selected = (tool and tool.location_id == loc.id) or (not tool and preset_location_id and preset_location_id|int == loc.id) %}
+                  <option value="{{ loc.id }}" {% if is_selected %}selected{% endif %}>{{ loc.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field" style="grid-column: 1 / -1;">
+          <label class="label" for="tool_description">Description</label>
+          <div class="control">
+            <textarea class="textarea" id="tool_description" name="description" rows="4">{{ tool.description if tool else '' }}</textarea>
+          </div>
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">{{ 'Save Changes' if tool else 'Add Tool' }}</button>
+        <a class="button is-small is-light" href="{{ next_url or url_for('main.tool_inventory') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

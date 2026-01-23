@@ -29,6 +29,8 @@ from app.models import (
     RailroadColorScheme,
     RailroadLogo,
     RailroadSlogan,
+    ToolItem,
+    PartItem,
 )
 
 
@@ -1675,6 +1677,184 @@ def railroad_edit(railroad_id: int):
 @main_bp.route("/tools")
 def tools():
     return render_template("tools.html")
+
+
+def attach_location_refs(items: list) -> None:
+    location_ids = {item.location_id for item in items if getattr(item, "location_id", None)}
+    locations = {loc_id: Location.query.get(loc_id) for loc_id in location_ids}
+    for item in items:
+        loc_id = getattr(item, "location_id", None)
+        if loc_id:
+            item._location_ref = locations.get(loc_id)
+
+
+def parse_quantity(value: str) -> int | None:
+    value = value.strip()
+    if not value:
+        return None
+    if value.isdigit():
+        return int(value)
+    return None
+
+
+def apply_tool_form(tool: ToolItem, form) -> str | None:
+    name = form.get("name", "").strip()
+    location_id = form.get("location_id", "").strip()
+    if not name:
+        return "Tool name is required."
+    if not location_id.isdigit():
+        return "Location is required."
+    tool.name = name
+    tool.description = form.get("description", "").strip()
+    tool.brand = form.get("brand", "").strip()
+    tool.quantity = parse_quantity(form.get("quantity", ""))
+    tool.location_id = int(location_id)
+    return None
+
+
+def apply_part_form(part: PartItem, form) -> str | None:
+    name = form.get("name", "").strip()
+    location_id = form.get("location_id", "").strip()
+    if not name:
+        return "Part name is required."
+    if not location_id.isdigit():
+        return "Location is required."
+    part.name = name
+    part.description = form.get("description", "").strip()
+    part.brand = form.get("brand", "").strip()
+    part.upc = form.get("upc", "").strip()
+    part.quantity = parse_quantity(form.get("quantity", ""))
+    part.location_id = int(location_id)
+    return None
+
+
+def redirect_next(fallback: str):
+    next_url = request.form.get("next", "").strip() or request.args.get("next", "").strip()
+    return redirect(next_url or fallback)
+
+
+@main_bp.route("/tool-inventory")
+def tool_inventory():
+    tools = ToolItem.query.order_by("name").all()
+    attach_location_refs(tools)
+    return render_template("tool_inventory.html", tools=tools)
+
+
+@main_bp.route("/tool-inventory/new", methods=["GET", "POST"])
+def tool_new():
+    locations = Location.query.order_by("name").all()
+    preset_location_id = request.args.get("location_id", "").strip()
+    next_url = request.args.get("next", "").strip()
+    if request.method == "POST":
+        tool = ToolItem()
+        error = apply_tool_form(tool, request.form)
+        if error:
+            return error, 400
+        db.session.add(tool)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect_next(url_for("main.tool_inventory"))
+    return render_template(
+        "tool_form.html",
+        tool=None,
+        locations=locations,
+        preset_location_id=preset_location_id,
+        form_action=url_for("main.tool_new", location_id=preset_location_id, next=next_url),
+        next_url=next_url,
+    )
+
+
+@main_bp.route("/tool-inventory/<int:tool_id>/edit", methods=["GET", "POST"])
+def tool_edit(tool_id: int):
+    tool = ToolItem.query.get_or_404(tool_id)
+    locations = Location.query.order_by("name").all()
+    next_url = request.args.get("next", "").strip()
+    if request.method == "POST":
+        error = apply_tool_form(tool, request.form)
+        if error:
+            return error, 400
+        db.session.commit()
+        ensure_db_backup()
+        return redirect_next(url_for("main.tool_inventory"))
+    return render_template(
+        "tool_form.html",
+        tool=tool,
+        locations=locations,
+        preset_location_id=str(tool.location_id or ""),
+        form_action=url_for("main.tool_edit", tool_id=tool.id, next=next_url),
+        next_url=next_url,
+    )
+
+
+@main_bp.route("/tool-inventory/<int:tool_id>/delete", methods=["POST"])
+def tool_delete(tool_id: int):
+    tool = ToolItem.query.get_or_404(tool_id)
+    db.session.delete(tool)
+    db.session.commit()
+    ensure_db_backup()
+    return redirect_next(url_for("main.tool_inventory"))
+
+
+@main_bp.route("/parts-inventory")
+def parts_inventory():
+    parts = PartItem.query.order_by("name").all()
+    attach_location_refs(parts)
+    return render_template("parts_inventory.html", parts=parts)
+
+
+@main_bp.route("/parts-inventory/new", methods=["GET", "POST"])
+def part_new():
+    locations = Location.query.order_by("name").all()
+    preset_location_id = request.args.get("location_id", "").strip()
+    next_url = request.args.get("next", "").strip()
+    if request.method == "POST":
+        part = PartItem()
+        error = apply_part_form(part, request.form)
+        if error:
+            return error, 400
+        db.session.add(part)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect_next(url_for("main.parts_inventory"))
+    return render_template(
+        "part_form.html",
+        part=None,
+        locations=locations,
+        preset_location_id=preset_location_id,
+        form_action=url_for("main.part_new", location_id=preset_location_id, next=next_url),
+        next_url=next_url,
+    )
+
+
+@main_bp.route("/parts-inventory/<int:part_id>/edit", methods=["GET", "POST"])
+def part_edit(part_id: int):
+    part = PartItem.query.get_or_404(part_id)
+    locations = Location.query.order_by("name").all()
+    next_url = request.args.get("next", "").strip()
+    if request.method == "POST":
+        error = apply_part_form(part, request.form)
+        if error:
+            return error, 400
+        db.session.commit()
+        ensure_db_backup()
+        return redirect_next(url_for("main.parts_inventory"))
+    return render_template(
+        "part_form.html",
+        part=part,
+        locations=locations,
+        preset_location_id=str(part.location_id or ""),
+        form_action=url_for("main.part_edit", part_id=part.id, next=next_url),
+        next_url=next_url,
+    )
+
+
+@main_bp.route("/parts-inventory/<int:part_id>/delete", methods=["POST"])
+def part_delete(part_id: int):
+    part = PartItem.query.get_or_404(part_id)
+    db.session.delete(part)
+    db.session.commit()
+    ensure_db_backup()
+    return redirect_next(url_for("main.parts_inventory"))
 
 
 @main_bp.route("/tools/aar-plate-viewer")
@@ -3858,6 +4038,8 @@ def location_inventory_pdf(location_id: int):
 def location_detail(location_id: int):
     location = Location.query.get_or_404(location_id)
     cars = Car.query.filter_by(location_id=location.id).order_by("id", reverse=True).all()
+    tools = ToolItem.query.filter_by(location_id=location.id).order_by("name").all()
+    parts = PartItem.query.filter_by(location_id=location.id).order_by("name").all()
     page_size = get_page_size()
     page = get_page_number()
     paged_cars, cars_pagination = paginate_list(
@@ -3872,6 +4054,8 @@ def location_detail(location_id: int):
         location=location,
         cars=paged_cars,
         cars_pagination=cars_pagination,
+        tools=tools,
+        parts=parts,
     )
 
 
@@ -4246,6 +4430,7 @@ def car_new():
         "brand": request.args.get("brand", "").strip(),
         "price": request.args.get("price", "").strip(),
         "msrp": request.args.get("msrp", "").strip(),
+        "location": request.args.get("location", "").strip(),
     }
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()

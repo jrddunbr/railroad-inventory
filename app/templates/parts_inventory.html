@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Parts Inventory{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Parts Inventory</h1>
+    <div class="actions buttons">
+      <a class="button is-small is-primary" href="{{ url_for('main.part_new') }}">Add Part</a>
+    </div>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Description</th>
+          <th>Brand</th>
+          <th>UPC</th>
+          <th>Quantity</th>
+          <th>Location</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for part in parts %}
+        <tr>
+          <td>{{ part.name or "-" }}</td>
+          <td>{{ part.description or "-" }}</td>
+          <td>{{ part.brand or "-" }}</td>
+          <td>{{ part.upc or "-" }}</td>
+          <td>{{ part.quantity if part.quantity is not none else "-" }}</td>
+          <td>
+            {% if part.location %}
+              <a href="{{ url_for('main.location_detail', location_id=part.location.id) }}">{{ part.location.name }}</a>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            <a class="button is-small is-light" href="{{ url_for('main.part_edit', part_id=part.id, next=url_for('main.parts_inventory')) }}">Edit</a>
+            <form method="post" action="{{ url_for('main.part_delete', part_id=part.id, next=url_for('main.parts_inventory')) }}" data-action="delete" data-table="part_items" data-id="{{ part.id }}" data-id-field="id" data-entity-label="part {{ part.name or part.id }}" style="display: inline;">
+              <button type="submit" class="button is-small is-danger">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">No parts in inventory yet.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

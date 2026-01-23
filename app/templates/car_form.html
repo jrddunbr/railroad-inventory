@@ -18,7 +18,7 @@
           <div class="field">
             <label class="label" for="location">Location</label>
             <div class="control">
-              <input class="input" list="locations" id="location" name="location" value="{{ car.location.name if car and car.location else '' }}" />
+              <input class="input" list="locations" id="location" name="location" value="{{ car.location.name if car and car.location else prefill.get('location', '') }}" />
               <datalist id="locations">
                 {% for loc in locations %}
                   <option value="{{ loc.name }}"></option>
