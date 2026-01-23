@@ -71,6 +71,7 @@ Location: {{ location.name }}
         <p><strong>Gauge:</strong> {{ location.flat_gauge }}</p>
       {% endif %}
     {% endif %}
+    {% if cars_pagination.total %}
     <h3 class="title is-5">Cars</h3>
     <p class="keyboard-hint">Results: {{ cars_pagination.total }}</p>
     <table class="table is-fullwidth is-striped">
@@ -130,13 +131,11 @@ Location: {{ location.name }}
             {% endif %}
           </td>
         </tr>
-        {% else %}
-        <tr>
-          <td colspan="5">No cars in this location yet.</td>
-        </tr>
         {% endfor %}
       </tbody>
     </table>
+    {% endif %}
+    {% if location.load_placements %}
     <h3 class="title is-5">Loads</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -158,13 +157,11 @@ Location: {{ location.name }}
             </form>
           </td>
         </tr>
-        {% else %}
-        <tr>
-          <td colspan="3">No loads stored here.</td>
-        </tr>
         {% endfor %}
       </tbody>
     </table>
+    {% endif %}
+    {% if tools %}
     <h3 class="title is-5">Tools</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -190,13 +187,11 @@ Location: {{ location.name }}
             </form>
           </td>
         </tr>
-        {% else %}
-        <tr>
-          <td colspan="5">No tools stored here.</td>
-        </tr>
         {% endfor %}
       </tbody>
     </table>
+    {% endif %}
+    {% if parts %}
     <h3 class="title is-5">Parts</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -224,15 +219,13 @@ Location: {{ location.name }}
             </form>
           </td>
         </tr>
-        {% else %}
-        <tr>
-          <td colspan="6">No parts stored here.</td>
-        </tr>
         {% endfor %}
       </tbody>
     </table>
+    {% endif %}
     {% if child_cars or child_tools or child_parts %}
       <h3 class="title is-5">Child Location Inventory</h3>
+      {% if child_cars %}
       <h4 class="title is-6">Cars</h4>
       <table class="table is-fullwidth is-striped">
         <thead>
@@ -299,14 +292,12 @@ Location: {{ location.name }}
               {% endif %}
             </td>
           </tr>
-          {% else %}
-          <tr>
-            <td colspan="6">No cars stored in child locations.</td>
-          </tr>
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
 
+      {% if child_tools %}
       <h4 class="title is-6">Tools</h4>
       <table class="table is-fullwidth is-striped">
         <thead>
@@ -333,14 +324,12 @@ Location: {{ location.name }}
               {% endif %}
             </td>
           </tr>
-          {% else %}
-          <tr>
-            <td colspan="5">No tools stored in child locations.</td>
-          </tr>
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
 
+      {% if child_parts %}
       <h4 class="title is-6">Parts</h4>
       <table class="table is-fullwidth is-striped">
         <thead>
@@ -369,22 +358,15 @@ Location: {{ location.name }}
               {% endif %}
             </td>
           </tr>
-          {% else %}
-          <tr>
-            <td colspan="6">No parts stored in child locations.</td>
-          </tr>
           {% endfor %}
         </tbody>
       </table>
+      {% endif %}
     {% endif %}
-    {% if cars_pagination %}
+    {% if cars_pagination and cars_pagination.total %}
       <div class="pagination">
         <div class="pagination-info">
-          {% if cars_pagination.total %}
-            Showing {{ cars_pagination.start }}-{{ cars_pagination.end }} of {{ cars_pagination.total }}
-          {% else %}
-            No results.
-          {% endif %}
+          Showing {{ cars_pagination.start }}-{{ cars_pagination.end }} of {{ cars_pagination.total }}
         </div>
         {% if cars_pagination.pages > 1 %}
           <div class="pagination-controls">
