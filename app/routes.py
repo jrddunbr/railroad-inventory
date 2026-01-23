@@ -4040,6 +4040,19 @@ def location_detail(location_id: int):
     cars = Car.query.filter_by(location_id=location.id).order_by("id", reverse=True).all()
     tools = ToolItem.query.filter_by(location_id=location.id).order_by("name").all()
     parts = PartItem.query.filter_by(location_id=location.id).order_by("name").all()
+    descendant_ids = get_location_descendant_ids(location)
+    child_cars = []
+    child_tools = []
+    child_parts = []
+    child_locations = {}
+    if descendant_ids:
+        child_locations = {loc.id: loc for loc in Location.query.all() if loc.id in descendant_ids}
+        child_cars = [car for car in Car.query.all() if car.location_id in descendant_ids]
+        prefetch_car_relations(child_cars)
+        child_tools = [tool for tool in ToolItem.query.all() if tool.location_id in descendant_ids]
+        child_parts = [part for part in PartItem.query.all() if part.location_id in descendant_ids]
+        attach_location_refs(child_tools)
+        attach_location_refs(child_parts)
     page_size = get_page_size()
     page = get_page_number()
     paged_cars, cars_pagination = paginate_list(
@@ -4056,6 +4069,9 @@ def location_detail(location_id: int):
         cars_pagination=cars_pagination,
         tools=tools,
         parts=parts,
+        child_cars=child_cars,
+        child_tools=child_tools,
+        child_parts=child_parts,
     )
 
 

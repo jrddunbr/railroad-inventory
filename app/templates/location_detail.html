@@ -8,6 +8,7 @@ Location: {{ location.name }}
     <div class="actions buttons">
       <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
       <a class="button is-small is-primary" href="{{ url_for('main.car_new', location=location.name) }}">Add Car</a>
+      <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
       <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
       <a class="button is-small is-link" href="{{ url_for('main.tool_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Tool</a>
       <a class="button is-small is-link" href="{{ url_for('main.part_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Parts</a>
@@ -137,9 +138,6 @@ Location: {{ location.name }}
       </tbody>
     </table>
     <h3 class="title is-5">Loads</h3>
-    <div class="actions buttons">
-      <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
-    </div>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
@@ -233,6 +231,152 @@ Location: {{ location.name }}
         {% endfor %}
       </tbody>
     </table>
+    {% if child_cars or child_tools or child_parts %}
+      <h3 class="title is-5">Child Location Inventory</h3>
+      <h4 class="title is-6">Cars</h4>
+      <table class="table is-fullwidth is-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Reporting Mark</th>
+            <th>Car #</th>
+            <th>Type</th>
+            <th>Class</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for car in child_cars %}
+          <tr>
+            <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
+            <td>
+              {% if car.railroad %}
+                <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.reporting_mark or "-" }}</a>
+              {% else %}
+                {{ car.reporting_mark_override or "-" }}
+              {% endif %}
+            </td>
+            <td>
+              {% if car.car_number %}
+                <span class="icon-text">
+                  <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+                  {% if car.repairs_required %}
+                    <span class="icon">
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path fill="#4a4a4a" d="M21 6.6l-2.4 2.4-2.6-.3-.3-2.6L18 3.7A6.3 6.3 0 0011.2 12l-6.4 6.4a2.1 2.1 0 003 3l6.4-6.4A6.3 6.3 0 0021 6.6z"/>
+                      </svg>
+                    </span>
+                  {% endif %}
+                </span>
+              {% else %}
+                {% if car.repairs_required %}
+                  <span class="icon-text">
+                    <span>-</span>
+                    <span class="icon">
+                      <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                        <path fill="#4a4a4a" d="M21 6.6l-2.4 2.4-2.6-.3-.3-2.6L18 3.7A6.3 6.3 0 0011.2 12l-6.4 6.4a2.1 2.1 0 003 3l6.4-6.4A6.3 6.3 0 0021 6.6z"/>
+                      </svg>
+                    </span>
+                  </span>
+                {% else %}
+                  -
+                {% endif %}
+              {% endif %}
+            </td>
+            <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
+            <td>
+              {% if car.car_class %}
+                <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+            <td>
+              {% if car.location %}
+                <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6">No cars stored in child locations.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h4 class="title is-6">Tools</h4>
+      <table class="table is-fullwidth is-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Brand</th>
+            <th>Quantity</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tool in child_tools %}
+          <tr>
+            <td>{{ tool.name or "-" }}</td>
+            <td>{{ tool.description or "-" }}</td>
+            <td>{{ tool.brand or "-" }}</td>
+            <td>{{ tool.quantity if tool.quantity is not none else "-" }}</td>
+            <td>
+              {% if tool.location %}
+                <a href="{{ url_for('main.location_detail', location_id=tool.location.id) }}">{{ tool.location.name }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="5">No tools stored in child locations.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h4 class="title is-6">Parts</h4>
+      <table class="table is-fullwidth is-striped">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Description</th>
+            <th>Brand</th>
+            <th>UPC</th>
+            <th>Quantity</th>
+            <th>Location</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for part in child_parts %}
+          <tr>
+            <td>{{ part.name or "-" }}</td>
+            <td>{{ part.description or "-" }}</td>
+            <td>{{ part.brand or "-" }}</td>
+            <td>{{ part.upc or "-" }}</td>
+            <td>{{ part.quantity if part.quantity is not none else "-" }}</td>
+            <td>
+              {% if part.location %}
+                <a href="{{ url_for('main.location_detail', location_id=part.location.id) }}">{{ part.location.name }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6">No parts stored in child locations.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
     {% if cars_pagination %}
       <div class="pagination">
         <div class="pagination-info">
