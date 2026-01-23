@@ -2049,6 +2049,26 @@ def draw_wrapped_text(draw, text, x, y, max_width, font, line_height) -> None:
         draw.text((x, y), " ".join(line), fill="#111111", font=font)
 
 
+def wrap_text_lines(draw, text, max_width, font) -> list[str]:
+    if not text:
+        return []
+    words = text.split()
+    lines = []
+    line = []
+    for word in words:
+        test = " ".join(line + [word]).strip()
+        if not test:
+            continue
+        if draw.textlength(test, font=font) <= max_width or not line:
+            line.append(word)
+        else:
+            lines.append(" ".join(line))
+            line = [word]
+    if line:
+        lines.append(" ".join(line))
+    return lines
+
+
 def draw_centered_text(draw, text, x, y, width, font) -> None:
     if not text:
         return
@@ -2176,7 +2196,16 @@ def code128_values(text: str) -> list[int]:
     return values
 
 
-def draw_code128(draw, text: str, x: int, y: int, height: int, max_width: int, center: bool = False) -> int:
+def draw_code128(
+    draw,
+    text: str,
+    x: int,
+    y: int,
+    height: int,
+    max_width: int,
+    center: bool = False,
+    module_width_max: int = 2,
+) -> int:
     values = code128_values(text)
     if not values or height <= 0 or max_width <= 0:
         return 0
@@ -2190,7 +2219,7 @@ def draw_code128(draw, text: str, x: int, y: int, height: int, max_width: int, c
     modules = sum(sum(int(digit) for digit in pattern) for pattern in patterns)
     if modules <= 0:
         return 0
-    module_width = max(1, min(2, max_width // modules))
+    module_width = max(1, min(module_width_max, max_width // modules))
     total_width = modules * module_width
     cursor = x
     if center and max_width > total_width:
@@ -2204,6 +2233,41 @@ def draw_code128(draw, text: str, x: int, y: int, height: int, max_width: int, c
             cursor += width
             is_bar = not is_bar
     return total_width
+
+
+def draw_barcode_with_label(
+    draw,
+    code: str,
+    label_lines: list[str],
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    label_font,
+    label_line_height: int,
+    module_width_max: int = 2,
+    barcode_height_scale: float = 1.0,
+) -> None:
+    label_height = max(len(label_lines) * label_line_height, 0)
+    barcode_height = max(int(height - label_height - 2), int(label_line_height * 2))
+    barcode_height = min(barcode_height, height)
+    barcode_height = max(int(barcode_height * barcode_height_scale), int(label_line_height * 2))
+    draw_code128(
+        draw,
+        code,
+        x,
+        y,
+        barcode_height,
+        width,
+        center=True,
+        module_width_max=module_width_max,
+    )
+    label_y = y + barcode_height + 2
+    for line in label_lines:
+        label_width = draw.textlength(line, font=label_font)
+        label_x = x + max((width - label_width) / 2, 0)
+        draw.text((label_x, label_y), line, fill="#111111", font=label_font)
+        label_y += label_line_height
 
 
 @main_bp.route("/tools/prr-home-shop-repair", methods=["GET", "POST"])
@@ -3604,6 +3668,192 @@ def flat_pack_pdf(location_id: int):
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
+
+@main_bp.route("/locations/<int:location_id>/inventory/pdf")
+def location_inventory_pdf(location_id: int):
+    location = Location.query.get_or_404(location_id)
+    cars = Car.query.filter_by(location_id=location.id).order_by("id").all()
+    if not cars:
+        return "No cars in this location.", 400
+    prefetch_car_relations(cars)
+
+    dpi = 200
+    page_width_in = 8.5
+    page_height_in = 11.0
+    margin_in = 0.25
+    top_label_height_in = 0.75
+    top_label_gap_in = 0.2
+    columns = 3
+    rows = 10
+    page_width_px = int(round(page_width_in * dpi))
+    page_height_px = int(round(page_height_in * dpi))
+    margin_px = int(round(margin_in * dpi))
+    top_label_height_px = int(round(top_label_height_in * dpi))
+    top_label_gap_px = int(round(top_label_gap_in * dpi))
+    table_top_px = margin_px + top_label_height_px + top_label_gap_px
+    table_height_px = page_height_px - margin_px - table_top_px
+    table_width_px = page_width_px - (margin_px * 2)
+    cell_width_px = max(int(table_width_px / columns), 1)
+    cell_height_px = max(int(table_height_px / rows), 1)
+    top_label_width_px = cell_width_px
+
+    inner_margin = int(dpi * 0.05)
+    text_width = max(cell_width_px - (inner_margin * 2), 1)
+
+    title_size = max(int(dpi * 0.12), 22)
+    class_size = max(int(dpi * 0.1), 18)
+    label_size = max(int(dpi * 0.09), 16)
+    try:
+        title_font = ImageFont.truetype("DejaVuSans-Bold.ttf", size=title_size)
+        class_font = ImageFont.truetype("DejaVuSans.ttf", size=class_size)
+        label_font = ImageFont.truetype("DejaVuSans.ttf", size=label_size)
+    except OSError:
+        title_font = ImageFont.load_default()
+        class_font = title_font
+        label_font = title_font
+
+    title_line_height = title_size + 2
+    class_line_height = class_size + 2
+    label_line_height = label_size + 2
+
+    labels_per_page = columns * rows
+    page_images = []
+    page_draw = None
+
+    for idx, car in enumerate(cars):
+        if idx % labels_per_page == 0:
+            page_image = Image.new("RGB", (page_width_px, page_height_px), "white")
+            page_images.append(page_image)
+            page_draw = ImageDraw.Draw(page_image)
+            table_left = margin_px
+            table_top = table_top_px
+            table_right = table_left + (cell_width_px * columns)
+            table_bottom = table_top + (cell_height_px * rows)
+            page_draw.rectangle(
+                [table_left, table_top, table_right, table_bottom],
+                outline="#111111",
+                width=1,
+            )
+            for col_idx in range(1, columns):
+                x = table_left + col_idx * cell_width_px
+                page_draw.line([(x, table_top), (x, table_bottom)], fill="#111111", width=1)
+            for row_idx in range(1, rows):
+                y = table_top + row_idx * cell_height_px
+                page_draw.line([(table_left, y), (table_right, y)], fill="#111111", width=1)
+
+            if len(page_images) == 1:
+                location_code = location.name or f"Location {location.id}"
+                label_x = margin_px
+                label_y = margin_px
+                label_text_width = max(top_label_width_px - (inner_margin * 2), 1)
+                header_line = location_code
+                line_width = page_draw.textlength(header_line, font=title_font)
+                text_x = label_x + inner_margin + max((label_text_width - line_width) / 2, 0)
+                text_y = label_y + inner_margin
+                page_draw.text((text_x, text_y), header_line, fill="#111111", font=title_font)
+                barcode_top = text_y + title_line_height + int(dpi * 0.02)
+                barcode_height = label_y + top_label_height_px - inner_margin - barcode_top
+                if barcode_height <= label_line_height:
+                    barcode_top = label_y + inner_margin
+                    barcode_height = max(top_label_height_px - (inner_margin * 2), 1)
+                label_lines = wrap_text_lines(page_draw, location_code, label_text_width, label_font)
+                if not label_lines:
+                    label_lines = [location_code]
+                draw_barcode_with_label(
+                    page_draw,
+                    location_code,
+                    label_lines[:2],
+                    label_x + inner_margin,
+                    int(barcode_top),
+                    label_text_width,
+                    int(barcode_height),
+                    label_font,
+                    label_line_height,
+                    module_width_max=6,
+                    barcode_height_scale=0.7,
+                )
+        if page_draw is None:
+            continue
+        local_index = idx % labels_per_page
+        row = local_index // columns
+        col = local_index % columns
+        origin_x = margin_px + col * cell_width_px
+        origin_y = table_top_px + row * cell_height_px
+        cursor_y = origin_y + inner_margin
+
+        text_top = cursor_y
+        reporting_mark = car.railroad.reporting_mark if car.railroad else car.reporting_mark_override
+        car_number = car.car_number
+        header_line = ""
+        if reporting_mark and car_number:
+            header_line = f"{reporting_mark} {car_number}"
+        elif reporting_mark:
+            header_line = reporting_mark
+        elif car_number:
+            header_line = str(car_number)
+        else:
+            header_line = f"Car {car.id}"
+
+        text_lines = [header_line]
+        class_info = build_car_type_class(car)
+        if class_info:
+            class_lines = wrap_text_lines(page_draw, class_info, text_width, class_font)
+            if class_lines:
+                text_lines.append(class_lines[0])
+        text_lines = text_lines[:2]
+        for line in text_lines:
+            line_width = page_draw.textlength(line, font=title_font if line == header_line else class_font)
+            page_draw.text(
+                (origin_x + inner_margin + max((text_width - line_width) / 2, 0), cursor_y),
+                line,
+                fill="#111111",
+                font=title_font if line == header_line else class_font,
+            )
+            cursor_y += title_line_height if line == header_line else class_line_height
+
+        cursor_y += int(dpi * 0.02)
+        text_bottom = max(cursor_y - int(dpi * 0.02), text_top)
+        barcode_top = cursor_y
+        barcode_area_height = origin_y + cell_height_px - inner_margin - barcode_top
+        if barcode_area_height <= label_line_height:
+            barcode_top = origin_y + inner_margin
+            barcode_area_height = max(cell_height_px - (inner_margin * 2), 1)
+
+        car_code = f"C{car.id}"
+        draw_barcode_with_label(
+            page_draw,
+            car_code,
+            [car_code],
+            origin_x + inner_margin,
+            int(barcode_top),
+            text_width,
+            int(barcode_area_height),
+            label_font,
+            label_line_height,
+            module_width_max=6,
+            barcode_height_scale=0.7,
+        )
+
+    output = io.BytesIO()
+    pdf_images = [page_images[0].convert("RGB")]
+    pdf_images[0].save(
+        output,
+        format="PDF",
+        save_all=True,
+        append_images=[img.convert("RGB") for img in page_images[1:]],
+        resolution=dpi,
+        quality=100,
+        subsampling=0,
+    )
+    output.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f"location-inventory-{location.id}-{timestamp}.pdf"
+    return Response(
+        output.getvalue(),
+        mimetype="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
 @main_bp.route("/locations/<int:location_id>")
 def location_detail(location_id: int):
     location = Location.query.get_or_404(location_id)
@@ -4052,6 +4302,16 @@ def search():
         if car:
             return redirect(url_for("main.car_detail", car_id=car.id))
     cars = search_cars(query)
+    needle = query.lower()
+    if needle:
+        car_number_match = any(car.car_number == query for car in cars if car.car_number)
+        location_matches = [
+            location
+            for location in Location.query.all()
+            if location.name and location.name.strip().lower() == needle
+        ]
+        if len(location_matches) == 1 and not car_number_match:
+            return redirect(url_for("main.location_detail", location_id=location_matches[0].id))
     return render_template("search.html", cars=cars, query=query)
 
 

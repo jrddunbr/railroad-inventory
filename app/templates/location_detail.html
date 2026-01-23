@@ -8,6 +8,7 @@ Location: {{ location.name }}
     <div class="actions buttons">
       <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
       <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
+      <a class="button is-small is-link" href="{{ url_for('main.location_inventory_pdf', location_id=location.id) }}">Inventory PDF</a>
       {% if location.location_type == "flat" or location.flat_length or location.flat_rows %}
         <a class="button is-small is-link" href="{{ url_for('main.flat_pack', location_id=location.id) }}">Pack Flat</a>
       {% endif %}
