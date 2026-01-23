@@ -92,9 +92,29 @@ Location: {{ location.name }}
           </td>
           <td>
             {% if car.car_number %}
-              <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+              <span class="icon-text">
+                <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+                {% if car.repairs_required %}
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <path fill="#4a4a4a" d="M21 6.6l-2.4 2.4-2.6-.3-.3-2.6L18 3.7A6.3 6.3 0 0011.2 12l-6.4 6.4a2.1 2.1 0 003 3l6.4-6.4A6.3 6.3 0 0021 6.6z"/>
+                    </svg>
+                  </span>
+                {% endif %}
+              </span>
             {% else %}
-              -
+              {% if car.repairs_required %}
+                <span class="icon-text">
+                  <span>-</span>
+                  <span class="icon">
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <path fill="#4a4a4a" d="M21 6.6l-2.4 2.4-2.6-.3-.3-2.6L18 3.7A6.3 6.3 0 0011.2 12l-6.4 6.4a2.1 2.1 0 003 3l6.4-6.4A6.3 6.3 0 0021 6.6z"/>
+                    </svg>
+                  </span>
+                </span>
+              {% else %}
+                -
+              {% endif %}
             {% endif %}
           </td>
           <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
