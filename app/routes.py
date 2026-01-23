@@ -4503,6 +4503,7 @@ def search():
         if car:
             return redirect(url_for("main.car_detail", car_id=car.id))
     cars = search_cars(query)
+    parts = search_parts(query)
     needle = query.lower()
     if needle:
         car_number_match = any(car.car_number == query for car in cars if car.car_number)
@@ -4513,7 +4514,7 @@ def search():
         ]
         if len(location_matches) == 1 and not car_number_match:
             return redirect(url_for("main.location_detail", location_id=location_matches[0].id))
-    return render_template("search.html", cars=cars, query=query)
+    return render_template("search.html", cars=cars, parts=parts, query=query)
 
 
 @main_bp.route("/api/cars")
@@ -4590,9 +4591,15 @@ def api_car_classes():
 def api_search():
     query = request.args.get("q", "").strip()
     if not query:
-        return jsonify([])
+        return jsonify({"cars": [], "parts": []})
     cars = search_cars(query)
-    return jsonify([serialize_car(car) for car in cars])
+    parts = search_parts(query)
+    return jsonify(
+        {
+            "cars": [serialize_car(car) for car in cars],
+            "parts": [serialize_part(part) for part in parts],
+        }
+    )
 
 
 def search_cars(query: str) -> list[Car]:
@@ -4615,6 +4622,7 @@ def search_cars(query: str) -> list[Car]:
             car.actual_length,
             car.scale,
             car.gauge,
+            car.upc,
             str(car.id),
             f"c{car.id}",
         ]
@@ -4626,6 +4634,32 @@ def search_cars(query: str) -> list[Car]:
             values.append(car.location.name)
         if any(matches(value) for value in values):
             results.append(car)
+    return results
+
+
+def search_parts(query: str) -> list[PartItem]:
+    if not query:
+        return []
+    needle = query.lower()
+
+    def matches(value: str | None) -> bool:
+        return bool(value) and needle in value.lower()
+
+    results = []
+    for part in PartItem.query.all():
+        values = [
+            part.name,
+            part.description,
+            part.brand,
+            part.upc,
+            str(part.id),
+        ]
+        if part.quantity is not None:
+            values.append(str(part.quantity))
+        if part.location:
+            values.append(part.location.name)
+        if any(matches(value) for value in values):
+            results.append(part)
     return results
 
 
@@ -5119,4 +5153,16 @@ def serialize_car(car: Car) -> dict:
         "tender_axles_override": car.tender_axles_override,
         "is_locomotive_override": car.is_locomotive_override,
         "is_locomotive": is_locomotive,
+    }
+
+
+def serialize_part(part: PartItem) -> dict:
+    return {
+        "id": part.id,
+        "name": part.name,
+        "description": part.description,
+        "brand": part.brand,
+        "upc": part.upc,
+        "quantity": part.quantity,
+        "location": part.location.name if part.location else None,
     }

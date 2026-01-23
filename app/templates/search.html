@@ -7,65 +7,102 @@
     <h1 class="title is-3">Search</h1>
     <form method="get" action="{{ url_for('main.search') }}">
       <div class="actions buttons">
-        <input class="input" name="q" placeholder="Search by location, car number, or notes" value="{{ query }}" />
+        <input class="input" name="q" placeholder="Search by location, car number, UPC, or notes" value="{{ query }}" />
         <button type="submit" class="button is-small is-primary">Search</button>
       </div>
     </form>
     {% if query %}
       <h3 class="title is-5">Results for "{{ query }}"</h3>
-      <p class="keyboard-hint">Results: {{ cars|length }}</p>
-      <table class="table is-fullwidth is-striped">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Reporting Mark</th>
-            <th>Car #</th>
-            <th>Type</th>
-            <th>Class</th>
-            <th>Location</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for car in cars %}
-          <tr>
-            <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
-            <td>
-              {% if car.railroad %}
-                <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.reporting_mark or "-" }}</a>
-              {% else %}
-                {{ car.reporting_mark_override or "-" }}
-              {% endif %}
-            </td>
-            <td>
-              {% if car.car_number %}
-                <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
-              {% else %}
-                -
-              {% endif %}
-            </td>
-            <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
-            <td>
-              {% if car.car_class %}
-                <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
-              {% else %}
-                -
-              {% endif %}
-            </td>
-            <td>
-              {% if car.location %}
-                <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
-              {% else %}
-                -
-              {% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr>
-            <td colspan="6">No matches found.</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      {% set car_count = cars|length %}
+      {% set part_count = parts|length %}
+      <p class="keyboard-hint">Results: {{ car_count + part_count }} (Cars: {{ car_count }}, Parts: {{ part_count }})</p>
+      {% if car_count %}
+        <h4 class="title is-6">Cars</h4>
+        <table class="table is-fullwidth is-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Reporting Mark</th>
+              <th>Car #</th>
+              <th>Type</th>
+              <th>Class</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for car in cars %}
+            <tr>
+              <td><a href="{{ url_for('main.car_detail', car_id=car.id) }}">{{ car.id }}</a></td>
+              <td>
+                {% if car.railroad %}
+                  <a href="{{ url_for('main.railroad_detail', railroad_id=car.railroad.id) }}">{{ car.railroad.reporting_mark or "-" }}</a>
+                {% else %}
+                  {{ car.reporting_mark_override or "-" }}
+                {% endif %}
+              </td>
+              <td>
+                {% if car.car_number %}
+                  <a href="{{ url_for('main.car_by_number', number=car.car_number) }}">{{ car.car_number }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ car.car_type_override or (car.car_class.car_type if car.car_class else "-") }}</td>
+              <td>
+                {% if car.car_class %}
+                  <a href="{{ url_for('main.car_class_detail', class_id=car.car_class.id) }}">{{ car.car_class.code }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if car.location %}
+                  <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      {% if part_count %}
+        <h4 class="title is-6">Parts</h4>
+        <table class="table is-fullwidth is-striped">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Description</th>
+              <th>Brand</th>
+              <th>UPC</th>
+              <th>Quantity</th>
+              <th>Location</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for part in parts %}
+            <tr>
+              <td>{{ part.name or "-" }}</td>
+              <td>{{ part.description or "-" }}</td>
+              <td>{{ part.brand or "-" }}</td>
+              <td>{{ part.upc or "-" }}</td>
+              <td>{{ part.quantity if part.quantity is not none else "-" }}</td>
+              <td>
+                {% if part.location %}
+                  <a href="{{ url_for('main.location_detail', location_id=part.location.id) }}">{{ part.location.name }}</a>
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+      {% if not car_count and not part_count %}
+        <p class="keyboard-hint">No matches found.</p>
+      {% endif %}
     {% endif %}
   </div>
 {% endblock %}
