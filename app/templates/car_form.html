@@ -92,7 +92,26 @@
           <div class="field">
             <label class="label" for="car_type">Car Type</label>
             <div class="control">
-              <input class="input" id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
+              <input class="input" list="car_types" id="car_type" name="car_type" value="{{ car.car_type_override if car and car.car_type_override else (car.car_class.car_type if car and car.car_class else prefill.get('car_type', '')) }}" required data-gray-default="true" />
+              <datalist id="car_types">
+                {% for class in classes %}
+                  {% if class.car_type %}
+                    <option value="{{ class.car_type }}"></option>
+                  {% endif %}
+                {% endfor %}
+              </datalist>
+            </div>
+          </div>
+        </div>
+        <h3 class="title is-5">Locomotive</h3>
+        <div class="grid">
+          <div class="field">
+            <label class="label">Locomotive</label>
+            <div class="control">
+              <label class="checkbox">
+                <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car and (car.is_locomotive_override if car.is_locomotive_override is not none else (car.car_class.is_locomotive if car.car_class else false)) %}checked{% endif %} />
+                Enabled
+              </label>
             </div>
           </div>
           <div class="field">
@@ -107,6 +126,37 @@
                   {% endfor %}
                 </select>
               </div>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="class_wheel_arrangement">Wheel Arrangement</label>
+            <div class="control">
+              <input class="input" list="wheel_arrangements" id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.wheel_arrangement_override if car and car.wheel_arrangement_override else (car.car_class.wheel_arrangement if car and car.car_class else '') }}" data-gray-default="true" />
+              <datalist id="wheel_arrangements">
+                {% for arrangement in wheel_arrangements %}
+                  <option value="{{ arrangement }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="class_tender_axles">Tender Wheel Arrangement</label>
+            <div class="control">
+              <input class="input" list="tender_arrangements" id="class_tender_axles" name="class_tender_axles" value="{{ car.tender_axles_override if car and car.tender_axles_override else (car.car_class.tender_axles if car and car.car_class else '') }}" data-gray-default="true" />
+              <datalist id="tender_arrangements">
+                {% for arrangement in tender_arrangements %}
+                  <option value="{{ arrangement }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Traction Drivers</label>
+            <div class="control">
+              <label class="checkbox">
+                <input id="traction_drivers" type="checkbox" name="traction_drivers" {% if car and car.traction_drivers %}checked{% endif %} />
+                Enabled
+              </label>
             </div>
           </div>
         </div>
@@ -417,45 +467,15 @@
         <h3 class="title is-5">Lettering &amp; Options</h3>
         <div class="grid">
           <div class="field">
-            <label class="label" for="class_wheel_arrangement">Locomotive Class Wheel Arrangement</label>
-            <div class="control">
-              <input class="input" id="class_wheel_arrangement" name="class_wheel_arrangement" value="{{ car.wheel_arrangement_override if car and car.wheel_arrangement_override else (car.car_class.wheel_arrangement if car and car.car_class else '') }}" data-gray-default="true" />
-            </div>
-          </div>
-          <div class="field">
-            <label class="label" for="class_tender_axles">Class Tender Axles</label>
-            <div class="control">
-              <input class="input" id="class_tender_axles" name="class_tender_axles" value="{{ car.tender_axles_override if car and car.tender_axles_override else (car.car_class.tender_axles if car and car.car_class else '') }}" data-gray-default="true" />
-            </div>
-          </div>
-          <div class="field">
             <label class="label" for="other_lettering">Other Lettering</label>
             <div class="control">
               <input class="input" id="other_lettering" name="other_lettering" value="{{ car.other_lettering if car else '' }}" />
             </div>
           </div>
           <div class="field">
-            <label class="label">Traction Drivers</label>
-            <div class="control">
-              <label class="checkbox">
-                <input id="traction_drivers" type="checkbox" name="traction_drivers" {% if car and car.traction_drivers %}checked{% endif %} />
-                Enabled
-              </label>
-            </div>
-          </div>
-          <div class="field">
             <label class="label" for="load">Load</label>
             <div class="control">
               <input class="input" id="load" name="load" value="{{ car.load if car else '' }}" />
-            </div>
-          </div>
-          <div class="field">
-            <label class="label">Locomotive</label>
-            <div class="control">
-              <label class="checkbox">
-                <input id="is_locomotive" type="checkbox" name="is_locomotive" {% if car and (car.is_locomotive_override if car.is_locomotive_override is not none else (car.car_class.is_locomotive if car.car_class else false)) %}checked{% endif %} />
-                Enabled
-              </label>
             </div>
           </div>
         </div>
@@ -596,14 +616,18 @@
       setSelectValue(select, value);
     };
 
-    const wheelField = document.getElementById('class_wheel_arrangement')?.closest('div');
-    const tenderField = document.getElementById('class_tender_axles')?.closest('div');
+    const wheelField = document.getElementById('class_wheel_arrangement')?.closest('.field');
+    const tenderField = document.getElementById('class_tender_axles')?.closest('.field');
+    const powerField = document.getElementById('power_type')?.closest('.field');
+    const tractionField = document.getElementById('traction_drivers')?.closest('.field');
     const locomotiveInput = document.getElementById('is_locomotive');
     const updateTenderVisibility = () => {
       if (!locomotiveInput) return;
       const show = locomotiveInput.checked;
-      if (wheelField) wheelField.style.display = show ? '' : 'none';
+      if (wheelField) wheelField.style.display = '';
       if (tenderField) tenderField.style.display = show ? '' : 'none';
+      if (powerField) powerField.style.display = show ? '' : 'none';
+      if (tractionField) tractionField.style.display = show ? '' : 'none';
     };
 
     const applyClassDetails = (carClass) => {

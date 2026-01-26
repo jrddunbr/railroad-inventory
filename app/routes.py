@@ -4358,6 +4358,25 @@ def car_by_number():
     return render_template("car_number_list.html", number=number, cars=cars)
 
 
+def build_unique_text_values(values: list[str | None]) -> list[str]:
+    seen = set()
+    options: list[str] = []
+    for value in values:
+        if value is None:
+            continue
+        normalized = str(value).strip()
+        if not normalized:
+            continue
+        lower = normalized.lower()
+        if lower in {"none", "null", "-"}:
+            continue
+        if lower in seen:
+            continue
+        seen.add(lower)
+        options.append(normalized)
+    return options
+
+
 @main_bp.route("/cars/<int:car_id>/edit", methods=["GET", "POST"])
 def car_edit(car_id: int):
     car = Car.query.get_or_404(car_id)
@@ -4374,6 +4393,8 @@ def car_edit(car_id: int):
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
     locations = Location.query.order_by("name").all()
+    wheel_arrangements = build_unique_text_values([c.wheel_arrangement for c in classes])
+    tender_arrangements = build_unique_text_values([c.tender_axles for c in classes])
     scale_value = normalize_scale_input(car.scale)
     gauge_value = normalize_gauge_input(car.gauge)
     actual_weight_value, actual_weight_unit = parse_actual_weight(car.actual_weight)
@@ -4397,6 +4418,8 @@ def car_edit(car_id: int):
         railroads=railroads,
         classes=classes,
         locations=locations,
+        wheel_arrangements=wheel_arrangements,
+        tender_arrangements=tender_arrangements,
         prefill={},
         scale_options=get_scale_options(),
         gauge_options=get_gauge_options(),
@@ -4455,6 +4478,8 @@ def car_new():
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
     locations = Location.query.order_by("name").all()
+    wheel_arrangements = build_unique_text_values([c.wheel_arrangement for c in classes])
+    tender_arrangements = build_unique_text_values([c.tender_axles for c in classes])
     scale_value = normalize_scale_input(prefill.get("scale", ""))
     gauge_value = normalize_gauge_input(prefill.get("gauge", ""))
     actual_weight_value, actual_weight_unit = parse_actual_weight(prefill.get("actual_weight", ""))
@@ -4478,6 +4503,8 @@ def car_new():
         railroads=railroads,
         classes=classes,
         locations=locations,
+        wheel_arrangements=wheel_arrangements,
+        tender_arrangements=tender_arrangements,
         prefill=prefill,
         scale_options=get_scale_options(),
         gauge_options=get_gauge_options(),
