@@ -2807,6 +2807,10 @@ def car_class_edit(class_id: int):
         car_class.internal_length = request.form.get("internal_length", "").strip()
         car_class.internal_width = request.form.get("internal_width", "").strip()
         car_class.internal_height = request.form.get("internal_height", "").strip()
+        car_class.external_length = request.form.get("external_length", "").strip()
+        car_class.external_width = request.form.get("external_width", "").strip()
+        car_class.external_height = request.form.get("external_height", "").strip()
+        car_class.cubic_feet = request.form.get("cubic_feet", "").strip()
         car_class.notes = request.form.get("notes", "").strip()
         db.session.commit()
         ensure_db_backup()
@@ -4581,6 +4585,10 @@ def api_car_classes():
             "internal_length": c.internal_length,
             "internal_width": c.internal_width,
             "internal_height": c.internal_height,
+            "external_length": c.external_length,
+            "external_width": c.external_width,
+            "external_height": c.external_height,
+            "cubic_feet": c.cubic_feet,
             "notes": c.notes,
         }
         for c in classes
@@ -4829,12 +4837,24 @@ def apply_car_form(car: Car, form) -> None:
         class_internal_length = form.get("internal_length", "").strip()
         class_internal_width = form.get("internal_width", "").strip()
         class_internal_height = form.get("internal_height", "").strip()
+        class_external_length = form.get("external_length", "").strip()
+        class_external_width = form.get("external_width", "").strip()
+        class_external_height = form.get("external_height", "").strip()
+        class_cubic_feet = form.get("cubic_feet", "").strip()
         if class_internal_length and not car_class.internal_length:
             car_class.internal_length = class_internal_length
         if class_internal_width and not car_class.internal_width:
             car_class.internal_width = class_internal_width
         if class_internal_height and not car_class.internal_height:
             car_class.internal_height = class_internal_height
+        if class_external_length and not car_class.external_length:
+            car_class.external_length = class_external_length
+        if class_external_width and not car_class.external_width:
+            car_class.external_width = class_external_width
+        if class_external_height and not car_class.external_height:
+            car_class.external_height = class_external_height
+        if class_cubic_feet and not car_class.cubic_feet:
+            car_class.cubic_feet = class_cubic_feet
 
         if created_class:
             car.capacity_override = None
@@ -4849,6 +4869,10 @@ def apply_car_form(car: Car, form) -> None:
             car.internal_length_override = None
             car.internal_width_override = None
             car.internal_height_override = None
+            car.external_length_override = None
+            car.external_width_override = None
+            car.external_height_override = None
+            car.cubic_feet_override = None
         else:
             car.capacity_override = (
                 capacity_value if capacity_value and car_class.capacity and capacity_value != car_class.capacity else None
@@ -4875,6 +4899,26 @@ def apply_car_form(car: Car, form) -> None:
             car.internal_height_override = (
                 class_internal_height
                 if class_internal_height and car_class.internal_height and class_internal_height != car_class.internal_height
+                else None
+            )
+            car.external_length_override = (
+                class_external_length
+                if class_external_length and car_class.external_length and class_external_length != car_class.external_length
+                else None
+            )
+            car.external_width_override = (
+                class_external_width
+                if class_external_width and car_class.external_width and class_external_width != car_class.external_width
+                else None
+            )
+            car.external_height_override = (
+                class_external_height
+                if class_external_height and car_class.external_height and class_external_height != car_class.external_height
+                else None
+            )
+            car.cubic_feet_override = (
+                class_cubic_feet
+                if class_cubic_feet and car_class.cubic_feet and class_cubic_feet != car_class.cubic_feet
                 else None
             )
             car.car_type_override = (
@@ -4914,6 +4958,10 @@ def apply_car_form(car: Car, form) -> None:
         car.internal_length_override = form.get("internal_length", "").strip() or None
         car.internal_width_override = form.get("internal_width", "").strip() or None
         car.internal_height_override = form.get("internal_height", "").strip() or None
+        car.external_length_override = form.get("external_length", "").strip() or None
+        car.external_width_override = form.get("external_width", "").strip() or None
+        car.external_height_override = form.get("external_height", "").strip() or None
+        car.cubic_feet_override = form.get("cubic_feet", "").strip() or None
 
     location_name = form.get("location", "").strip()
     if location_name:
@@ -5094,6 +5142,10 @@ def serialize_car(car: Car) -> dict:
     class_internal_length = car.car_class.internal_length if car.car_class else None
     class_internal_width = car.car_class.internal_width if car.car_class else None
     class_internal_height = car.car_class.internal_height if car.car_class else None
+    class_external_length = car.car_class.external_length if car.car_class else None
+    class_external_width = car.car_class.external_width if car.car_class else None
+    class_external_height = car.car_class.external_height if car.car_class else None
+    class_cubic_feet = car.car_class.cubic_feet if car.car_class else None
     class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
     class_power_type = car.car_class.power_type if car.car_class else None
     is_locomotive = (
@@ -5129,6 +5181,10 @@ def serialize_car(car: Car) -> dict:
         "internal_length": car.internal_length_override or class_internal_length,
         "internal_width": car.internal_width_override or class_internal_width,
         "internal_height": car.internal_height_override or class_internal_height,
+        "external_length": car.external_length_override or class_external_length,
+        "external_width": car.external_width_override or class_external_width,
+        "external_height": car.external_height_override or class_external_height,
+        "cubic_feet": car.cubic_feet_override or class_cubic_feet,
         "built": car.built,
         "alt_date": car.alt_date,
         "reweight_date": car.reweight_date,
@@ -5147,6 +5203,10 @@ def serialize_car(car: Car) -> dict:
         "internal_length_override": car.internal_length_override,
         "internal_width_override": car.internal_width_override,
         "internal_height_override": car.internal_height_override,
+        "external_length_override": car.external_length_override,
+        "external_width_override": car.external_width_override,
+        "external_height_override": car.external_height_override,
+        "cubic_feet_override": car.cubic_feet_override,
         "car_type_override": car.car_type_override,
         "power_type_override": car.power_type_override,
         "wheel_arrangement_override": car.wheel_arrangement_override,

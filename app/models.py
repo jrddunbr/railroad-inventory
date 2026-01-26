@@ -80,6 +80,10 @@ class CarClass(BaseModel):
     internal_length: str | None = None
     internal_width: str | None = None
     internal_height: str | None = None
+    external_length: str | None = None
+    external_width: str | None = None
+    external_height: str | None = None
+    cubic_feet: str | None = None
 
     @property
     def cars(self) -> list[Car]:
@@ -263,6 +267,10 @@ class Car(BaseModel):
     internal_length_override: str | None = None
     internal_width_override: str | None = None
     internal_height_override: str | None = None
+    external_length_override: str | None = None
+    external_width_override: str | None = None
+    external_height_override: str | None = None
+    cubic_feet_override: str | None = None
 
     _railroad_ref: Railroad | None = field(default=None, repr=False, compare=False)
     _car_class_ref: CarClass | None = field(default=None, repr=False, compare=False)

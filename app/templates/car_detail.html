@@ -152,9 +152,13 @@
         <p><strong>Load Length:</strong> {{ car.load_length or "-" }}</p>
         <p><strong>Load Width:</strong> {{ car.load_width or "-" }}</p>
         <p><strong>Load Height:</strong> {{ car.load_height or "-" }}</p>
-        <p><strong>Prototype Length:</strong> {{ car.internal_length_override or (car.car_class.internal_length if car.car_class else "-") }}</p>
-        <p><strong>Prototype Width:</strong> {{ car.internal_width_override or (car.car_class.internal_width if car.car_class else "-") }}</p>
-        <p><strong>Prototype Height:</strong> {{ car.internal_height_override or (car.car_class.internal_height if car.car_class else "-") }}</p>
+        <p><strong>Prototype Length (IL):</strong> {{ car.internal_length_override or (car.car_class.internal_length if car.car_class else "-") }}</p>
+        <p><strong>Prototype Width (IW):</strong> {{ car.internal_width_override or (car.car_class.internal_width if car.car_class else "-") }}</p>
+        <p><strong>Prototype Height (IH):</strong> {{ car.internal_height_override or (car.car_class.internal_height if car.car_class else "-") }}</p>
+        <p><strong>Prototype Length (EL):</strong> {{ car.external_length_override or (car.car_class.external_length if car.car_class else "-") }}</p>
+        <p><strong>Prototype Width (EW):</strong> {{ car.external_width_override or (car.car_class.external_width if car.car_class else "-") }}</p>
+        <p><strong>Prototype Height (EH):</strong> {{ car.external_height_override or (car.car_class.external_height if car.car_class else "-") }}</p>
+        <p><strong>Cubic Feet:</strong> {{ car.cubic_feet_override or (car.car_class.cubic_feet if car.car_class else "-") }}</p>
         <p><strong>Built:</strong> {{ car.built or "-" }}</p>
         <p><strong>Alt Date:</strong> {{ car.alt_date or "-" }}</p>
         <p><strong>Reweigh Date:</strong> {{ car.reweight_date or "-" }}</p>
@@ -354,9 +358,13 @@
       { key: 'scale', label: 'Scale' },
       { key: 'gauge', label: 'Gauge' },
       { key: 'aar_plate', label: 'AAR Plate' },
-      { key: 'internal_length', label: 'Prototype Length' },
-      { key: 'internal_width', label: 'Prototype Width' },
-      { key: 'internal_height', label: 'Prototype Height' },
+      { key: 'internal_length', label: 'Prototype Length (IL)' },
+      { key: 'internal_width', label: 'Prototype Width (IW)' },
+      { key: 'internal_height', label: 'Prototype Height (IH)' },
+      { key: 'external_length', label: 'Prototype Length (EL)' },
+      { key: 'external_width', label: 'Prototype Width (EW)' },
+      { key: 'external_height', label: 'Prototype Height (EH)' },
+      { key: 'cubic_feet', label: 'Cubic Feet' },
       { key: 'built', label: 'Built' },
       { key: 'alt_date', label: 'Alt Date' },
       { key: 'reweight_date', label: 'Reweigh Date' },

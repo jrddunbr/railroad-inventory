@@ -36,9 +36,13 @@ Class {{ car_class.code }}
         <p><strong>Weight:</strong> {{ car_class.weight or "-" }}</p>
         <p><strong>Load Limit:</strong> {{ car_class.load_limit or "-" }}</p>
         <p><strong>AAR Plate:</strong> {{ car_class.aar_plate or "-" }}</p>
-        <p><strong>Prototype Length:</strong> {{ car_class.internal_length or "-" }}</p>
-        <p><strong>Prototype Width:</strong> {{ car_class.internal_width or "-" }}</p>
-        <p><strong>Prototype Height:</strong> {{ car_class.internal_height or "-" }}</p>
+        <p><strong>Prototype Length (IL):</strong> {{ car_class.internal_length or "-" }}</p>
+        <p><strong>Prototype Width (IW):</strong> {{ car_class.internal_width or "-" }}</p>
+        <p><strong>Prototype Height (IH):</strong> {{ car_class.internal_height or "-" }}</p>
+        <p><strong>Prototype Length (EL):</strong> {{ car_class.external_length or "-" }}</p>
+        <p><strong>Prototype Width (EW):</strong> {{ car_class.external_width or "-" }}</p>
+        <p><strong>Prototype Height (EH):</strong> {{ car_class.external_height or "-" }}</p>
+        <p><strong>Cubic Feet:</strong> {{ car_class.cubic_feet or "-" }}</p>
       </div>
       <div>
         <p><strong>Notes:</strong> {{ car_class.notes or "-" }}</p>

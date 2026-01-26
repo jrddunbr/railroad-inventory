@@ -76,16 +76,32 @@ Edit Class {{ car_class.code }}
           </div>
         </div>
         <div>
-          <label class="label" for="internal_length">Prototype Length</label>
+          <label class="label" for="internal_length">Prototype Length (IL)</label>
           <input class="input" id="internal_length" name="internal_length" value="{{ car_class.internal_length or '' }}" />
         </div>
         <div>
-          <label class="label" for="internal_width">Prototype Width</label>
+          <label class="label" for="internal_width">Prototype Width (IW)</label>
           <input class="input" id="internal_width" name="internal_width" value="{{ car_class.internal_width or '' }}" />
         </div>
         <div>
-          <label class="label" for="internal_height">Prototype Height</label>
+          <label class="label" for="internal_height">Prototype Height (IH)</label>
           <input class="input" id="internal_height" name="internal_height" value="{{ car_class.internal_height or '' }}" />
+        </div>
+        <div>
+          <label class="label" for="external_length">Prototype Length (EL)</label>
+          <input class="input" id="external_length" name="external_length" value="{{ car_class.external_length or '' }}" />
+        </div>
+        <div>
+          <label class="label" for="external_width">Prototype Width (EW)</label>
+          <input class="input" id="external_width" name="external_width" value="{{ car_class.external_width or '' }}" />
+        </div>
+        <div>
+          <label class="label" for="external_height">Prototype Height (EH)</label>
+          <input class="input" id="external_height" name="external_height" value="{{ car_class.external_height or '' }}" />
+        </div>
+        <div>
+          <label class="label" for="cubic_feet">Cubic Feet</label>
+          <input class="input" id="cubic_feet" name="cubic_feet" value="{{ car_class.cubic_feet or '' }}" />
         </div>
         <div>
           <label class="label" for="notes">Notes</label>

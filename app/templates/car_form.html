@@ -345,21 +345,45 @@
         <h3 class="title is-5">Prototype Dimensions</h3>
         <div class="grid">
           <div class="field">
-            <label class="label" for="internal_length">Prototype Length</label>
+            <label class="label" for="internal_length">Prototype Length (IL)</label>
             <div class="control">
               <input class="input" id="internal_length" name="internal_length" value="{{ car.internal_length_override if car and car.internal_length_override else (prefill.get('internal_length', '') if not car else '') }}" data-gray-default="true" />
             </div>
           </div>
           <div class="field">
-            <label class="label" for="internal_width">Prototype Width</label>
+            <label class="label" for="internal_width">Prototype Width (IW)</label>
             <div class="control">
               <input class="input" id="internal_width" name="internal_width" value="{{ car.internal_width_override if car and car.internal_width_override else (prefill.get('internal_width', '') if not car else '') }}" data-gray-default="true" />
             </div>
           </div>
           <div class="field">
-            <label class="label" for="internal_height">Prototype Height</label>
+            <label class="label" for="internal_height">Prototype Height (IH)</label>
             <div class="control">
               <input class="input" id="internal_height" name="internal_height" value="{{ car.internal_height_override if car and car.internal_height_override else (prefill.get('internal_height', '') if not car else '') }}" data-gray-default="true" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="external_length">Prototype Length (EL)</label>
+            <div class="control">
+              <input class="input" id="external_length" name="external_length" value="{{ car.external_length_override if car and car.external_length_override else (prefill.get('external_length', '') if not car else '') }}" data-gray-default="true" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="external_width">Prototype Width (EW)</label>
+            <div class="control">
+              <input class="input" id="external_width" name="external_width" value="{{ car.external_width_override if car and car.external_width_override else (prefill.get('external_width', '') if not car else '') }}" data-gray-default="true" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="external_height">Prototype Height (EH)</label>
+            <div class="control">
+              <input class="input" id="external_height" name="external_height" value="{{ car.external_height_override if car and car.external_height_override else (prefill.get('external_height', '') if not car else '') }}" data-gray-default="true" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="cubic_feet">Cubic Feet</label>
+            <div class="control">
+              <input class="input" id="cubic_feet" name="cubic_feet" value="{{ car.cubic_feet_override if car and car.cubic_feet_override else (prefill.get('cubic_feet', '') if not car else '') }}" data-gray-default="true" />
             </div>
           </div>
         </div>
@@ -537,6 +561,10 @@
       internalLength: document.getElementById('internal_length'),
       internalWidth: document.getElementById('internal_width'),
       internalHeight: document.getElementById('internal_height'),
+      externalLength: document.getElementById('external_length'),
+      externalWidth: document.getElementById('external_width'),
+      externalHeight: document.getElementById('external_height'),
+      cubicFeet: document.getElementById('cubic_feet'),
       carType: document.getElementById('car_type'),
       powerType: document.getElementById('power_type'),
       locomotive: document.getElementById('is_locomotive'),
@@ -589,6 +617,10 @@
       setGrayDefault(classFields.internalLength, carClass.internal_length);
       setGrayDefault(classFields.internalWidth, carClass.internal_width);
       setGrayDefault(classFields.internalHeight, carClass.internal_height);
+      setGrayDefault(classFields.externalLength, carClass.external_length);
+      setGrayDefault(classFields.externalWidth, carClass.external_width);
+      setGrayDefault(classFields.externalHeight, carClass.external_height);
+      setGrayDefault(classFields.cubicFeet, carClass.cubic_feet);
       if (classFields.carType) {
         setGrayDefault(classFields.carType, carClass.car_type);
       }

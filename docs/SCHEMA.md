@@ -36,6 +36,10 @@ This document describes the current database schema and common alternate names u
 - `internal_length` (string, optional)
 - `internal_width` (string, optional)
 - `internal_height` (string, optional)
+- `external_length` (string, optional)
+- `external_width` (string, optional)
+- `external_height` (string, optional)
+- `cubic_feet` (string, optional)
 
 ## Locations (`locations`)
 - `id` (integer, primary key)
@@ -95,6 +99,10 @@ This document describes the current database schema and common alternate names u
 - `internal_length_override` (string, optional)
 - `internal_width_override` (string, optional)
 - `internal_height_override` (string, optional)
+- `external_length_override` (string, optional)
+- `external_width_override` (string, optional)
+- `external_height_override` (string, optional)
+- `cubic_feet_override` (string, optional)
 
 ## Consists (`consists`)
 - `id` (integer, primary key)
