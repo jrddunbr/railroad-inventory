@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}
+Financial Summary
+{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Financial Summary</h1>
+    <p class="keyboard-hint">
+      Collection worth uses purchase price when available, otherwise MSRP.
+      <a href="{{ url_for('main.financial_msrp_summary') }}">View MSRP coverage report.</a>
+    </p>
+    <p class="keyboard-hint">
+      <a href="{{ url_for('main.worth_by_category_report') }}">View worth by railroad and class.</a>
+      <a href="{{ url_for('main.missing_worth_report') }}">View cars missing worth.</a>
+    </p>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Total cars</td>
+          <td>{{ total_cars }}</td>
+        </tr>
+        <tr>
+          <td>Cars with MSRP</td>
+          <td>{{ msrp_count }}</td>
+        </tr>
+        <tr>
+          <td>Cars with purchase price</td>
+          <td>{{ price_count }}</td>
+        </tr>
+        <tr>
+          <td>Total purchase value</td>
+          <td>{{ price_total }}</td>
+        </tr>
+        <tr>
+          <td>Overall collection worth</td>
+          <td>{{ worth_total }}</td>
+        </tr>
+        <tr>
+          <td>Assumed minimum worth ($5 each)</td>
+          <td>{{ assumed_worth_total }}</td>
+        </tr>
+        <tr>
+          <td>Cars missing worth</td>
+          <td>{{ missing_worth }}</td>
+        </tr>
+        <tr>
+          <td>Missing MSRP with purchase price</td>
+          <td>{{ missing_msrp_with_price }}</td>
+        </tr>
+        <tr>
+          <td>Items counted toward worth</td>
+          <td>{{ worth_count }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Items</th>
+          <th>Purchase Total</th>
+          <th>Worth Total</th>
+          <th>Missing MSRP w/ Price</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, summary in category_summaries.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          <td>{{ summary.count }}</td>
+          <td>{{ summary.price_total }}</td>
+          <td>{{ summary.worth_total }}</td>
+          <td>{{ summary.missing_msrp_with_price }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

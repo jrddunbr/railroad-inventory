@@ -50,6 +50,26 @@ Reports & CSV Exports
           <td>Duplicate car IDs and DCC IDs across the inventory.</td>
           <td><a class="button is-small is-light" href="{{ url_for('main.conflict_report') }}">View</a></td>
         </tr>
+        <tr>
+          <td>Financial Summary</td>
+          <td>Totals for MSRP, purchase value, and collection worth.</td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.financial_summary') }}">View</a></td>
+        </tr>
+        <tr>
+          <td>MSRP Coverage</td>
+          <td>Coverage breakdown of MSRP values across the collection.</td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.financial_msrp_summary') }}">View</a></td>
+        </tr>
+        <tr>
+          <td>Worth by Category</td>
+          <td>Totals and missing percentages by railroad and car class.</td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.worth_by_category_report') }}">View</a></td>
+        </tr>
+        <tr>
+          <td>Missing Worth</td>
+          <td>Cars missing MSRP and purchase price.</td>
+          <td><a class="button is-small is-light" href="{{ url_for('main.missing_worth_report') }}">View</a></td>
+        </tr>
       </tbody>
     </table>
   </div>

@@ -420,6 +420,42 @@ def parse_actual_length(value: str | None) -> tuple[str, str]:
     return cleaned, ""
 
 
+def parse_currency(value: str | None) -> float | None:
+    if not value:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    cleaned = cleaned.replace(",", "")
+    match = re.search(r"-?\d+(?:\.\d+)?", cleaned)
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except ValueError:
+        return None
+
+
+def format_currency(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"${value:,.2f}"
+
+
+def format_percent(value: float | None) -> str:
+    if value is None:
+        return "-"
+    return f"{value:.1f}%"
+
+
+def select_worth_value(msrp_value: float | None, price_value: float | None) -> float | None:
+    if price_value is None:
+        return msrp_value
+    if price_value == 0 and msrp_value is not None:
+        return msrp_value
+    return price_value
+
+
 def get_scale_name(value: str | None) -> str | None:
     if not value:
         return None
@@ -1337,6 +1373,242 @@ def introduction_years():
         year_entries=year_entries,
         current_year=current_year,
     )
+
+
+@main_bp.route("/reports/financial-summary")
+def financial_summary():
+    cars = Car.query.order_by("id").all()
+    summary = {
+        "total_cars": len(cars),
+        "msrp_total": 0.0,
+        "msrp_count": 0,
+        "price_total": 0.0,
+        "price_count": 0,
+        "worth_total": 0.0,
+        "worth_count": 0,
+        "missing_msrp_with_price": 0,
+        "missing_worth": 0,
+        "minimum_worth_total": 0.0,
+    }
+    categories = {
+        "Locomotives": {
+            "count": 0,
+            "msrp_total": 0.0,
+            "msrp_count": 0,
+            "price_total": 0.0,
+            "price_count": 0,
+            "worth_total": 0.0,
+            "worth_count": 0,
+            "missing_msrp_with_price": 0,
+        },
+        "Cars": {
+            "count": 0,
+            "msrp_total": 0.0,
+            "msrp_count": 0,
+            "price_total": 0.0,
+            "price_count": 0,
+            "worth_total": 0.0,
+            "worth_count": 0,
+            "missing_msrp_with_price": 0,
+        },
+    }
+
+    for car in cars:
+        class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
+        is_locomotive = (
+            car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
+        )
+        bucket = categories["Locomotives"] if is_locomotive else categories["Cars"]
+        bucket["count"] += 1
+
+        msrp_value = parse_currency(car.msrp)
+        price_value = parse_currency(car.price)
+
+        if msrp_value is not None:
+            summary["msrp_total"] += msrp_value
+            summary["msrp_count"] += 1
+            bucket["msrp_total"] += msrp_value
+            bucket["msrp_count"] += 1
+        if price_value is not None:
+            summary["price_total"] += price_value
+            summary["price_count"] += 1
+            bucket["price_total"] += price_value
+            bucket["price_count"] += 1
+        if msrp_value is None and price_value is not None:
+            summary["missing_msrp_with_price"] += 1
+            bucket["missing_msrp_with_price"] += 1
+
+        worth_value = select_worth_value(msrp_value, price_value)
+        if worth_value is not None:
+            summary["worth_total"] += worth_value
+            summary["worth_count"] += 1
+            bucket["worth_total"] += worth_value
+            bucket["worth_count"] += 1
+        else:
+            summary["missing_worth"] += 1
+            summary["minimum_worth_total"] += 5.0
+
+    def format_summary(values: dict[str, float | int]) -> dict[str, str | int]:
+        coverage = None
+        if values["count"]:
+            coverage = (values["msrp_count"] / values["count"]) * 100
+        return {
+            "count": values["count"],
+            "msrp_total": format_currency(values["msrp_total"]) if values["msrp_count"] else "-",
+            "msrp_count": values["msrp_count"],
+            "msrp_coverage": format_percent(coverage),
+            "price_total": format_currency(values["price_total"]) if values["price_count"] else "-",
+            "price_count": values["price_count"],
+            "worth_total": format_currency(values["worth_total"]) if values["worth_count"] else "-",
+            "worth_count": values["worth_count"],
+            "missing_msrp_with_price": values["missing_msrp_with_price"],
+        }
+
+    assumed_worth_total = summary["worth_total"] + summary["minimum_worth_total"]
+
+    return render_template(
+        "financial_report.html",
+        total_cars=summary["total_cars"],
+        msrp_count=summary["msrp_count"],
+        price_count=summary["price_count"],
+        worth_count=summary["worth_count"],
+        missing_msrp_with_price=summary["missing_msrp_with_price"],
+        missing_worth=summary["missing_worth"],
+        price_total=format_currency(summary["price_total"]) if summary["price_count"] else "-",
+        worth_total=format_currency(summary["worth_total"]) if summary["worth_count"] else "-",
+        assumed_worth_total=format_currency(assumed_worth_total),
+        category_summaries={name: format_summary(values) for name, values in categories.items()},
+    )
+
+
+@main_bp.route("/reports/financial-summary/msrp")
+def financial_msrp_summary():
+    cars = Car.query.order_by("id").all()
+    total_cars = len(cars)
+    msrp_total = 0.0
+    msrp_count = 0
+    categories = {
+        "Locomotives": {"count": 0, "msrp_total": 0.0, "msrp_count": 0},
+        "Cars": {"count": 0, "msrp_total": 0.0, "msrp_count": 0},
+    }
+
+    for car in cars:
+        class_is_locomotive = car.car_class.is_locomotive if car.car_class else None
+        is_locomotive = (
+            car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
+        )
+        bucket = categories["Locomotives"] if is_locomotive else categories["Cars"]
+        bucket["count"] += 1
+
+        msrp_value = parse_currency(car.msrp)
+        if msrp_value is not None:
+            msrp_total += msrp_value
+            msrp_count += 1
+            bucket["msrp_total"] += msrp_value
+            bucket["msrp_count"] += 1
+
+    msrp_coverage = None
+    if total_cars:
+        msrp_coverage = (msrp_count / total_cars) * 100
+
+    def format_msrp_summary(values: dict[str, float | int]) -> dict[str, str | int]:
+        coverage = None
+        if values["count"]:
+            coverage = (values["msrp_count"] / values["count"]) * 100
+        return {
+            "count": values["count"],
+            "msrp_total": format_currency(values["msrp_total"]) if values["msrp_count"] else "-",
+            "msrp_count": values["msrp_count"],
+            "msrp_coverage": format_percent(coverage),
+        }
+
+    return render_template(
+        "financial_msrp_report.html",
+        total_cars=total_cars,
+        msrp_count=msrp_count,
+        msrp_total=format_currency(msrp_total) if msrp_count else "-",
+        msrp_coverage=format_percent(msrp_coverage),
+        category_summaries={name: format_msrp_summary(values) for name, values in categories.items()},
+    )
+
+
+@main_bp.route("/reports/worth-by-category")
+def worth_by_category_report():
+    cars = Car.query.order_by("id").all()
+    railroads: dict[str, dict[str, float | int]] = {}
+    classes: dict[str, dict[str, float | int]] = {}
+
+    def ensure_bucket(container: dict[str, dict[str, float | int]], key: str) -> dict[str, float | int]:
+        if key not in container:
+            container[key] = {
+                "count": 0,
+                "worth_total": 0.0,
+                "worth_count": 0,
+                "missing_worth": 0,
+            }
+        return container[key]
+
+    for car in cars:
+        railroad_label = "Unknown Railroad"
+        if car.railroad:
+            railroad_label = car.railroad.reporting_mark or car.railroad.name or "Unknown Railroad"
+        elif car.reporting_mark_override:
+            railroad_label = car.reporting_mark_override
+        class_label = car.car_class.code if car.car_class and car.car_class.code else "Unclassified"
+
+        msrp_value = parse_currency(car.msrp)
+        price_value = parse_currency(car.price)
+        worth_value = select_worth_value(msrp_value, price_value)
+
+        for container, key in ((railroads, railroad_label), (classes, class_label)):
+            bucket = ensure_bucket(container, key)
+            bucket["count"] += 1
+            if worth_value is None:
+                bucket["missing_worth"] += 1
+            else:
+                bucket["worth_total"] += worth_value
+                bucket["worth_count"] += 1
+
+    def format_bucket(values: dict[str, float | int]) -> dict[str, str | int]:
+        missing_percent = None
+        if values["count"]:
+            missing_percent = (values["missing_worth"] / values["count"]) * 100
+        return {
+            "count": values["count"],
+            "worth_total": format_currency(values["worth_total"]) if values["worth_count"] else "-",
+            "missing_worth": values["missing_worth"],
+            "missing_percent": format_percent(missing_percent),
+        }
+
+    railroad_rows = [
+        {"label": label, **format_bucket(values)} for label, values in sorted(railroads.items())
+    ]
+    class_rows = [{"label": label, **format_bucket(values)} for label, values in sorted(classes.items())]
+
+    return render_template(
+        "worth_by_category_report.html",
+        railroad_rows=railroad_rows,
+        class_rows=class_rows,
+    )
+
+
+@main_bp.route("/reports/missing-worth")
+def missing_worth_report():
+    cars = Car.query.order_by("id").all()
+    missing = []
+    for car in cars:
+        msrp_value = parse_currency(car.msrp)
+        price_value = parse_currency(car.price)
+        worth_value = select_worth_value(msrp_value, price_value)
+        if worth_value is None:
+            missing.append(car)
+    missing.sort(
+        key=lambda car: (
+            car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
+            car.car_number or "",
+        )
+    )
+    return render_template("missing_worth_report.html", cars=missing, total=len(missing))
 
 
 @main_bp.route("/reports/repairs")

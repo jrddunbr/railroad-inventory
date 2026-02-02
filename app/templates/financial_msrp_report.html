@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}
+MSRP Coverage
+{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">MSRP Coverage</h1>
+    <p class="keyboard-hint">
+      MSRP coverage highlights how much of the collection has MSRP values stored.
+      <a href="{{ url_for('main.financial_summary') }}">Back to financial summary.</a>
+    </p>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Total cars</td>
+          <td>{{ total_cars }}</td>
+        </tr>
+        <tr>
+          <td>Cars with MSRP</td>
+          <td>{{ msrp_count }} ({{ msrp_coverage }})</td>
+        </tr>
+        <tr>
+          <td>Total MSRP</td>
+          <td>{{ msrp_total }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Items</th>
+          <th>MSRP Coverage</th>
+          <th>MSRP Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for name, summary in category_summaries.items() %}
+        <tr>
+          <td>{{ name }}</td>
+          <td>{{ summary.count }}</td>
+          <td>{{ summary.msrp_coverage }}</td>
+          <td>{{ summary.msrp_total }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

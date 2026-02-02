@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}
+Worth by Category
+{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Worth by Category</h1>
+    <p class="keyboard-hint">
+      Missing percent reflects cars without MSRP or purchase price.
+      <a href="{{ url_for('main.financial_summary') }}">Back to financial summary.</a>
+    </p>
+    <h2 class="title is-5">By Railroad</h2>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Railroad</th>
+          <th>Items</th>
+          <th>Worth Total</th>
+          <th>Missing Worth</th>
+          <th>Missing %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in railroad_rows %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td>{{ row.count }}</td>
+          <td>{{ row.worth_total }}</td>
+          <td>{{ row.missing_worth }}</td>
+          <td>{{ row.missing_percent }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No railroad data available.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h2 class="title is-5">By Car Class</h2>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Car Class</th>
+          <th>Items</th>
+          <th>Worth Total</th>
+          <th>Missing Worth</th>
+          <th>Missing %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in class_rows %}
+        <tr>
+          <td>{{ row.label }}</td>
+          <td>{{ row.count }}</td>
+          <td>{{ row.worth_total }}</td>
+          <td>{{ row.missing_worth }}</td>
+          <td>{{ row.missing_percent }}</td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5">No class data available.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
