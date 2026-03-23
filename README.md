@@ -37,6 +37,39 @@ Podman users can run:
 podman compose up --build
 ```
 
+## Docker Deployment
+For a host deployment that keeps both the app and CouchDB in containers, use:
+
+```bash
+./deploy.sh up
+```
+
+What it does:
+- creates `.env` with generated CouchDB and Flask secrets if missing
+- creates persistent bind-mounted directories under `data/`
+- starts CouchDB first and waits for it to become ready
+- builds and starts the Flask app container
+
+Future updates from the cloned repo:
+
+```bash
+./deploy.sh update
+```
+
+Useful commands:
+
+```bash
+./deploy.sh status
+./deploy.sh logs
+./deploy.sh down
+```
+
+Notes:
+- install Docker and the Docker Compose plugin on the host first
+- application data persists in `data/couchdb` and uploaded assets persist in `data/uploads`
+- `./deploy.sh update` creates a timestamped CouchDB backup in `data/backups/update/` before pulling and restarting
+- edit `.env` if you want to change credentials, ports, or the database name before first startup
+
 ## Kubernetes
 Build and load the image into your cluster (example uses the local tag):
 ```bash
