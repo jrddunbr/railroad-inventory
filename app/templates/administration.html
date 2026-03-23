@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}
+Administration
+{% endblock %}
+{% block content %}
+  <style>
+    .admin-grid {
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      align-items: start;
+    }
+    .admin-card {
+      min-width: 0;
+      overflow: hidden;
+    }
+    .admin-table,
+    .admin-table-wide {
+      table-layout: fixed;
+      width: 100%;
+    }
+    .admin-table th,
+    .admin-table td,
+    .admin-table-wide th,
+    .admin-table-wide td {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
+      vertical-align: top;
+    }
+    .admin-table th {
+      width: 38%;
+    }
+    .admin-table code,
+    .admin-table-wide code {
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+    }
+  </style>
+  <div class="box">
+    <h1 class="title is-3">Administration</h1>
+    <p class="subtitle is-6">Application metadata, database status, and backup or restore operations.</p>
+
+    <div class="grid admin-grid">
+      <div class="box admin-card">
+        <h2 class="title is-5">Application</h2>
+        <table class="table is-fullwidth is-striped admin-table">
+          <tbody>
+            <tr><th>Name</th><td>{{ admin.application.name }}</td></tr>
+            <tr><th>Schema Version</th><td>{{ admin.application.schema_version }}</td></tr>
+            <tr><th>Backup Format</th><td>{{ admin.application.backup_format }} v{{ admin.application.backup_format_version }}</td></tr>
+            <tr><th>Python</th><td>{{ admin.application.python_version }}</td></tr>
+            <tr><th>Platform</th><td>{{ admin.application.platform }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box admin-card">
+        <h2 class="title is-5">Source Control</h2>
+        <table class="table is-fullwidth is-striped admin-table">
+          <tbody>
+            <tr><th>Commit</th><td><code>{{ admin.source_control.git_commit_short or "-" }}</code></td></tr>
+            <tr><th>Full Hash</th><td><code>{{ admin.source_control.git_commit or "-" }}</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box admin-card">
+        <h2 class="title is-5">Database</h2>
+        <table class="table is-fullwidth is-striped admin-table">
+          <tbody>
+            <tr><th>Name</th><td>{{ admin.database.name }}</td></tr>
+            <tr><th>Endpoint</th><td><code>{{ admin.database.endpoint }}</code></td></tr>
+            <tr><th>Document Count</th><td>{{ admin.database.doc_count }}</td></tr>
+            <tr><th>Disk Size</th><td>{{ admin.database.disk_size_label }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box admin-card">
+        <h2 class="title is-5">CouchDB Health</h2>
+        <table class="table is-fullwidth is-striped admin-table">
+          <tbody>
+            <tr><th>Reachable</th><td>{{ "Yes" if admin.health.couchdb.reachable else "No" }}</td></tr>
+            <tr><th>Status</th><td>{{ admin.health.couchdb.status }}</td></tr>
+            <tr><th>Response Time</th><td>{{ "%.1f"|format(admin.health.couchdb.response_time_ms) }} ms</td></tr>
+            {% if admin.health.couchdb.error %}
+              <tr><th>Last Error</th><td><code>{{ admin.health.couchdb.error }}</code></td></tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box admin-card">
+        <h2 class="title is-5">Flask Health</h2>
+        <table class="table is-fullwidth is-striped admin-table">
+          <tbody>
+            <tr><th>PID</th><td>{{ admin.health.flask.pid }}</td></tr>
+            <tr><th>Uptime</th><td>{{ admin.health.flask.uptime_label }}</td></tr>
+            <tr><th>Peak Memory</th><td>{{ admin.health.flask.memory_label }}</td></tr>
+            <tr><th>User CPU</th><td>{{ "%.2f"|format(admin.health.flask.cpu_user_seconds) }} s</td></tr>
+            <tr><th>System CPU</th><td>{{ "%.2f"|format(admin.health.flask.cpu_system_seconds) }} s</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <h2 class="title is-4">Document Totals</h2>
+    <table class="table is-fullwidth is-striped admin-table-wide">
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Document Key</th>
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stat in admin.stats %}
+          <tr>
+            <td>{{ stat.label }}</td>
+            <td><code>{{ stat.doc_type }}</code></td>
+            <td>{{ stat.count if stat.count is not none else "-" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 class="title is-4">Managed Assets</h2>
+    <table class="table is-fullwidth is-striped admin-table-wide">
+      <thead>
+        <tr>
+          <th>Asset Set</th>
+          <th>Backup Root</th>
+          <th>Source Path</th>
+          <th>Files</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asset in admin.assets %}
+          <tr>
+            <td>{{ asset.label }}</td>
+            <td><code>{{ asset.name }}</code></td>
+            <td><code>{{ asset.source }}</code></td>
+            <td>{{ asset.file_count }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <hr>
+
+    <div class="grid admin-grid">
+      <div class="box admin-card">
+        <h2 class="title is-4">Backup To File</h2>
+        <p class="content">Downloads a logical JSON backup of all CouchDB documents, managed asset files, and metadata about the application, schema version, and database state.</p>
+        <div class="buttons">
+          <a class="button is-primary" href="{{ url_for('main.administration_backup') }}">Download Backup</a>
+        </div>
+      </div>
+
+      <div class="box admin-card">
+        <h2 class="title is-4">Upload Backup File</h2>
+        <article class="message is-warning">
+          <div class="message-body">
+            Restoring a backup replaces the current database contents entirely. Uploaded backup files may be up to {{ admin.restore.max_upload_bytes // (1024 * 1024) }} MB.
+          </div>
+        </article>
+        <form method="post" action="{{ url_for('main.administration_restore') }}" enctype="multipart/form-data">
+          <div class="field">
+            <label class="label" for="backup_file">Backup File</label>
+            <div class="control">
+              <input class="input" type="file" id="backup_file" name="backup_file" accept=".json,application/json" required>
+            </div>
+          </div>
+          <div class="actions buttons">
+            <button type="submit" class="button is-danger">Restore Database</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}

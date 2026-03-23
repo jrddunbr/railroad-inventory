@@ -27,6 +27,7 @@ def create_app() -> Flask:
     app.config.update(
         COUCHDB_URL=couchdb_url,
         COUCHDB_DATABASE=os.environ.get("COUCHDB_DATABASE", "model_inventory"),
+        APP_STARTED_AT=time.time(),
         COUCHDB_COUNTERS=[
             "railroads",
             "car_classes",
@@ -63,7 +64,7 @@ def create_app() -> Flask:
         ],
         SCHEMA_VERSION=SCHEMA_VERSION,
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
-        MAX_CONTENT_LENGTH=2 * 1024 * 1024,
+        MAX_CONTENT_LENGTH=32 * 1024 * 1024,
         LOGO_UPLOAD_FOLDER=os.path.join(base_dir, "static", "uploads", "railroad-logos"),
     )
     os.makedirs(app.config["LOGO_UPLOAD_FOLDER"], exist_ok=True)

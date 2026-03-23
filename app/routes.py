@@ -5,16 +5,30 @@ import io
 import json
 import math
 import os
+import platform
 import re
+import resource
+import subprocess
+import sys
+import time
 from datetime import datetime
 from typing import Optional
+from urllib.parse import urlsplit
 
-from flask import Blueprint, Response, current_app, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for
 from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.backup import ensure_periodic_backup
+from app.backup import (
+    BACKUP_FILE_FORMAT,
+    BACKUP_FILE_VERSION,
+    create_backup_payload,
+    dump_backup_payload,
+    ensure_periodic_backup,
+    load_backup_payload,
+    restore_asset_files,
+)
 from app.models import (
     AppSettings,
     Car,
@@ -119,10 +133,265 @@ DEFAULT_LENGTH_UNIT = "mm"
 DEFAULT_WEIGHT_UNIT = "g"
 WEIGHT_UNITS = ["g", "kg", "lb", "oz"]
 LENGTH_UNITS = ["mm", "cm", "m", "in", "ft"]
+ADMIN_COUNTER_LABELS = {
+    "railroads": "Railroads",
+    "car_classes": "Car Classes",
+    "locations": "Locations",
+    "cars": "Cars",
+    "consists": "Consists",
+    "loads": "Loads",
+    "load_placements": "Load Placements",
+    "car_inspections": "Car Inspections",
+    "inspection_types": "Inspection Types",
+    "railroad_color_schemes": "Railroad Color Schemes",
+    "railroad_logos": "Railroad Logos",
+    "railroad_slogans": "Railroad Slogans",
+    "app_settings": "App Settings",
+    "tool_items": "Tool Items",
+    "part_items": "Part Items",
+}
 
 
 def ensure_db_backup() -> None:
     ensure_periodic_backup(db.store.db)
+
+
+def get_repo_root() -> str:
+    return os.path.abspath(os.path.join(current_app.root_path, os.pardir))
+
+
+def get_git_commit_hash() -> str | None:
+    try:
+        return (
+            subprocess.check_output(
+                ["git", "rev-parse", "HEAD"],
+                cwd=get_repo_root(),
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+            or None
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def get_couchdb_endpoint_label() -> str:
+    raw_url = current_app.config.get("COUCHDB_URL", "")
+    parsed = urlsplit(raw_url)
+    if not parsed.scheme or not parsed.hostname:
+        return raw_url or "-"
+    host = parsed.hostname or ""
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    return f"{parsed.scheme}://{host}"
+
+
+def get_backup_application_metadata() -> dict[str, str | None]:
+    return {
+        "app_name": "Railroad Inventory",
+        "schema_version": current_app.config.get("SCHEMA_VERSION"),
+        "database_name": current_app.config.get("COUCHDB_DATABASE"),
+        "git_commit": get_git_commit_hash(),
+        "backup_scope": "CouchDB documents and managed assets",
+    }
+
+
+def format_bytes(value: int | float | None) -> str:
+    if value is None:
+        return "-"
+    size = float(value)
+    units = ["bytes", "KB", "MB", "GB", "TB"]
+    for unit in units:
+        if size < 1024 or unit == units[-1]:
+            if unit == "bytes":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{int(value)} bytes"
+
+
+def format_duration_seconds(value: float | int | None) -> str:
+    if value is None:
+        return "-"
+    total_seconds = max(0, int(value))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}h {minutes}m {seconds}s"
+    if minutes:
+        return f"{minutes}m {seconds}s"
+    return f"{seconds}s"
+
+
+def count_files_in_directory(path: str) -> int:
+    if not path or not os.path.exists(path):
+        return 0
+    total = 0
+    for _, _, files in os.walk(path):
+        total += len(files)
+    return total
+
+
+def get_couchdb_size_bytes(info: dict[str, object] | None) -> int:
+    if not info:
+        return 0
+    sizes = info.get("sizes")
+    if isinstance(sizes, dict):
+        for key in ("file", "external", "active"):
+            value = sizes.get(key)
+            try:
+                numeric = int(value or 0)
+            except (TypeError, ValueError):
+                numeric = 0
+            if numeric > 0:
+                return numeric
+    try:
+        return int(info.get("disk_size", 0) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_couchdb_health() -> dict[str, object]:
+    started = time.perf_counter()
+    try:
+        database = db.store.db
+        if not database:
+            raise RuntimeError("CouchDB database handle is not initialized.")
+        database.info()
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        return {
+            "reachable": True,
+            "status": "connected",
+            "response_time_ms": elapsed_ms,
+        }
+    except Exception as exc:
+        elapsed_ms = (time.perf_counter() - started) * 1000
+        return {
+            "reachable": False,
+            "status": "error",
+            "response_time_ms": elapsed_ms,
+            "error": str(exc),
+        }
+
+
+def get_flask_health() -> dict[str, object]:
+    usage = resource.getrusage(resource.RUSAGE_SELF)
+    memory_kb = usage.ru_maxrss
+    if sys.platform == "darwin":
+        memory_bytes = int(memory_kb)
+    else:
+        memory_bytes = int(memory_kb * 1024)
+    started_at = float(current_app.config.get("APP_STARTED_AT", time.time()) or time.time())
+    uptime_seconds = max(0.0, time.time() - started_at)
+    return {
+        "pid": os.getpid(),
+        "uptime_seconds": uptime_seconds,
+        "uptime_label": format_duration_seconds(uptime_seconds),
+        "memory_bytes": memory_bytes,
+        "memory_label": format_bytes(memory_bytes),
+        "cpu_user_seconds": float(usage.ru_utime),
+        "cpu_system_seconds": float(usage.ru_stime),
+    }
+
+
+def get_managed_asset_roots() -> list[dict[str, object]]:
+    static_folder = current_app.static_folder or os.path.join(current_app.root_path, "static")
+    repo_root = get_repo_root()
+    upload_dir = current_app.config.get("LOGO_UPLOAD_FOLDER") or os.path.join(static_folder, "uploads", "railroad-logos")
+    local_upload_root = os.path.dirname(upload_dir)
+    data_upload_root = os.path.join(repo_root, "data", "uploads")
+    generated_root = os.path.join(static_folder, "tools", "generated")
+
+    asset_roots: list[dict[str, object]] = []
+    upload_sources = [path for path in [data_upload_root, local_upload_root] if os.path.isdir(path)]
+    upload_source = (
+        max(upload_sources, key=count_files_in_directory)
+        if upload_sources
+        else local_upload_root
+    )
+    asset_roots.append(
+        {
+            "name": "uploads",
+            "label": "Uploaded Assets",
+            "source": upload_source,
+            "destinations": [local_upload_root, data_upload_root],
+        }
+    )
+    asset_roots.append(
+        {
+            "name": "generated_tools",
+            "label": "Generated Tool Assets",
+            "source": generated_root,
+            "destinations": [generated_root],
+        }
+    )
+    return asset_roots
+
+
+def get_admin_database_counts() -> list[dict[str, int | str | None]]:
+    counts: list[dict[str, int | str | None]] = []
+    for entry in current_app.config.get("COUCHDB_TOTALS", []):
+        counter_key = entry.get("counter_key")
+        doc_type = entry.get("doc_type")
+        if not counter_key or not doc_type:
+            continue
+        counts.append(
+            {
+                "label": ADMIN_COUNTER_LABELS.get(counter_key, counter_key.replace("_", " ").title()),
+                "doc_type": doc_type,
+                "counter_key": counter_key,
+                "count": db.store.total_count(counter_key),
+            }
+        )
+    return counts
+
+
+def get_administration_summary() -> dict[str, object]:
+    database = db.store.db
+    db_info = database.info() if database else {}
+    disk_size_bytes = get_couchdb_size_bytes(db_info)
+    git_commit = get_git_commit_hash()
+    asset_roots = get_managed_asset_roots()
+    couchdb_health = get_couchdb_health()
+    flask_health = get_flask_health()
+    return {
+        "application": {
+            "name": "Railroad Inventory",
+            "schema_version": current_app.config.get("SCHEMA_VERSION"),
+            "backup_format": BACKUP_FILE_FORMAT,
+            "backup_format_version": BACKUP_FILE_VERSION,
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+        },
+        "source_control": {
+            "git_commit": git_commit,
+            "git_commit_short": git_commit[:12] if git_commit else None,
+        },
+        "database": {
+            "name": current_app.config.get("COUCHDB_DATABASE"),
+            "endpoint": get_couchdb_endpoint_label(),
+            "doc_count": int(db_info.get("doc_count", 0) or 0),
+            "disk_size_bytes": disk_size_bytes,
+            "disk_size_label": format_bytes(disk_size_bytes),
+        },
+        "health": {
+            "couchdb": couchdb_health,
+            "flask": flask_health,
+        },
+        "stats": get_admin_database_counts(),
+        "assets": [
+            {
+                "label": str(asset_root["label"]),
+                "name": str(asset_root["name"]),
+                "source": str(asset_root["source"]),
+                "file_count": count_files_in_directory(str(asset_root["source"])),
+            }
+            for asset_root in asset_roots
+        ],
+        "restore": {
+            "max_upload_bytes": int(current_app.config.get("MAX_CONTENT_LENGTH", 0) or 0),
+        },
+    }
 
 
 def get_app_settings() -> AppSettings:
@@ -5267,6 +5536,52 @@ def apply_car_form(car: Car, form) -> None:
         car.location = get_or_create_location(location_name)
     else:
         car.location = None
+
+
+@main_bp.route("/administration")
+def administration():
+    return render_template("administration.html", admin=get_administration_summary())
+
+
+@main_bp.route("/administration/backup")
+def administration_backup():
+    payload = create_backup_payload(
+        db.store.db,
+        app_metadata=get_backup_application_metadata(),
+        asset_roots=get_managed_asset_roots(),
+    )
+    response = Response(dump_backup_payload(payload), mimetype="application/json")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    response.headers["Content-Disposition"] = (
+        f'attachment; filename="railroad-inventory-backup-{timestamp}.json"'
+    )
+    return response
+
+
+@main_bp.route("/administration/restore", methods=["POST"])
+def administration_restore():
+    uploaded = request.files.get("backup_file")
+    if not uploaded or not uploaded.filename:
+        flash("Select a backup file to restore.", "danger")
+        return redirect(url_for("main.administration"))
+    try:
+        payload = load_backup_payload(uploaded.read())
+        db.store.replace_database(current_app, payload["docs"])
+        restore_asset_files(get_managed_asset_roots(), payload.get("assets"))
+    except ValueError as exc:
+        flash(str(exc), "danger")
+        return redirect(url_for("main.administration"))
+    except Exception:
+        flash("Restore failed while rebuilding the database.", "danger")
+        return redirect(url_for("main.administration"))
+    backup_created = payload.get("created_at") or "unknown time"
+    restored_count = len(payload.get("docs", []))
+    asset_count = len(payload.get("assets", []))
+    flash(
+        f"Restored {restored_count} documents and {asset_count} asset files from backup created {backup_created}.",
+        "success",
+    )
+    return redirect(url_for("main.administration"))
 
 
 @main_bp.route("/settings")

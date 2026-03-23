@@ -51,6 +51,17 @@
       padding: 16px;
       background: var(--mi-surface);
     }
+    .nav-section {
+      margin-bottom: 20px;
+    }
+    .nav-heading {
+      color: var(--mi-ink-muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
     nav a {
       display: block;
       margin-bottom: 12px;
@@ -89,6 +100,9 @@
       display: grid;
       gap: 16px;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .grid > * {
+      min-width: 0;
     }
     .actions {
       margin-top: 16px;
@@ -261,21 +275,43 @@
   </header>
   <div class="container">
     <nav>
-      <a href="{{ url_for('main.inventory') }}" class="{% if request.path == '/inventory' %}active{% endif %}">Inventory</a>
-      <a href="{{ url_for('main.railroads') }}" class="{% if request.path == '/railroads' %}active{% endif %}">Railroads</a>
-      <a href="{{ url_for('main.locations') }}" class="{% if request.path == '/locations' %}active{% endif %}">Locations</a>
-      <a href="{{ url_for('main.car_classes') }}" class="{% if request.path == '/car-classes' %}active{% endif %}">Car Classes</a>
-      <a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>
-      <a href="{{ url_for('main.loads') }}" class="{% if request.path == '/loads' %}active{% endif %}">Loads</a>
-      <a href="{{ url_for('main.consists') }}" class="{% if request.path.startswith('/consists') %}active{% endif %}">Consists</a>
-      <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Software Tools</a>
-      <a href="{{ url_for('main.tool_inventory') }}" class="{% if request.path == '/tool-inventory' %}active{% endif %}">Tool Inventory</a>
-      <a href="{{ url_for('main.parts_inventory') }}" class="{% if request.path == '/parts-inventory' %}active{% endif %}">Parts Inventory</a>
-      <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
-      <a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>
-      <a href="{{ url_for('main.settings') }}" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
+      <div class="nav-section">
+        <div class="nav-heading">Inventory</div>
+        <a href="{{ url_for('main.inventory') }}" class="{% if request.path == '/inventory' %}active{% endif %}">Inventory</a>
+        <a href="{{ url_for('main.railroads') }}" class="{% if request.path == '/railroads' %}active{% endif %}">Railroads</a>
+        <a href="{{ url_for('main.locations') }}" class="{% if request.path == '/locations' %}active{% endif %}">Locations</a>
+        <a href="{{ url_for('main.car_classes') }}" class="{% if request.path == '/car-classes' %}active{% endif %}">Car Classes</a>
+        <a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>
+        <a href="{{ url_for('main.loads') }}" class="{% if request.path == '/loads' %}active{% endif %}">Loads</a>
+        <a href="{{ url_for('main.consists') }}" class="{% if request.path.startswith('/consists') %}active{% endif %}">Consists</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Tools</div>
+        <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Software Tools</a>
+        <a href="{{ url_for('main.tool_inventory') }}" class="{% if request.path == '/tool-inventory' %}active{% endif %}">Tool Inventory</a>
+        <a href="{{ url_for('main.parts_inventory') }}" class="{% if request.path == '/parts-inventory' %}active{% endif %}">Parts Inventory</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Analysis</div>
+        <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
+        <a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-heading">Administration</div>
+        <a href="{{ url_for('main.administration') }}" class="{% if request.path.startswith('/administration') %}active{% endif %}">Administration</a>
+        <a href="{{ url_for('main.settings') }}" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
+      </div>
     </nav>
     <main>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <article class="message {% if category == 'danger' %}is-danger{% elif category == 'success' %}is-success{% else %}is-info{% endif %}" style="margin-bottom: 16px;">
+              <div class="message-body">{{ message }}</div>
+            </article>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
       {% block content %}{% endblock %}
     </main>
   </div>

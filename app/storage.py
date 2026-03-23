@@ -33,6 +33,22 @@ class CouchStore:
         self.ensure_totals(app.config.get("COUCHDB_TOTALS", []))
         self.ensure_schema_version(app.config["SCHEMA_VERSION"])
 
+    def replace_database(self, app, docs: Iterable[dict[str, Any]]) -> None:
+        if not self.server:
+            raise RuntimeError("CouchDB is not initialized.")
+        db_name = app.config["COUCHDB_DATABASE"]
+        if db_name in self.server:
+            del self.server[db_name]
+        self.db = self.server.create(db_name)
+        self.cache = {}
+        for doc in docs:
+            clean_doc = {key: value for key, value in doc.items() if key != "_rev"}
+            self.db.save(clean_doc)
+        self.ensure_views()
+        self.ensure_counters(app.config["COUCHDB_COUNTERS"])
+        self.ensure_totals(app.config.get("COUCHDB_TOTALS", []))
+        self.ensure_schema_version(app.config["SCHEMA_VERSION"])
+
     def ensure_schema_version(self, version: str) -> None:
         if not self.db:
             return
