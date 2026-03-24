@@ -58,6 +58,7 @@
                     <button type="submit" class="button is-small is-light">{{ "Disable" if user.is_active else "Enable" }}</button>
                   </form>
                 {% endif %}
+                <a class="button is-small is-light" href="{{ url_for('main.administration_users_permissions', user_id=user.id) }}">Edit Permissions</a>
                 <a class="button is-small is-light" href="{{ url_for('main.administration_users_reset_password', user_id=user.id) }}">Reset Password</a>
                 {% if current_user and current_user.id == user.id %}
                   <button type="button" class="button is-small is-static">Delete</button>

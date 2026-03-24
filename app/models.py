@@ -584,6 +584,11 @@ class User(BaseModel):
     permissions: list[dict[str, str]] = field(default_factory=list)
     is_active: bool = True
     last_login_at: str | None = None
+    failed_password_attempts: int = 0
+    failed_mfa_attempts: int = 0
+    locked_until: str | None = None
+    last_totp_counter: int | None = None
+    session_version: int = 1
     totp_secret_encrypted: str | None = None
     totp_enabled: bool = False
     passkeys: list[dict[str, object]] = field(default_factory=list)

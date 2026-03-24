@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import time
 from datetime import timedelta
 
@@ -8,13 +9,62 @@ from flask import Flask, g
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.11.0"
+SCHEMA_VERSION = "2.12.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
+
+
+def _read_env_value(env_path: str, key: str) -> str | None:
+    if not os.path.exists(env_path):
+        return None
+    with open(env_path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.startswith(f"{key}="):
+                return line.split("=", 1)[1].strip()
+    return None
+
+
+def _upsert_env_value(env_path: str, key: str, value: str) -> None:
+    lines: list[str] = []
+    found = False
+    if os.path.exists(env_path):
+        with open(env_path, encoding="utf-8") as handle:
+            lines = handle.readlines()
+    updated_lines: list[str] = []
+    for line in lines:
+        if line.startswith(f"{key}="):
+            updated_lines.append(f"{key}={value}\n")
+            found = True
+        else:
+            updated_lines.append(line)
+    if not found:
+        if updated_lines and not updated_lines[-1].endswith("\n"):
+            updated_lines[-1] = f"{updated_lines[-1]}\n"
+        updated_lines.append(f"{key}={value}\n")
+    with open(env_path, "w", encoding="utf-8") as handle:
+        handle.writelines(updated_lines)
+
+
+def ensure_local_secret_key(project_root: str) -> str:
+    configured = (os.environ.get("SECRET_KEY") or "").strip()
+    if configured and configured != "dev-secret-key":
+        return configured
+    env_file = os.environ.get("ENV_FILE") or os.path.join(project_root, ".env")
+    file_value = (_read_env_value(env_file, "SECRET_KEY") or "").strip()
+    if file_value and file_value != "dev-secret-key":
+        os.environ["SECRET_KEY"] = file_value
+        return file_value
+    generated = secrets.token_urlsafe(48)
+    os.makedirs(os.path.dirname(env_file) or ".", exist_ok=True)
+    _upsert_env_value(env_file, "SECRET_KEY", generated)
+    os.environ["SECRET_KEY"] = generated
+    return generated
 
 
 def create_app() -> Flask:
     app = Flask(__name__)
     base_dir = os.path.abspath(os.path.dirname(__file__))
+    project_root = os.path.dirname(base_dir)
+    secret_key = ensure_local_secret_key(project_root)
     os.makedirs(os.path.join(os.path.dirname(base_dir), "data"), exist_ok=True)
 
     couchdb_url = os.environ.get("COUCHDB_URL")
@@ -66,13 +116,19 @@ def create_app() -> Flask:
             {"doc_type": "user", "counter_key": "users"},
         ],
         SCHEMA_VERSION=SCHEMA_VERSION,
-        SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
+        SECRET_KEY=secret_key,
         MAX_CONTENT_LENGTH=32 * 1024 * 1024,
         LOGO_UPLOAD_FOLDER=os.path.join(base_dir, "static", "uploads", "railroad-logos"),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").strip().lower() in {"1", "true", "yes"},
-        PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=1),
+        SESSION_REFRESH_EACH_REQUEST=True,
+        AUTH_SESSION_OVERALL_LIFETIME=timedelta(hours=24),
+        AUTH_PENDING_LIFETIME=timedelta(minutes=10),
+        AUTH_RECENT_AUTH_LIFETIME=timedelta(minutes=15),
+        AUTH_LOCKOUT_LIFETIME=timedelta(minutes=15),
+        AUTH_FAILURE_LIMIT=3,
         WEBAUTHN_RP_NAME=os.environ.get("WEBAUTHN_RP_NAME", "Railroad Inventory"),
         WEBAUTHN_RP_ID=os.environ.get("WEBAUTHN_RP_ID", ""),
         WEBAUTHN_ORIGIN=os.environ.get("WEBAUTHN_ORIGIN", ""),

@@ -72,6 +72,10 @@ def generate_totp_secret() -> str:
     return base64.b32encode(secrets.token_bytes(20)).decode("ascii").rstrip("=")
 
 
+def generate_secret_key() -> str:
+    return secrets.token_urlsafe(48)
+
+
 def encrypt_value(value: str) -> str:
     return _get_fernet().encrypt(value.encode("utf-8")).decode("utf-8")
 
@@ -93,16 +97,21 @@ def build_totp_uri(secret: str, username: str, issuer: str) -> str:
     )
 
 
-def verify_totp_code(secret: str, code: str, now: int | None = None, window: int = 1) -> bool:
+def get_valid_totp_counter(secret: str, code: str, now: int | None = None, window: int = 1) -> int | None:
     cleaned = "".join(ch for ch in (code or "") if ch.isdigit())
     if len(cleaned) != TOTP_DIGITS:
-        return False
+        return None
     timestamp = int(now or datetime.now(UTC).timestamp())
     counter = timestamp // TOTP_PERIOD_SECONDS
     for offset in range(-window, window + 1):
-        if secrets.compare_digest(_totp_at(secret, counter + offset), cleaned):
-            return True
-    return False
+        candidate_counter = counter + offset
+        if secrets.compare_digest(_totp_at(secret, candidate_counter), cleaned):
+            return candidate_counter
+    return None
+
+
+def verify_totp_code(secret: str, code: str, now: int | None = None, window: int = 1) -> bool:
+    return get_valid_totp_counter(secret, code, now=now, window=window) is not None
 
 
 def parse_permissions(raw: str | None) -> list[dict[str, str]]:

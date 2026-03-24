@@ -14,7 +14,7 @@ import secrets
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Optional
 from urllib.parse import urlsplit
 
@@ -48,6 +48,7 @@ from app.auth import (
     encrypt_value,
     format_permissions,
     generate_totp_secret,
+    get_valid_totp_counter,
     get_csrf_token,
     hash_password,
     is_safe_next_url,
@@ -231,6 +232,15 @@ SELF_SERVICE_ENDPOINTS = {
     "main.account_passkey_verify",
     "main.account_passkey_delete",
 }
+RECENT_AUTH_ENDPOINTS = {
+    "main.account_totp_start",
+    "main.account_totp_setup",
+    "main.account_totp_enable",
+    "main.account_totp_disable",
+    "main.account_passkey_options",
+    "main.account_passkey_verify",
+    "main.account_passkey_delete",
+}
 SCOPE_PREFIXES = [
     ("/administration/users", "admin/users"),
     ("/administration", "admin"),
@@ -287,6 +297,167 @@ def ensure_db_backup() -> None:
     ensure_periodic_backup(db.store.db)
 
 
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def clear_session_and_auth_state() -> None:
+    session.clear()
+
+
+def get_timedelta_config(name: str) -> timedelta:
+    value = current_app.config.get(name)
+    if isinstance(value, timedelta):
+        return value
+    return timedelta()
+
+
+def get_failure_limit() -> int:
+    try:
+        return max(1, int(current_app.config.get("AUTH_FAILURE_LIMIT", 3)))
+    except (TypeError, ValueError):
+        return 3
+
+
+def is_recent_auth(max_age: timedelta | None = None) -> bool:
+    authenticated_at = parse_iso_datetime(session.get("recent_auth_at"))
+    if not authenticated_at:
+        return False
+    allowed_age = max_age or get_timedelta_config("AUTH_RECENT_AUTH_LIFETIME")
+    return utcnow() - authenticated_at <= allowed_age
+
+
+def mark_recent_auth() -> None:
+    session["recent_auth_at"] = utcnow_iso()
+
+
+def establish_authenticated_session(user: User, next_url: str | None = None, update_last_login: bool = True) -> None:
+    session.clear()
+    now_value = utcnow_iso()
+    session["user_id"] = user.id
+    session["session_version"] = int(user.session_version or 1)
+    session["_csrf_token"] = secrets.token_urlsafe(32)
+    session["authenticated_at"] = now_value
+    session["recent_auth_at"] = now_value
+    session["last_seen_at"] = now_value
+    session.permanent = True
+    if isinstance(next_url, str) and is_safe_next_url(next_url):
+        session["login_next"] = next_url
+    if update_last_login:
+        user.last_login_at = now_value
+        db.session.commit()
+
+
+def start_pending_login(user: User) -> None:
+    session.clear()
+    session["pending_user_id"] = user.id
+    session["pending_user_version"] = int(user.session_version or 1)
+    session["pending_started_at"] = utcnow_iso()
+    session["login_next"] = get_post_login_redirect()
+    session["_csrf_token"] = secrets.token_urlsafe(32)
+    session["last_seen_at"] = utcnow_iso()
+    session.permanent = True
+
+
+def complete_login(user: User) -> None:
+    next_url = session.get("login_next")
+    establish_authenticated_session(user, next_url=next_url, update_last_login=True)
+
+
+def unlock_user_if_lock_expired(user: User | None) -> None:
+    if not user or not user.locked_until:
+        return
+    locked_until = parse_iso_datetime(user.locked_until)
+    if locked_until and locked_until > utcnow():
+        return
+    user.locked_until = None
+    user.failed_password_attempts = 0
+    user.failed_mfa_attempts = 0
+    db.session.commit()
+
+
+def is_user_locked(user: User | None) -> bool:
+    if not user:
+        return False
+    unlock_user_if_lock_expired(user)
+    locked_until = parse_iso_datetime(user.locked_until)
+    return bool(locked_until and locked_until > utcnow())
+
+
+def register_failed_auth_attempt(user: User | None, attempt_type: str) -> bool:
+    if not user:
+        return False
+    unlock_user_if_lock_expired(user)
+    if attempt_type == "password":
+        user.failed_password_attempts = int(user.failed_password_attempts or 0) + 1
+        current_count = user.failed_password_attempts
+    else:
+        user.failed_mfa_attempts = int(user.failed_mfa_attempts or 0) + 1
+        current_count = user.failed_mfa_attempts
+    locked = current_count >= get_failure_limit()
+    if locked:
+        user.locked_until = (utcnow() + get_timedelta_config("AUTH_LOCKOUT_LIFETIME")).replace(microsecond=0).isoformat()
+        user.failed_password_attempts = 0
+        user.failed_mfa_attempts = 0
+    db.session.commit()
+    return locked
+
+
+def clear_failed_auth_attempts(user: User | None, attempt_type: str | None = None) -> None:
+    if not user:
+        return
+    changed = False
+    if attempt_type in {None, "password"} and user.failed_password_attempts:
+        user.failed_password_attempts = 0
+        changed = True
+    if attempt_type in {None, "mfa"} and user.failed_mfa_attempts:
+        user.failed_mfa_attempts = 0
+        changed = True
+    if user.locked_until:
+        user.locked_until = None
+        changed = True
+    if changed:
+        db.session.commit()
+
+
+def bump_session_version(user: User | None) -> None:
+    if not user:
+        return
+    user.session_version = int(user.session_version or 1) + 1
+
+
+def pending_login_expired() -> bool:
+    started_at = parse_iso_datetime(session.get("pending_started_at"))
+    if not started_at:
+        return True
+    return utcnow() - started_at > get_timedelta_config("AUTH_PENDING_LIFETIME")
+
+
+def current_session_expired() -> bool:
+    authenticated_at = parse_iso_datetime(session.get("authenticated_at"))
+    last_seen_at = parse_iso_datetime(session.get("last_seen_at"))
+    if not authenticated_at or not last_seen_at:
+        return True
+    now_value = utcnow()
+    if now_value - authenticated_at > get_timedelta_config("AUTH_SESSION_OVERALL_LIFETIME"):
+        return True
+    if now_value - last_seen_at > get_timedelta_config("PERMANENT_SESSION_LIFETIME"):
+        return True
+    return False
+
+
 def user_count() -> int:
     return User.query.count()
 
@@ -299,9 +470,15 @@ def get_current_user() -> User | None:
     user_id = session.get("user_id")
     if not isinstance(user_id, int):
         return None
+    if current_session_expired():
+        clear_session_and_auth_state()
+        return None
     user = User.query.get(user_id)
     if not user or not user.is_active:
-        session.pop("user_id", None)
+        clear_session_and_auth_state()
+        return None
+    if int(session.get("session_version") or 0) != int(user.session_version or 1):
+        clear_session_and_auth_state()
         return None
     return user
 
@@ -310,9 +487,15 @@ def get_pending_user() -> User | None:
     user_id = session.get("pending_user_id")
     if not isinstance(user_id, int):
         return None
+    if pending_login_expired():
+        clear_session_and_auth_state()
+        return None
     user = User.query.get(user_id)
     if not user or not user.is_active:
-        session.pop("pending_user_id", None)
+        clear_session_and_auth_state()
+        return None
+    if int(session.get("pending_user_version") or 0) != int(user.session_version or 1):
+        clear_session_and_auth_state()
         return None
     return user
 
@@ -450,6 +633,17 @@ def build_user_form_defaults() -> dict[str, str]:
     }
 
 
+def get_permission_examples() -> list[dict[str, str]]:
+    return [
+        {"permission": "inventory/* READ", "description": "Read all inventory records."},
+        {"permission": "inventory/cars WRITE", "description": "Create and edit cars."},
+        {"permission": "inventory/cars/c38 WRITE", "description": "Specific leaf scope example."},
+        {"permission": "railroads/* WRITE", "description": "Manage railroad records and related details."},
+        {"permission": "admin/users WRITE", "description": "Create users, reset passwords, and edit permissions."},
+        {"permission": "* WRITE", "description": "Full platform administration."},
+    ]
+
+
 def get_sorted_users() -> list[User]:
     return User.query.order_by("username").all()
 
@@ -511,25 +705,6 @@ def get_post_login_redirect() -> str:
     if is_safe_next_url(next_url):
         return next_url
     return url_for("main.inventory")
-
-
-def start_pending_login(user: User) -> None:
-    session.clear()
-    session["pending_user_id"] = user.id
-    session["login_next"] = get_post_login_redirect()
-    session["_csrf_token"] = secrets.token_urlsafe(32)
-
-
-def complete_login(user: User) -> None:
-    next_url = session.get("login_next")
-    session.clear()
-    session["user_id"] = user.id
-    session["_csrf_token"] = secrets.token_urlsafe(32)
-    session.permanent = True
-    if isinstance(next_url, str) and is_safe_next_url(next_url):
-        session["login_next"] = next_url
-    user.last_login_at = utcnow_iso()
-    db.session.commit()
 
 
 def consume_login_redirect() -> str:
@@ -636,9 +811,16 @@ def load_request_security_context():
         return deny_request("Sign in to continue.", 401)
 
     if request.endpoint in SELF_SERVICE_ENDPOINTS:
+        if request.endpoint in RECENT_AUTH_ENDPOINTS and not is_recent_auth():
+            clear_session_and_auth_state()
+            flash("Sign in again to manage MFA settings.", "danger")
+            return redirect(url_for("main.login", next=request.full_path if request.query_string else request.path))
+        session["last_seen_at"] = utcnow_iso()
         session.permanent = True
         return None
 
+    if g.current_user or g.pending_user:
+        session["last_seen_at"] = utcnow_iso()
     session.permanent = True
     required_access = required_access_for_request()
     if not user_has_access(g.current_user, g.current_scope, required_access):
@@ -1804,9 +1986,17 @@ def login():
         username = normalize_username(request.form.get("username"))
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
+        if user and is_user_locked(user):
+            flash("That account is temporarily locked after repeated sign-in failures. Try again later.", "danger")
+            return render_template("login.html", next_url=get_post_login_redirect()), 423
         if not user or not user.is_active or not verify_password(user.password_hash, password):
+            locked = register_failed_auth_attempt(user, "password") if user and user.is_active else False
+            if locked:
+                flash("That account is temporarily locked after repeated sign-in failures. Try again later.", "danger")
+                return render_template("login.html", next_url=get_post_login_redirect()), 423
             flash("Invalid username or password.", "danger")
             return render_template("login.html", next_url=get_post_login_redirect()), 401
+        clear_failed_auth_attempts(user, "password")
         if user_has_verified_mfa(user):
             start_pending_login(user)
             return redirect(url_for("main.login_verify"))
@@ -1821,12 +2011,24 @@ def login_verify():
     user = get_pending_user()
     if not user:
         return redirect(url_for("main.login"))
+    if is_user_locked(user):
+        clear_session_and_auth_state()
+        flash("That account is temporarily locked after repeated verification failures. Try again later.", "danger")
+        return redirect(url_for("main.login"))
     if request.method == "POST":
         code = request.form.get("totp_code", "").strip()
         secret = get_user_totp_secret(user)
-        if not user.totp_enabled or not secret or not verify_totp_code(secret, code):
+        counter = get_valid_totp_counter(secret, code) if (user.totp_enabled and secret) else None
+        if counter is None or (user.last_totp_counter is not None and counter <= user.last_totp_counter):
+            locked = register_failed_auth_attempt(user, "mfa")
+            if locked:
+                clear_session_and_auth_state()
+                flash("That account is temporarily locked after repeated verification failures. Try again later.", "danger")
+                return redirect(url_for("main.login"))
             flash("Invalid authentication code.", "danger")
             return render_template("login_verify.html", user=user), 401
+        user.last_totp_counter = counter
+        clear_failed_auth_attempts(user, "mfa")
         complete_login(user)
         return redirect(consume_login_redirect())
     return render_template("login_verify.html", user=user)
@@ -1835,7 +2037,7 @@ def login_verify():
 @main_bp.route("/login/passkeys/options", methods=["POST"])
 def login_passkey_options():
     user = get_login_passkey_user()
-    if not user or not user.is_active or not user.has_passkeys:
+    if not user or not user.is_active or not user.has_passkeys or is_user_locked(user):
         return jsonify({"error": "Passkey sign-in is unavailable for that account."}), 400
     options = generate_authentication_options(
         rp_id=get_webauthn_rp_id(),
@@ -1859,19 +2061,31 @@ def login_passkey_verify():
     credential_id = credential.get("id")
     record = find_passkey_record(user, credential_id)
     if not record:
+        locked = register_failed_auth_attempt(user, "mfa") if user else False
+        if locked:
+            clear_session_and_auth_state()
+            return jsonify({"error": "That account is temporarily locked. Try again later."}), 423
         return jsonify({"error": "Passkey credential was not recognized."}), 400
-    verification = verify_authentication_response(
-        credential=credential,
-        expected_challenge=base64url_to_bytes(challenge),
-        expected_rp_id=get_webauthn_rp_id(),
-        expected_origin=get_webauthn_origin(),
-        credential_public_key=base64url_to_bytes(str(record.get("public_key", ""))),
-        credential_current_sign_count=int(record.get("sign_count", 0) or 0),
-        require_user_verification=True,
-    )
+    try:
+        verification = verify_authentication_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(challenge),
+            expected_rp_id=get_webauthn_rp_id(),
+            expected_origin=get_webauthn_origin(),
+            credential_public_key=base64url_to_bytes(str(record.get("public_key", ""))),
+            credential_current_sign_count=int(record.get("sign_count", 0) or 0),
+            require_user_verification=True,
+        )
+    except Exception:
+        locked = register_failed_auth_attempt(user, "mfa") if user else False
+        if locked:
+            clear_session_and_auth_state()
+            return jsonify({"error": "That account is temporarily locked. Try again later."}), 423
+        return jsonify({"error": "Passkey authentication could not be completed."}), 400
     record["sign_count"] = verification.new_sign_count
     user.passkeys = list(user.passkeys or [])
     session.pop("passkey_auth_challenge", None)
+    clear_failed_auth_attempts(user, "mfa")
     complete_login(user)
     return jsonify({"ok": True, "redirect_url": consume_login_redirect()})
 
@@ -1897,12 +2111,7 @@ def setup_users():
         except ValueError as exc:
             flash(str(exc), "danger")
             return render_template("account_setup.html", users=[], form_values=form_values, setup_mode=True), 400
-        session.clear()
-        session["user_id"] = user.id
-        session["_csrf_token"] = secrets.token_urlsafe(32)
-        session.permanent = True
-        user.last_login_at = utcnow_iso()
-        db.session.commit()
+        establish_authenticated_session(user, update_last_login=True)
         updated_count = backfill_ownerless_documents(user)
         if updated_count:
             flash(f"Assigned ownership for {updated_count} existing records to {get_user_label(user)}.", "success")
@@ -1939,11 +2148,13 @@ def account_password():
             flash("New passwords do not match.", "danger")
             return render_template("account_password.html"), 400
         validate_password_strength(new_password)
+        bump_session_version(user)
         user.password_hash = hash_password(new_password)
         db.session.commit()
         ensure_db_backup()
-        flash("Password updated.", "success")
-        return redirect(url_for("main.account_password"))
+        clear_session_and_auth_state()
+        flash("Password updated. Sign in again with the new password.", "success")
+        return redirect(url_for("main.login"))
     return render_template("account_password.html")
 
 
@@ -1984,11 +2195,16 @@ def account_totp_enable():
     user = g.current_user
     secret = get_user_totp_secret(user)
     code = request.form.get("totp_code", "").strip()
-    if not secret or not verify_totp_code(secret, code):
+    counter = get_valid_totp_counter(secret, code) if secret else None
+    if counter is None or (user.last_totp_counter is not None and counter <= user.last_totp_counter):
         flash("Invalid TOTP code.", "danger")
         return redirect(url_for("main.account_security"))
+    user.last_totp_counter = counter
     user.totp_enabled = True
+    bump_session_version(user)
     db.session.commit()
+    session["session_version"] = int(user.session_version or 1)
+    mark_recent_auth()
     ensure_db_backup()
     flash("TOTP is enabled.", "success")
     return redirect(url_for("main.account_security"))
@@ -1999,7 +2215,11 @@ def account_totp_disable():
     user = g.current_user
     user.totp_secret_encrypted = None
     user.totp_enabled = False
+    user.last_totp_counter = None
+    bump_session_version(user)
     db.session.commit()
+    session["session_version"] = int(user.session_version or 1)
+    mark_recent_auth()
     ensure_db_backup()
     flash("TOTP was disabled.", "success")
     return redirect(url_for("main.account_security"))
@@ -2032,13 +2252,16 @@ def account_passkey_verify():
     challenge = session.get("passkey_registration_challenge")
     if not isinstance(credential, dict) or not isinstance(challenge, str):
         return jsonify({"error": "Passkey registration could not be completed."}), 400
-    verification = verify_registration_response(
-        credential=credential,
-        expected_challenge=base64url_to_bytes(challenge),
-        expected_rp_id=get_webauthn_rp_id(),
-        expected_origin=get_webauthn_origin(),
-        require_user_verification=True,
-    )
+    try:
+        verification = verify_registration_response(
+            credential=credential,
+            expected_challenge=base64url_to_bytes(challenge),
+            expected_rp_id=get_webauthn_rp_id(),
+            expected_origin=get_webauthn_origin(),
+            require_user_verification=True,
+        )
+    except Exception:
+        return jsonify({"error": "Passkey registration could not be completed."}), 400
     user.passkeys = list(user.passkeys or [])
     user.passkeys.append(
         {
@@ -2051,7 +2274,10 @@ def account_passkey_verify():
         }
     )
     session.pop("passkey_registration_challenge", None)
+    bump_session_version(user)
     db.session.commit()
+    session["session_version"] = int(user.session_version or 1)
+    mark_recent_auth()
     ensure_db_backup()
     return jsonify({"ok": True})
 
@@ -2060,7 +2286,10 @@ def account_passkey_verify():
 def account_passkey_delete(credential_id: str):
     user = g.current_user
     user.passkeys = [item for item in (user.passkeys or []) if item.get("credential_id") != credential_id]
+    bump_session_version(user)
     db.session.commit()
+    session["session_version"] = int(user.session_version or 1)
+    mark_recent_auth()
     ensure_db_backup()
     flash("Passkey removed.", "success")
     return redirect(url_for("main.account_security"))
@@ -6432,11 +6661,53 @@ def administration_users_new():
             user = create_user_from_form(force_superuser=False)
         except (ValueError, json.JSONDecodeError) as exc:
             flash(str(exc), "danger")
-            return render_template("user_form.html", form_values=form_values, mode="create"), 400
+            return render_template(
+                "user_form.html",
+                form_values=form_values,
+                mode="create",
+                permission_examples=get_permission_examples(),
+            ), 400
         flash(f"Created user {get_user_label(user)}.", "success")
         ensure_db_backup()
         return redirect(url_for("main.administration_users"))
-    return render_template("user_form.html", form_values=form_values, mode="create")
+    return render_template(
+        "user_form.html",
+        form_values=form_values,
+        mode="create",
+        permission_examples=get_permission_examples(),
+    )
+
+
+@main_bp.route("/administration/users/<int:user_id>/permissions", methods=["GET", "POST"])
+def administration_users_permissions(user_id: int):
+    user = User.query.get_or_404(user_id)
+    form_values = {
+        "permissions": format_permissions(user.permissions),
+    }
+    if request.method == "POST":
+        form_values["permissions"] = request.form.get("permissions", "").strip() or DEFAULT_PERMISSION_TEXT
+        try:
+            user.permissions = parse_permissions(request.form.get("permissions"))
+        except (ValueError, json.JSONDecodeError) as exc:
+            flash(str(exc), "danger")
+            return render_template(
+                "user_form.html",
+                mode="edit_permissions",
+                target_user=user,
+                form_values=form_values,
+                permission_examples=get_permission_examples(),
+            ), 400
+        db.session.commit()
+        ensure_db_backup()
+        flash(f"Updated permissions for {get_user_label(user)}.", "success")
+        return redirect(url_for("main.administration_users"))
+    return render_template(
+        "user_form.html",
+        mode="edit_permissions",
+        target_user=user,
+        form_values=form_values,
+        permission_examples=get_permission_examples(),
+    )
 
 
 @main_bp.route("/administration/users/<int:user_id>/reset-password", methods=["GET", "POST"])
@@ -6453,7 +6724,11 @@ def administration_users_reset_password(user_id: int):
         except ValueError as exc:
             flash(str(exc), "danger")
             return render_template("user_form.html", mode="reset_password", target_user=user), 400
+        bump_session_version(user)
         user.password_hash = hash_password(password)
+        user.failed_password_attempts = 0
+        user.failed_mfa_attempts = 0
+        user.locked_until = None
         db.session.commit()
         ensure_db_backup()
         flash(f"Password reset for {get_user_label(user)}.", "success")

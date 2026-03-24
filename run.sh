@@ -17,20 +17,37 @@ import secrets
 print(secrets.token_urlsafe(24))
 PY
   )
+  GENERATED_SECRET_KEY=$("$SYSTEM_PYTHON" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+  )
   cat > "$ENV_FILE" <<EOF
 COUCHDB_USER=admin
 COUCHDB_PASSWORD=${GENERATED_PASSWORD}
 COUCHDB_HOST=127.0.0.1
 COUCHDB_PORT=5984
 COUCHDB_DATABASE=model_inventory
+SECRET_KEY=${GENERATED_SECRET_KEY}
 EOF
-  echo "Created ${ENV_FILE} with a generated CouchDB password."
+  echo "Created ${ENV_FILE} with generated local secrets."
 fi
 
 set -a
 # shellcheck disable=SC1090
 source "$ENV_FILE"
 set +a
+
+if [ -z "${SECRET_KEY:-}" ]; then
+  GENERATED_SECRET_KEY=$("$SYSTEM_PYTHON" - <<'PY'
+import secrets
+print(secrets.token_urlsafe(48))
+PY
+  )
+  printf '\nSECRET_KEY=%s\n' "$GENERATED_SECRET_KEY" >> "$ENV_FILE"
+  export SECRET_KEY="$GENERATED_SECRET_KEY"
+  echo "Added SECRET_KEY to ${ENV_FILE}."
+fi
 
 COUCHDB_CONTAINER_NAME=${COUCHDB_CONTAINER_NAME:-modelinventory-couchdb}
 COUCHDB_IMAGE=${COUCHDB_IMAGE:-docker.io/library/couchdb:3}
