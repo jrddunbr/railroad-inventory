@@ -6,11 +6,16 @@ Railroads ({{ pagination.total }})
   <div class="box">
     <h1 class="title is-3">Railroads</h1>
     <p class="keyboard-hint">Results: {{ pagination.total }}</p>
+    <div class="buttons are-small">
+      <a class="button is-light{% if current_sort == 'alpha' %} is-link{% endif %}" href="{{ url_for('main.railroads') }}">Sort A-Z</a>
+      <a class="button is-light{% if current_sort == 'count' %} is-link{% endif %}" href="{{ url_for('main.railroads', sort='count') }}">Sort by Most Cars</a>
+    </div>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Reporting Mark</th>
           <th>Name</th>
+          <th>Cars + Locomotives</th>
           <th>Logo</th>
           <th>Start</th>
           <th>End</th>
@@ -23,6 +28,7 @@ Railroads ({{ pagination.total }})
         <tr>
           <td><a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">{{ railroad.reporting_mark or "-" }}</a></td>
           <td><a href="{{ url_for('main.railroad_detail', railroad_id=railroad.id) }}">{{ railroad.name }}</a></td>
+          <td>{{ railroad.inventory_count }}</td>
           <td>
             {% if railroad.representative_logo and railroad.representative_logo.image_path %}
               <img src="{{ url_for('static', filename=railroad.representative_logo.image_path) }}" alt="{{ railroad.representative_logo.description or railroad.name }}" style="max-height: 32px; max-width: 96px;" />
@@ -37,7 +43,7 @@ Railroads ({{ pagination.total }})
         </tr>
         {% else %}
         <tr>
-          <td colspan="7">No railroads yet. Add a car to create one automatically.</td>
+          <td colspan="8">No railroads yet. Add a car to create one automatically.</td>
         </tr>
         {% endfor %}
       </tbody>

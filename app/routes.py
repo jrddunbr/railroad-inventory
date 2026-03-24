@@ -1918,11 +1918,44 @@ def conflict_report():
 
 @main_bp.route("/railroads")
 def railroads():
-    railroads = Railroad.query.order_by("reporting_mark").all()
+    sort = (request.args.get("sort") or "alpha").strip().lower()
+    if sort not in {"alpha", "count"}:
+        sort = "alpha"
+
+    railroads = Railroad.query.all()
+    railroad_counts: dict[int, int] = {}
+    for car in Car.query.all():
+        if car.railroad_id:
+            railroad_counts[car.railroad_id] = railroad_counts.get(car.railroad_id, 0) + 1
+
+    for railroad in railroads:
+        railroad.inventory_count = railroad_counts.get(railroad.id, 0)
+
+    if sort == "count":
+        railroads.sort(
+            key=lambda railroad: (
+                -railroad.inventory_count,
+                (railroad.name or railroad.reporting_mark or "").lower(),
+            )
+        )
+    else:
+        railroads.sort(
+            key=lambda railroad: (
+                (railroad.name or railroad.reporting_mark or "").lower(),
+                (railroad.reporting_mark or "").lower(),
+            )
+        )
+
     page_size = get_page_size()
     page = get_page_number()
-    paged_railroads, pagination = paginate_list(railroads, page, page_size, "main.railroads", {})
-    return render_template("railroads.html", railroads=paged_railroads, pagination=pagination)
+    route_params = {"sort": sort} if sort != "alpha" else {}
+    paged_railroads, pagination = paginate_list(railroads, page, page_size, "main.railroads", route_params)
+    return render_template(
+        "railroads.html",
+        railroads=paged_railroads,
+        pagination=pagination,
+        current_sort=sort,
+    )
 
 
 @main_bp.route("/locations")
