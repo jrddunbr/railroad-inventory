@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if mode == "reset_password" %}Reset Password{% else %}Create User{% endif %}
+{% endblock %}
+{% block content %}
+  <div class="box">
+    {% if mode == "reset_password" %}
+      <h1 class="title is-3">Reset Password</h1>
+      <p class="subtitle is-6">Set a new password for <strong>{{ user_label(target_user) }}</strong>.</p>
+      <form method="post" action="{{ url_for('main.administration_users_reset_password', user_id=target_user.id) }}">
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="password">New Password</label>
+            <div class="control">
+              <input class="input" id="password" type="password" name="password" autocomplete="new-password" required />
+            </div>
+            <p class="keyboard-hint">Minimum 12 characters.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="confirm_password">Confirm Password</label>
+            <div class="control">
+              <input class="input" id="confirm_password" type="password" name="confirm_password" autocomplete="new-password" required />
+            </div>
+          </div>
+        </div>
+        <div class="actions buttons">
+          <button type="submit" class="button is-primary">Reset Password</button>
+          <a class="button is-light" href="{{ url_for('main.administration_users') }}">Back to Users</a>
+        </div>
+      </form>
+    {% else %}
+      <h1 class="title is-3">Create New User</h1>
+      <p class="subtitle is-6">Add a user and assign hierarchical permissions such as <code>inventory/* READ</code> or <code>admin/* WRITE</code>.</p>
+      <form method="post" action="{{ url_for('main.administration_users_new') }}">
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="display_name">Display Name</label>
+            <div class="control">
+              <input class="input" id="display_name" name="display_name" value="{{ form_values.display_name }}" autocomplete="name" required />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="username">Username</label>
+            <div class="control">
+              <input class="input" id="username" name="username" value="{{ form_values.username }}" autocomplete="username" required />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="email">Email</label>
+            <div class="control">
+              <input class="input" id="email" name="email" type="email" value="{{ form_values.email }}" autocomplete="email" />
+            </div>
+            <p class="keyboard-hint">Optional. Used for Gravatar.</p>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field">
+            <label class="label" for="password">Password</label>
+            <div class="control">
+              <input class="input" id="password" type="password" name="password" autocomplete="new-password" required />
+            </div>
+            <p class="keyboard-hint">Minimum 12 characters.</p>
+          </div>
+          <div class="field">
+            <label class="label" for="confirm_password">Confirm Password</label>
+            <div class="control">
+              <input class="input" id="confirm_password" type="password" name="confirm_password" autocomplete="new-password" required />
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="permissions">Permissions</label>
+          <div class="control">
+            <textarea class="textarea" id="permissions" name="permissions" rows="6" spellcheck="false">{{ form_values.permissions }}</textarea>
+          </div>
+          <p class="keyboard-hint">One permission per line: <code>scope access</code>. Example: <code>inventory/* READ</code>.</p>
+        </div>
+        <div class="actions buttons">
+          <button type="submit" class="button is-primary">Create User</button>
+          <a class="button is-light" href="{{ url_for('main.administration_users') }}">Back to Users</a>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+{% endblock %}

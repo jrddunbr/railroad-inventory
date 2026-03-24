@@ -4,7 +4,9 @@
   <div class="box">
     <h1 class="title is-3">Parts Inventory</h1>
     <div class="actions buttons">
-      <a class="button is-small is-primary" href="{{ url_for('main.part_new') }}">Add Part</a>
+      {% if can_access('inventory/parts', 'WRITE') %}
+        <a class="button is-small is-primary" href="{{ url_for('main.part_new') }}">Add Part</a>
+      {% endif %}
     </div>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -15,6 +17,7 @@
           <th>UPC</th>
           <th>Quantity</th>
           <th>Location</th>
+          <th>Owner</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -33,16 +36,19 @@
               -
             {% endif %}
           </td>
+          <td>{{ user_label(part.owner) }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.part_edit', part_id=part.id, next=url_for('main.parts_inventory')) }}">Edit</a>
-            <form method="post" action="{{ url_for('main.part_delete', part_id=part.id, next=url_for('main.parts_inventory')) }}" data-action="delete" data-table="part_items" data-id="{{ part.id }}" data-id-field="id" data-entity-label="part {{ part.name or part.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-danger">Delete</button>
-            </form>
+            {% if can_access('inventory/parts', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.part_edit', part_id=part.id, next=url_for('main.parts_inventory')) }}">Edit</a>
+              <form method="post" action="{{ url_for('main.part_delete', part_id=part.id, next=url_for('main.parts_inventory')) }}" data-action="delete" data-table="part_items" data-id="{{ part.id }}" data-id-field="id" data-entity-label="part {{ part.name or part.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="7">No parts in inventory yet.</td>
+          <td colspan="8">No parts in inventory yet.</td>
         </tr>
         {% endfor %}
       </tbody>

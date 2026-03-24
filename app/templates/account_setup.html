@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}{{ "Initial Setup" if setup_mode else "Users" }}{% endblock %}
+{% set auth_page = setup_mode %}
+{% block content %}
+  <div class="{% if setup_mode %}auth-card{% else %}box{% endif %}">
+    <h1 class="title is-3">{{ "Initial Account Setup" if setup_mode else "Users" }}</h1>
+    <p class="subtitle is-6">
+      {% if setup_mode %}
+        Create the first account. It will receive <code>* WRITE</code> access and will become the default owner for existing inventory records without an owner.
+      {% else %}
+        Add users and assign hierarchical permissions such as <code>inventory/* READ</code> or <code>admin/* WRITE</code>.
+      {% endif %}
+    </p>
+
+    {% if not setup_mode %}
+      <div class="box" style="background: rgba(255,255,255,0.65);">
+        <h2 class="title is-5">Existing Users</h2>
+        <table class="table is-fullwidth is-striped">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Username</th>
+              <th>Permissions</th>
+              <th>MFA</th>
+              <th>Last Login</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+              <tr>
+                <td>{{ user.label }}</td>
+                <td><code>{{ user.username }}</code></td>
+                <td>
+                  {% for permission in user.permissions %}
+                    <div><code>{{ permission.scope }} {{ permission.access }}</code></div>
+                  {% else %}
+                    -
+                  {% endfor %}
+                </td>
+                <td>
+                  {% if user.has_mfa %}
+                    Enabled
+                  {% else %}
+                    Read-only until configured
+                  {% endif %}
+                </td>
+                <td>{{ user.last_login_at or "-" }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="5">No users created yet.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('main.setup_users' if setup_mode else 'main.administration_users') }}">
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="display_name">Display Name</label>
+          <div class="control">
+            <input class="input" id="display_name" name="display_name" value="{{ form_values.display_name }}" autocomplete="name" required />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="username">Username</label>
+          <div class="control">
+            <input class="input" id="username" name="username" value="{{ form_values.username }}" autocomplete="username" required />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="email">Email</label>
+          <div class="control">
+            <input class="input" id="email" name="email" type="email" value="{{ form_values.email }}" autocomplete="email" />
+          </div>
+          <p class="keyboard-hint">Optional. Used for Gravatar.</p>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="password">Password</label>
+          <div class="control">
+            <input class="input" id="password" type="password" name="password" autocomplete="new-password" required />
+          </div>
+          <p class="keyboard-hint">Minimum 12 characters.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="confirm_password">Confirm Password</label>
+          <div class="control">
+            <input class="input" id="confirm_password" type="password" name="confirm_password" autocomplete="new-password" required />
+          </div>
+        </div>
+      </div>
+
+      {% if not setup_mode %}
+        <div class="field">
+          <label class="label" for="permissions">Permissions</label>
+          <div class="control">
+            <textarea class="textarea" id="permissions" name="permissions" rows="6" spellcheck="false">{{ form_values.permissions }}</textarea>
+          </div>
+          <p class="keyboard-hint">One permission per line: <code>scope access</code>. Example: <code>inventory/* READ</code>.</p>
+        </div>
+      {% endif %}
+
+      <div class="actions buttons">
+        <button type="submit" class="button is-primary">{{ "Create Administrator" if setup_mode else "Create User" }}</button>
+        {% if not setup_mode %}
+          <a class="button is-light" href="{{ url_for('main.administration') }}">Back to Administration</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+{% endblock %}

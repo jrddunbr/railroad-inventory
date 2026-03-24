@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+{% set auth_page = true %}
+{% block content %}
+  <div class="auth-card">
+    <h1 class="title is-3">Sign In</h1>
+    <p class="subtitle is-6">Access Railroad Inventory with your assigned account.</p>
+    <form method="post" action="{{ url_for('main.login', next=next_url) }}" data-confirm-skip="true">
+      <input type="hidden" name="next" value="{{ next_url }}" />
+      <div class="field">
+        <label class="label" for="username">Username</label>
+        <div class="control">
+          <input class="input" id="username" name="username" autocomplete="username" required />
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="password">Password</label>
+        <div class="control">
+          <input class="input" id="password" type="password" name="password" autocomplete="current-password" required />
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="submit" class="button is-primary">Sign In</button>
+        <button type="button" class="button is-light" id="passkey-sign-in">Use Passkey</button>
+      </div>
+    </form>
+    <p class="keyboard-hint" id="passkey-message" aria-live="polite"></p>
+  </div>
+  <script>
+    const usernameInput = document.getElementById('username');
+    const passkeyButton = document.getElementById('passkey-sign-in');
+    const passkeyMessage = document.getElementById('passkey-message');
+
+    const toArrayBuffer = (value) => {
+      const padding = '='.repeat((4 - (value.length % 4)) % 4);
+      const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const binary = atob(base64);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    };
+
+    const fromArrayBuffer = (buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    };
+
+    const decodeRequestOptions = (options) => {
+      options.challenge = toArrayBuffer(options.challenge);
+      if (options.allowCredentials) {
+        options.allowCredentials = options.allowCredentials.map((item) => ({
+          ...item,
+          id: toArrayBuffer(item.id),
+        }));
+      }
+      return options;
+    };
+
+    const encodeAssertion = (credential) => ({
+      id: credential.id,
+      rawId: fromArrayBuffer(credential.rawId),
+      type: credential.type,
+      response: {
+        authenticatorData: fromArrayBuffer(credential.response.authenticatorData),
+        clientDataJSON: fromArrayBuffer(credential.response.clientDataJSON),
+        signature: fromArrayBuffer(credential.response.signature),
+        userHandle: credential.response.userHandle ? fromArrayBuffer(credential.response.userHandle) : null,
+      },
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment,
+    });
+
+    passkeyButton?.addEventListener('click', async () => {
+      passkeyMessage.textContent = '';
+      const username = usernameInput.value.trim();
+      if (!username) {
+        passkeyMessage.textContent = 'Enter your username first.';
+        return;
+      }
+      try {
+        const optionsResponse = await fetch('{{ url_for("main.login_passkey_options") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+          },
+          body: JSON.stringify({ username, next: '{{ next_url }}' }),
+        });
+        const optionsPayload = await optionsResponse.json();
+        if (!optionsResponse.ok) {
+          throw new Error(optionsPayload.error || 'Passkey sign-in failed.');
+        }
+        const credential = await navigator.credentials.get({
+          publicKey: decodeRequestOptions(optionsPayload),
+        });
+        const verifyResponse = await fetch('{{ url_for("main.login_passkey_verify") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+          },
+          body: JSON.stringify({ credential: encodeAssertion(credential) }),
+        });
+        const verifyPayload = await verifyResponse.json();
+        if (!verifyResponse.ok) {
+          throw new Error(verifyPayload.error || 'Passkey sign-in failed.');
+        }
+        window.location.href = verifyPayload.redirect_url;
+      } catch (error) {
+        passkeyMessage.textContent = error.message || 'Passkey sign-in failed.';
+      }
+    });
+  </script>
+{% endblock %}

@@ -52,6 +52,17 @@
             </div>
           </div>
         </div>
+        <div class="field">
+          <label class="label" for="part_owner_username">Owner</label>
+          <div class="control">
+            <input class="input" list="enabled_users" id="part_owner_username" name="owner_username" value="{{ owner_username }}" />
+            <datalist id="enabled_users">
+              {% for user in enabled_users %}
+                <option value="{{ user.username }}">{{ user_label(user) }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+        </div>
         <div class="field" style="grid-column: 1 / -1;">
           <label class="label" for="part_description">Description</label>
           <div class="control">

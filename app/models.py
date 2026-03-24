@@ -10,6 +10,7 @@ class Railroad(BaseModel):
     doc_type = "railroad"
     counter_key = "railroads"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     reporting_mark: str | None = None
     name: str | None = None
@@ -64,6 +65,7 @@ class CarClass(BaseModel):
     doc_type = "car_class"
     counter_key = "car_classes"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     code: str | None = None
     car_type: str | None = None
@@ -103,6 +105,7 @@ class Location(BaseModel):
     doc_type = "location"
     counter_key = "locations"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     name: str | None = None
     location_type: str | None = None
@@ -169,6 +172,7 @@ class ToolItem(BaseModel):
     doc_type = "tool_item"
     counter_key = "tool_items"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     location_id: int | None = None
     name: str | None = None
@@ -197,6 +201,7 @@ class PartItem(BaseModel):
     doc_type = "part_item"
     counter_key = "part_items"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     location_id: int | None = None
     name: str | None = None
@@ -226,6 +231,7 @@ class Car(BaseModel):
     doc_type = "car"
     counter_key = "cars"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     railroad_id: int | None = None
     car_class_id: int | None = None
@@ -334,6 +340,7 @@ class Car(BaseModel):
             self.car_class_id = self._car_class_ref.id
         if self._location_ref and not self.location_id and self._location_ref.id:
             self.location_id = self._location_ref.id
+        super().prepare_save()
 
 
 @dataclass
@@ -341,6 +348,7 @@ class Consist(BaseModel):
     doc_type = "consist"
     counter_key = "consists"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     name: str | None = None
     era: str | None = None
@@ -372,6 +380,7 @@ class CarInspection(BaseModel):
     doc_type = "car_inspection"
     counter_key = "car_inspections"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     car_id: int | None = None
     inspection_type_id: int | None = None
@@ -434,6 +443,7 @@ class RailroadColorScheme(BaseModel):
     doc_type = "railroad_color_scheme"
     counter_key = "railroad_color_schemes"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     railroad_id: int | None = None
     description: str | None = None
@@ -453,6 +463,7 @@ class RailroadLogo(BaseModel):
     doc_type = "railroad_logo"
     counter_key = "railroad_logos"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     railroad_id: int | None = None
     description: str | None = None
@@ -472,6 +483,7 @@ class RailroadSlogan(BaseModel):
     doc_type = "railroad_slogan"
     counter_key = "railroad_slogans"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     railroad_id: int | None = None
     description: str | None = None
@@ -491,6 +503,7 @@ class LoadType(BaseModel):
     doc_type = "load"
     counter_key = "loads"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     name: str | None = None
     car_class_id: int | None = None
@@ -532,6 +545,7 @@ class LoadPlacement(BaseModel):
     doc_type = "load_placement"
     counter_key = "load_placements"
     query = QueryDescriptor()
+    ownership_enabled = True
 
     load_id: int | None = None
     car_id: int | None = None
@@ -557,6 +571,36 @@ class LoadPlacement(BaseModel):
         return self._store.get(Location, self.location_id)
 
 
+@dataclass
+class User(BaseModel):
+    doc_type = "user"
+    counter_key = "users"
+    query = QueryDescriptor()
+
+    username: str | None = None
+    display_name: str | None = None
+    email: str | None = None
+    password_hash: str | None = None
+    permissions: list[dict[str, str]] = field(default_factory=list)
+    is_active: bool = True
+    last_login_at: str | None = None
+    totp_secret_encrypted: str | None = None
+    totp_enabled: bool = False
+    passkeys: list[dict[str, object]] = field(default_factory=list)
+
+    @property
+    def label(self) -> str:
+        return self.display_name or self.username or f"User {self.id}"
+
+    @property
+    def has_passkeys(self) -> bool:
+        return bool(self.passkeys or [])
+
+    @property
+    def has_mfa(self) -> bool:
+        return bool(self.totp_enabled or self.has_passkeys)
+
+
 __all__ = [
     "Car",
     "CarInspection",
@@ -572,4 +616,5 @@ __all__ = [
     "RailroadLogo",
     "RailroadSlogan",
     "ToolItem",
+    "User",
 ]

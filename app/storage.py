@@ -454,12 +454,14 @@ class CouchDB:
 @dataclass
 class BaseModel:
     id: int | None = None
+    owner_user_id: int | None = None
     _rev: str | None = field(default=None, repr=False, compare=False)
     _store: CouchStore | None = field(default=None, repr=False, compare=False)
     _dirty: bool = field(default=False, repr=False, compare=False)
     _tracking: bool = field(default=False, repr=False, compare=False)
     doc_type = ""
     counter_key = ""
+    ownership_enabled = False
 
     def __setattr__(self, name: str, value: Any) -> None:
         object.__setattr__(self, name, value)
@@ -475,6 +477,14 @@ class BaseModel:
     @property
     def doc_id(self) -> str:
         return f"{self.doc_type}:{self.id}"
+
+    @property
+    def owner(self):
+        if not self.owner_user_id or not self._store:
+            return None
+        from app.models import User
+
+        return self._store.get(User, self.owner_user_id)
 
     def to_doc(self) -> dict[str, Any]:
         doc = {"_id": self.doc_id, "type": self.doc_type}
@@ -501,6 +511,10 @@ class BaseModel:
         return obj
 
     def prepare_save(self) -> None:
+        if self.ownership_enabled and not self.owner_user_id and has_request_context():
+            current_user = getattr(g, "current_user", None)
+            if current_user and getattr(current_user, "id", None):
+                self.owner_user_id = current_user.id
         return
 
 

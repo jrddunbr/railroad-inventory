@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$ROOT_DIR"
+
 ENV_FILE=${ENV_FILE:-.env}
+SYSTEM_PYTHON=${SYSTEM_PYTHON:-python3}
+VENV_DIR=${VENV_DIR:-.venv}
+VENV_PYTHON="${VENV_DIR}/bin/python"
+VENV_PIP="${VENV_DIR}/bin/pip"
+VENV_FLASK="${VENV_DIR}/bin/flask"
 
 if [ ! -f "$ENV_FILE" ]; then
-  GENERATED_PASSWORD=$(python - <<'PY'
+  GENERATED_PASSWORD=$("$SYSTEM_PYTHON" - <<'PY'
 import secrets
 print(secrets.token_urlsafe(24))
 PY
@@ -66,7 +74,7 @@ for _ in {1..30}; do
       break
     fi
   else
-    if python - <<PY >/dev/null 2>&1; then
+    if "$SYSTEM_PYTHON" - <<PY >/dev/null 2>&1; then
 import urllib.request
 import os
 url = os.environ.get("COUCHDB_URL", "").rstrip("/") + "/_up"
@@ -84,32 +92,25 @@ if [ "${ready:-0}" -ne 1 ]; then
   exit 1
 fi
 
-if [ ! -d ".venv" ]; then
-  python -m venv .venv
+if [ ! -x "$VENV_PYTHON" ]; then
+  "$SYSTEM_PYTHON" -m venv "$VENV_DIR"
 fi
 
-# shellcheck disable=SC1091
-source .venv/bin/activate
-
-pip install -r requirements.txt
+"$VENV_PIP" install -r requirements.txt
 
 LOCAL_PYSPY="${PWD}/py-spy/target/release/py-spy"
 if [ -x "$LOCAL_PYSPY" ]; then
   PYSPY_BIN="$LOCAL_PYSPY"
 else
   if ! command -v py-spy >/dev/null 2>&1; then
-    pip install py-spy
+    "$VENV_PIP" install py-spy
   fi
-  PYSPY_BIN="py-spy"
+  PYSPY_BIN="${VENV_DIR}/bin/py-spy"
 fi
 
 mkdir -p data/profiles
 PROFILE_PATH="data/profiles/profile-$(date +%Y%m%d-%H%M%S).svg"
-PYTHON_BIN=$(python - <<'PY'
-import sys
-print(sys.executable)
-PY
-)
+PYTHON_BIN="$VENV_PYTHON"
 
 echo "Recording py-spy profile to ${PROFILE_PATH}"
 echo "Press Ctrl+C to stop recording and write the flamegraph."

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Set Up TOTP{% endblock %}
+{% block content %}
+  <style>
+    .totp-setup-shell {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    .totp-card {
+      text-align: center;
+    }
+    .totp-qr {
+      background: #fff;
+      border: 1px solid #d6dce6;
+      border-radius: 16px;
+      display: inline-block;
+      padding: 16px;
+      margin: 12px 0 20px;
+    }
+    .totp-qr img {
+      width: min(320px, 100%);
+      height: auto;
+      display: block;
+    }
+    .totp-secret {
+      font-size: 1.1rem;
+      letter-spacing: 0.08em;
+      word-break: break-all;
+      background: #f6f8fb;
+      border: 1px solid #d6dce6;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    @media print {
+      header, nav, footer, .actions, .message {
+        display: none !important;
+      }
+      body {
+        background: #fff;
+      }
+      .container {
+        display: block;
+      }
+      main {
+        padding: 0;
+      }
+      .box {
+        border: none;
+        box-shadow: none;
+        padding: 0;
+      }
+    }
+  </style>
+  <div class="box totp-setup-shell">
+    <div class="totp-card">
+      <h1 class="title is-3">Set Up TOTP</h1>
+      <p class="subtitle is-6">Scan this QR code with your authenticator app, or copy the secret below.</p>
+      {% if qr_code_data_uri %}
+        <div class="totp-qr">
+          <img src="{{ qr_code_data_uri }}" alt="TOTP QR code for {{ user.username }}" />
+        </div>
+      {% else %}
+        <article class="message is-info" style="text-align: left;">
+          <div class="message-body">
+            QR code rendering is unavailable in this runtime. Use the secret below to add the account manually in your authenticator app.
+          </div>
+        </article>
+      {% endif %}
+    </div>
+
+    <div class="field">
+      <label class="label" for="totp_secret">Setup Secret</label>
+      <div class="control">
+        <input class="input totp-secret" id="totp_secret" value="{{ enrollment_secret }}" readonly onclick="this.select();" />
+      </div>
+      <p class="keyboard-hint">Click the secret to select and copy it if scanning the QR code is not convenient.</p>
+    </div>
+
+    <form method="post" action="{{ url_for('main.account_totp_enable') }}" data-confirm-skip="true">
+      <div class="field">
+        <label class="label" for="totp_code">Confirmation Code</label>
+        <div class="control">
+          <input class="input" id="totp_code" name="totp_code" inputmode="numeric" autocomplete="one-time-code" required autofocus />
+        </div>
+      </div>
+      <div class="actions buttons">
+        <button type="submit" class="button is-primary">Enable TOTP</button>
+        <button type="button" class="button is-light" onclick="window.print();">Print</button>
+        <a class="button is-light" href="{{ url_for('main.account_security') }}">Back to Account</a>
+      </div>
+    </form>
+  </div>
+{% endblock %}

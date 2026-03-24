@@ -14,6 +14,7 @@ Inventory ({{ pagination.total }})
           <th>Car #</th>
           <th>Class / Type</th>
           <th>Location</th>
+          <th>Owner</th>
         </tr>
       </thead>
       <tbody>
@@ -56,10 +57,16 @@ Inventory ({{ pagination.total }})
               -
             {% endif %}
           </td>
+          <td>{{ user_label(car.owner) }}</td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6">No cars yet. <a class="button is-small is-primary" href="{{ url_for('main.car_new') }}">Add the first entry</a>.</td>
+          <td colspan="6">
+            No cars yet.
+            {% if can_access('inventory/cars', 'WRITE') %}
+              <a class="button is-small is-primary" href="{{ url_for('main.car_new') }}">Add the first entry</a>.
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

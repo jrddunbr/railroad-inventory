@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import timedelta
 
 from flask import Flask, g
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.10.0"
+SCHEMA_VERSION = "2.11.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
@@ -44,6 +45,7 @@ def create_app() -> Flask:
             "app_settings",
             "tool_items",
             "part_items",
+            "users",
         ],
         COUCHDB_TOTALS=[
             {"doc_type": "railroad", "counter_key": "railroads"},
@@ -61,11 +63,19 @@ def create_app() -> Flask:
             {"doc_type": "app_settings", "counter_key": "app_settings"},
             {"doc_type": "tool_item", "counter_key": "tool_items"},
             {"doc_type": "part_item", "counter_key": "part_items"},
+            {"doc_type": "user", "counter_key": "users"},
         ],
         SCHEMA_VERSION=SCHEMA_VERSION,
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev-secret-key"),
         MAX_CONTENT_LENGTH=32 * 1024 * 1024,
         LOGO_UPLOAD_FOLDER=os.path.join(base_dir, "static", "uploads", "railroad-logos"),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        SESSION_COOKIE_SECURE=os.environ.get("SESSION_COOKIE_SECURE", "").strip().lower() in {"1", "true", "yes"},
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=12),
+        WEBAUTHN_RP_NAME=os.environ.get("WEBAUTHN_RP_NAME", "Railroad Inventory"),
+        WEBAUTHN_RP_ID=os.environ.get("WEBAUTHN_RP_ID", ""),
+        WEBAUTHN_ORIGIN=os.environ.get("WEBAUTHN_ORIGIN", ""),
     )
     os.makedirs(app.config["LOGO_UPLOAD_FOLDER"], exist_ok=True)
 

@@ -52,13 +52,17 @@
       {% endif %}
     </h1>
     <div class="actions buttons">
-      <a class="button is-small is-info" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
-      <a class="button is-small is-warning" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
+      {% if can_access('inventory/cars', 'WRITE') %}
+        <a class="button is-small is-info" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
+        <a class="button is-small is-warning" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
+      {% endif %}
       <button type="button" class="button is-small is-success" id="copy-trigger">Copy...</button>
       <button type="button" id="compare-trigger" {% if not compare_cars %}disabled{% endif %} class="button is-small is-link">Compare</button>
-      <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" data-action="delete" data-table="cars" data-id="{{ car.id }}" data-id-field="id" data-entity-label="car {{ car.id }}">
-        <button type="submit" class="button is-small is-danger">Delete</button>
-      </form>
+      {% if can_access('inventory/cars', 'WRITE') %}
+        <form method="post" action="{{ url_for('main.car_delete', car_id=car.id) }}" data-action="delete" data-table="cars" data-id="{{ car.id }}" data-id-field="id" data-entity-label="car {{ car.id }}">
+          <button type="submit" class="button is-small is-danger">Delete</button>
+        </form>
+      {% endif %}
       <a class="button is-small is-light" href="{{ url_for('main.inventory') }}">Back to Inventory</a>
     </div>
     <div class="grid">
@@ -88,6 +92,7 @@
             {{ car.reporting_mark_override or "-" }}
           {% endif %}
         </p>
+        <p><strong>Owner:</strong> {{ user_label(car.owner) }}</p>
       </div>
       <div>
         <h3 class="title is-5">Location</h3>
@@ -212,9 +217,11 @@
       </tbody>
     </table>
     <h3 class="title is-5">Loads</h3>
-    <div class="actions buttons">
-      <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', car_id=car.id) }}">Add Load</a>
-    </div>
+    {% if can_access('inventory/loads', 'WRITE') %}
+      <div class="actions buttons">
+        <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', car_id=car.id) }}">Add Load</a>
+      </div>
+    {% endif %}
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
@@ -229,10 +236,12 @@
           <td><a href="{{ url_for('main.load_detail', load_id=placement.load.id) }}">{{ placement.load.name }}</a></td>
           <td>{{ placement.quantity }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
-            <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" data-action="delete" data-table="load_placements" data-id="{{ placement.id }}" data-id-field="id" data-entity-label="placement {{ placement.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-danger">Delete</button>
-            </form>
+            {% if can_access('inventory/loads', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
+              <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" data-action="delete" data-table="load_placements" data-id="{{ placement.id }}" data-id-field="id" data-entity-label="placement {{ placement.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
           </td>
         </tr>
         {% else %}

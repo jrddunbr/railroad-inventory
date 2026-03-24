@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Account</h1>
+    <p class="subtitle is-6">
+      MFA methods unlock effective write access. Without TOTP or a passkey, this account is treated as read-only even if it has stored <code>WRITE</code> permissions.
+    </p>
+    <div class="actions buttons">
+      <a class="button is-light" href="{{ url_for('main.account_password') }}">Change Password</a>
+    </div>
+
+    <div class="grid">
+      <div class="box">
+        <h2 class="title is-5">Account</h2>
+        {% set account_gravatar = gravatar_url(user, 72) %}
+        {% if account_gravatar %}
+          <p>
+            <img src="{{ account_gravatar }}" alt="{{ user_label(user) }}" style="width: 72px; height: 72px; border-radius: 999px; border: 1px solid #d6dce6; object-fit: cover;" />
+          </p>
+        {% endif %}
+        <p><strong>User:</strong> {{ user_label(user) }}</p>
+        <p><strong>Username:</strong> <code>{{ user.username }}</code></p>
+        <p><strong>MFA Active:</strong> {{ "Yes" if user_has_verified_mfa(user) else "No" }}</p>
+        <form method="post" action="{{ url_for('main.account_security') }}" data-confirm-skip="true" style="margin-top: 1rem;">
+          <div class="field">
+            <label class="label" for="email">Email</label>
+            <div class="control">
+              <input class="input" id="email" name="email" type="email" value="{{ user.email or '' }}" autocomplete="email" />
+            </div>
+            <p class="help">Optional. Used for Gravatar.</p>
+          </div>
+          <div class="actions buttons">
+            <button type="submit" class="button is-primary">Update Email</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="box">
+        <h2 class="title is-5">TOTP</h2>
+        <p><strong>Status:</strong> {{ "Enabled" if user.totp_enabled else "Not Enabled" }}</p>
+        {% if enrollment_secret %}
+          <article class="message is-info">
+            <div class="message-body">
+              <p><strong>Secret:</strong> <code>{{ enrollment_secret }}</code></p>
+              <p><strong>URI:</strong> <code>{{ totp_uri }}</code></p>
+            </div>
+          </article>
+          <form method="post" action="{{ url_for('main.account_totp_enable') }}">
+            <div class="field">
+              <label class="label" for="totp_code">Verify Code</label>
+              <div class="control">
+                <input class="input" id="totp_code" name="totp_code" inputmode="numeric" autocomplete="one-time-code" required />
+              </div>
+            </div>
+            <div class="actions buttons">
+              <button type="submit" class="button is-primary">Enable TOTP</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="actions buttons">
+            <form method="post" action="{{ url_for('main.account_totp_start') }}" target="_blank" data-confirm-skip="true">
+              <button type="submit" class="button is-primary">{{ "Rotate TOTP Secret" if user.totp_enabled else "Set Up TOTP" }}</button>
+            </form>
+            {% if user.totp_enabled %}
+              <form method="post" action="{{ url_for('main.account_totp_disable') }}" data-confirm-skip="true">
+                <button type="submit" class="button is-light">Disable TOTP</button>
+              </form>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="box">
+        <h2 class="title is-5">Passkeys</h2>
+        <p><strong>Registered:</strong> {{ (user.passkeys or [])|length }}</p>
+        <div class="actions buttons">
+          <button type="button" class="button is-primary" id="register-passkey">Add Passkey</button>
+        </div>
+        <p class="keyboard-hint" id="passkey-message" aria-live="polite"></p>
+        <table class="table is-fullwidth is-striped">
+          <thead>
+            <tr>
+              <th>Label</th>
+              <th>Device</th>
+              <th>Backed Up</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for passkey in user.passkeys or [] %}
+              <tr>
+                <td>{{ passkey.label or passkey.credential_id }}</td>
+                <td>{{ passkey.device_type or "-" }}</td>
+                <td>{{ "Yes" if passkey.backed_up else "No" }}</td>
+                <td>
+                  <form method="post" action="{{ url_for('main.account_passkey_delete', credential_id=passkey.credential_id) }}" data-confirm-skip="true">
+                    <button type="submit" class="button is-small is-light">Remove</button>
+                  </form>
+                </td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="4">No passkeys registered.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <script>
+    const passkeyRegisterButton = document.getElementById('register-passkey');
+    const passkeyRegisterMessage = document.getElementById('passkey-message');
+
+    const toArrayBuffer = (value) => {
+      const padding = '='.repeat((4 - (value.length % 4)) % 4);
+      const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const binary = atob(base64);
+      return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    };
+
+    const fromArrayBuffer = (buffer) => {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    };
+
+    const decodeCreationOptions = (options) => {
+      options.challenge = toArrayBuffer(options.challenge);
+      options.user.id = toArrayBuffer(options.user.id);
+      if (options.excludeCredentials) {
+        options.excludeCredentials = options.excludeCredentials.map((item) => ({
+          ...item,
+          id: toArrayBuffer(item.id),
+        }));
+      }
+      return options;
+    };
+
+    const encodeAttestation = (credential) => ({
+      id: credential.id,
+      rawId: fromArrayBuffer(credential.rawId),
+      type: credential.type,
+      response: {
+        attestationObject: fromArrayBuffer(credential.response.attestationObject),
+        clientDataJSON: fromArrayBuffer(credential.response.clientDataJSON),
+        transports: credential.response.getTransports ? credential.response.getTransports() : [],
+      },
+      clientExtensionResults: credential.getClientExtensionResults(),
+      authenticatorAttachment: credential.authenticatorAttachment,
+    });
+
+    passkeyRegisterButton?.addEventListener('click', async () => {
+      passkeyRegisterMessage.textContent = '';
+      try {
+        const optionsResponse = await fetch('{{ url_for("main.account_passkey_options") }}', {
+          method: 'POST',
+          headers: {
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+          },
+        });
+        const optionsPayload = await optionsResponse.json();
+        if (!optionsResponse.ok) {
+          throw new Error(optionsPayload.error || 'Passkey registration failed.');
+        }
+        const credential = await navigator.credentials.create({
+          publicKey: decodeCreationOptions(optionsPayload),
+        });
+        const label = window.prompt('Passkey label', 'Primary Passkey') || '';
+        const verifyResponse = await fetch('{{ url_for("main.account_passkey_verify") }}', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+            'X-Passkey-Label': label,
+          },
+          body: JSON.stringify({ credential: encodeAttestation(credential) }),
+        });
+        const verifyPayload = await verifyResponse.json();
+        if (!verifyResponse.ok) {
+          throw new Error(verifyPayload.error || 'Passkey registration failed.');
+        }
+        window.location.reload();
+      } catch (error) {
+        passkeyRegisterMessage.textContent = error.message || 'Passkey registration failed.';
+      }
+    });
+  </script>
+{% endblock %}

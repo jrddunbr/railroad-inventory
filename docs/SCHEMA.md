@@ -10,6 +10,7 @@ This document describes the current database schema and common alternate names u
 
 ## Railroads (`railroads`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `reporting_mark` (string, nullable)
 - `name` (string)
 - `start_date` (string, optional)
@@ -21,6 +22,7 @@ This document describes the current database schema and common alternate names u
 
 ## Car Classes (`car_classes`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `code` (string)
 - `car_type` (string, optional)
 - `era` (string, optional)
@@ -43,6 +45,7 @@ This document describes the current database schema and common alternate names u
 
 ## Locations (`locations`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `name` (string)
 - `location_type` (string) values: `bag`, `carrier`, `flat`, `staging_track`, `yard_track`
 - `parent_id` (integer, self-reference, optional)
@@ -60,6 +63,7 @@ This document describes the current database schema and common alternate names u
 
 ## Cars (`cars`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `railroad_id` (integer, FK -> `railroads.id`)
 - `car_class_id` (integer, FK -> `car_classes.id`)
 - `location_id` (integer, FK -> `locations.id`)
@@ -106,6 +110,7 @@ This document describes the current database schema and common alternate names u
 
 ## Consists (`consists`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `name` (string, optional)
 - `era` (string, optional)
 - `power_type` (string, optional)
@@ -115,6 +120,7 @@ This document describes the current database schema and common alternate names u
 
 ## Loads (`loads`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `name` (string)
 - `car_class_id` (integer, FK -> `car_classes.id`, optional)
 - `railroad_id` (integer, FK -> `railroads.id`, optional)
@@ -133,6 +139,7 @@ This document describes the current database schema and common alternate names u
 
 ## Load Placements (`load_placements`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `load_id` (integer, FK -> `loads.id`)
 - `car_id` (integer, FK -> `cars.id`, optional)
 - `location_id` (integer, FK -> `locations.id`, optional)
@@ -140,6 +147,7 @@ This document describes the current database schema and common alternate names u
 
 ## Car Inspections (`car_inspections`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `car_id` (integer, FK -> `cars.id`)
 - `inspection_type_id` (integer, FK -> `inspection_types.id`, optional)
 - `inspection_date` (string, optional)
@@ -162,6 +170,7 @@ This document describes the current database schema and common alternate names u
 
 ## Railroad Color Schemes (`railroad_color_schemes`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `railroad_id` (integer, FK -> `railroads.id`)
 - `description` (string)
 - `start_date` (string, optional)
@@ -170,6 +179,7 @@ This document describes the current database schema and common alternate names u
 
 ## Railroad Logos (`railroad_logos`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `railroad_id` (integer, FK -> `railroads.id`)
 - `description` (string)
 - `start_date` (string, optional)
@@ -178,11 +188,44 @@ This document describes the current database schema and common alternate names u
 
 ## Railroad Slogans (`railroad_slogans`)
 - `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
 - `railroad_id` (integer, FK -> `railroads.id`)
 - `description` (string)
 - `slogan_text` (string, optional)
 - `start_date` (string, optional)
 - `end_date` (string, optional)
+
+## Tool Inventory (`tool_items`)
+- `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
+- `location_id` (integer, FK -> `locations.id`, optional)
+- `name` (string)
+- `description` (text, optional)
+- `brand` (string, optional)
+- `quantity` (integer, optional)
+
+## Parts Inventory (`part_items`)
+- `id` (integer, primary key)
+- `owner_user_id` (integer, FK -> `users.id`, optional)
+- `location_id` (integer, FK -> `locations.id`, optional)
+- `name` (string)
+- `description` (text, optional)
+- `brand` (string, optional)
+- `upc` (string, optional)
+- `quantity` (integer, optional)
+
+## Users (`users`)
+- `id` (integer, primary key)
+- `username` (string, unique, stored lowercase)
+- `display_name` (string)
+- `email` (string, optional, stored lowercase and used for Gravatar)
+- `password_hash` (string, Werkzeug password hash)
+- `permissions` (JSON array of objects with `scope` and `access`)
+- `is_active` (boolean)
+- `last_login_at` (string, optional ISO 8601 timestamp)
+- `totp_secret_encrypted` (string, optional)
+- `totp_enabled` (boolean)
+- `passkeys` (JSON array of registered WebAuthn credentials)
 
 ## Alternate Names and Legacy Labels
 - `weight`: also known as "Light Weight" (empty car weight).
@@ -195,3 +238,5 @@ This document describes the current database schema and common alternate names u
 - `car_type`: stored on car class; cars read it via class.
 - `is_locomotive`: stored on car class; cars read it via class.
 - `*_override` fields: used when no class is assigned or when a specific car must override class defaults.
+- `owner_user_id`: present on managed inventory records; new records default to the currently signed-in user.
+- Users without an enrolled TOTP factor or passkey authenticate successfully but their effective access is downgraded to read-only.

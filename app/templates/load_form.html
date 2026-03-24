@@ -167,6 +167,17 @@
             <input class="input" id="upc" name="upc" value="{{ load.upc if load else '' }}" />
           </div>
         </div>
+        <div class="field">
+          <label class="label" for="owner_username">Owner</label>
+          <div class="control">
+            <input class="input" list="enabled_users" id="owner_username" name="owner_username" value="{{ owner_username }}" />
+            <datalist id="enabled_users">
+              {% for user in enabled_users %}
+                <option value="{{ user.username }}">{{ user_label(user) }}</option>
+              {% endfor %}
+            </datalist>
+          </div>
+        </div>
       </div>
       <h2 class="title is-4">Notes</h2>
       <div class="grid">

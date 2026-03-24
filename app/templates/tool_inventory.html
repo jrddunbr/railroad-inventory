@@ -4,7 +4,9 @@
   <div class="box">
     <h1 class="title is-3">Tool Inventory</h1>
     <div class="actions buttons">
-      <a class="button is-small is-primary" href="{{ url_for('main.tool_new') }}">Add Tool</a>
+      {% if can_access('inventory/tools', 'WRITE') %}
+        <a class="button is-small is-primary" href="{{ url_for('main.tool_new') }}">Add Tool</a>
+      {% endif %}
     </div>
     <table class="table is-fullwidth is-striped">
       <thead>
@@ -14,6 +16,7 @@
           <th>Brand</th>
           <th>Quantity</th>
           <th>Location</th>
+          <th>Owner</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -31,16 +34,19 @@
               -
             {% endif %}
           </td>
+          <td>{{ user_label(tool.owner) }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.tool_edit', tool_id=tool.id, next=url_for('main.tool_inventory')) }}">Edit</a>
-            <form method="post" action="{{ url_for('main.tool_delete', tool_id=tool.id, next=url_for('main.tool_inventory')) }}" data-action="delete" data-table="tool_items" data-id="{{ tool.id }}" data-id-field="id" data-entity-label="tool {{ tool.name or tool.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-danger">Delete</button>
-            </form>
+            {% if can_access('inventory/tools', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.tool_edit', tool_id=tool.id, next=url_for('main.tool_inventory')) }}">Edit</a>
+              <form method="post" action="{{ url_for('main.tool_delete', tool_id=tool.id, next=url_for('main.tool_inventory')) }}" data-action="delete" data-table="tool_items" data-id="{{ tool.id }}" data-id-field="id" data-entity-label="tool {{ tool.name or tool.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
           </td>
         </tr>
         {% else %}
         <tr>
-          <td colspan="6">No tools in inventory yet.</td>
+          <td colspan="7">No tools in inventory yet.</td>
         </tr>
         {% endfor %}
       </tbody>

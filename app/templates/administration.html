@@ -42,6 +42,16 @@ Administration
 
     <div class="grid admin-grid">
       <div class="box admin-card">
+        <h2 class="title is-5">Accounts</h2>
+        <table class="table is-fullwidth is-striped admin-table">
+          <tbody>
+            <tr><th>User Count</th><td>{{ admin.user_count }}</td></tr>
+            <tr><th>Management</th><td><a href="{{ url_for('main.administration_users') }}">Open user administration</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="box admin-card">
         <h2 class="title is-5">Application</h2>
         <table class="table is-fullwidth is-striped admin-table">
           <tbody>

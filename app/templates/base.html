@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="csrf-token" content="{{ csrf_token }}" />
   <title>{% block title %}Railroad Inventory{% endblock %} | Railroad Inventory</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='bulma.min.css') }}">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600&display=swap">
@@ -246,6 +247,40 @@
     .compare-section .compare-diff td {
       background: #f7f3ea;
     }
+    .auth-shell {
+      width: min(560px, calc(100vw - 32px));
+      margin: 48px auto;
+    }
+    .auth-card {
+      background: var(--mi-surface);
+      border: 1px solid var(--mi-border);
+      border-radius: 18px;
+      box-shadow: 0 18px 40px rgba(31, 41, 55, 0.08);
+      padding: 28px;
+    }
+    .identity {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: right;
+      font-size: 0.9rem;
+      color: var(--mi-ink-muted);
+    }
+    .identity a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .identity a:hover {
+      text-decoration: underline;
+    }
+    .identity-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid var(--mi-border);
+      object-fit: cover;
+      flex: 0 0 auto;
+    }
     @media (max-width: 900px) {
       .container {
         grid-template-columns: 1fr;
@@ -266,55 +301,82 @@
 <body>
   <header>
     <div class="brand">Railroad Inventory</div>
-    <div class="actions buttons" style="margin-top: 0;">
-      <form method="get" action="{{ url_for('main.search') }}">
-        <input class="input is-small" name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
-      </form>
-      <a href="{{ url_for('main.car_new') }}" class="button is-small is-primary">Add New</a>
-    </div>
-  </header>
-  <div class="container">
-    <nav>
-      <div class="nav-section">
-        <div class="nav-heading">Inventory</div>
-        <a href="{{ url_for('main.inventory') }}" class="{% if request.path == '/inventory' %}active{% endif %}">Inventory</a>
-        <a href="{{ url_for('main.railroads') }}" class="{% if request.path == '/railroads' %}active{% endif %}">Railroads</a>
-        <a href="{{ url_for('main.locations') }}" class="{% if request.path == '/locations' %}active{% endif %}">Locations</a>
-        <a href="{{ url_for('main.car_classes') }}" class="{% if request.path == '/car-classes' %}active{% endif %}">Car Classes</a>
-        <a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>
-        <a href="{{ url_for('main.loads') }}" class="{% if request.path == '/loads' %}active{% endif %}">Loads</a>
-        <a href="{{ url_for('main.consists') }}" class="{% if request.path.startswith('/consists') %}active{% endif %}">Consists</a>
-      </div>
-      <div class="nav-section">
-        <div class="nav-heading">Tools</div>
-        <a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Software Tools</a>
-        <a href="{{ url_for('main.tool_inventory') }}" class="{% if request.path == '/tool-inventory' %}active{% endif %}">Tool Inventory</a>
-        <a href="{{ url_for('main.parts_inventory') }}" class="{% if request.path == '/parts-inventory' %}active{% endif %}">Parts Inventory</a>
-      </div>
-      <div class="nav-section">
-        <div class="nav-heading">Analysis</div>
-        <a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>
-        <a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>
-      </div>
-      <div class="nav-section">
-        <div class="nav-heading">Administration</div>
-        <a href="{{ url_for('main.administration') }}" class="{% if request.path.startswith('/administration') %}active{% endif %}">Administration</a>
-        <a href="{{ url_for('main.settings') }}" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>
-      </div>
-    </nav>
-    <main>
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, message in messages %}
-            <article class="message {% if category == 'danger' %}is-danger{% elif category == 'success' %}is-success{% else %}is-info{% endif %}" style="margin-bottom: 16px;">
-              <div class="message-body">{{ message }}</div>
-            </article>
-          {% endfor %}
+    {% if current_user %}
+      <div class="actions buttons" style="margin-top: 0; align-items: center;">
+        <form method="get" action="{{ url_for('main.search') }}">
+          <input class="input is-small" name="q" placeholder="Search inventory" value="{{ request.args.get('q', '') }}" />
+        </form>
+        {% if can_access('inventory/cars', 'WRITE') %}
+          <a href="{{ url_for('main.car_new') }}" class="button is-small is-primary">Add New</a>
         {% endif %}
-      {% endwith %}
-      {% block content %}{% endblock %}
+        <div class="identity">
+          {% set current_gravatar = gravatar_url(current_user, 32) %}
+          {% if current_gravatar %}
+            <a href="{{ url_for('main.account_security') }}" aria-label="Account">
+              <img class="identity-avatar" src="{{ current_gravatar }}" alt="{{ user_first_name(current_user) }}" />
+            </a>
+          {% endif %}
+          <div>
+            <a href="{{ url_for('main.account_security') }}">{{ user_first_name(current_user) }}</a>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('main.logout') }}" data-confirm-skip="true">
+          <button type="submit" class="button is-small is-light">Log Out</button>
+        </form>
+      </div>
+    {% endif %}
+  </header>
+  {% if auth_page %}
+    <main class="auth-shell">
+  {% else %}
+    <div class="container">
+      <nav>
+        <div class="nav-section">
+          <div class="nav-heading">Inventory</div>
+          {% if can_access('inventory', 'READ') %}<a href="{{ url_for('main.inventory') }}" class="{% if request.path == '/inventory' %}active{% endif %}">Inventory</a>{% endif %}
+          {% if can_access('railroads', 'READ') %}<a href="{{ url_for('main.railroads') }}" class="{% if request.path == '/railroads' %}active{% endif %}">Railroads</a>{% endif %}
+          {% if can_access('inventory/locations', 'READ') %}<a href="{{ url_for('main.locations') }}" class="{% if request.path == '/locations' %}active{% endif %}">Locations</a>{% endif %}
+          {% if can_access('inventory/car-classes', 'READ') %}<a href="{{ url_for('main.car_classes') }}" class="{% if request.path == '/car-classes' %}active{% endif %}">Car Classes</a>{% endif %}
+          {% if can_access('inventory/locomotive-classes', 'READ') %}<a href="{{ url_for('main.locomotive_classes') }}" class="{% if request.path == '/locomotive-classes' %}active{% endif %}">Locomotive Classes</a>{% endif %}
+          {% if can_access('inventory/loads', 'READ') %}<a href="{{ url_for('main.loads') }}" class="{% if request.path == '/loads' %}active{% endif %}">Loads</a>{% endif %}
+          {% if can_access('inventory/consists', 'READ') %}<a href="{{ url_for('main.consists') }}" class="{% if request.path.startswith('/consists') %}active{% endif %}">Consists</a>{% endif %}
+        </div>
+        <div class="nav-section">
+          <div class="nav-heading">Tools</div>
+          {% if can_access('tools', 'READ') %}<a href="{{ url_for('main.tools') }}" class="{% if request.path == '/tools' %}active{% endif %}">Software Tools</a>{% endif %}
+          {% if can_access('inventory/tools', 'READ') %}<a href="{{ url_for('main.tool_inventory') }}" class="{% if request.path == '/tool-inventory' %}active{% endif %}">Tool Inventory</a>{% endif %}
+          {% if can_access('inventory/parts', 'READ') %}<a href="{{ url_for('main.parts_inventory') }}" class="{% if request.path == '/parts-inventory' %}active{% endif %}">Parts Inventory</a>{% endif %}
+        </div>
+        <div class="nav-section">
+          <div class="nav-heading">Analysis</div>
+          {% if can_access('search', 'READ') %}<a href="{{ url_for('main.search') }}" class="{% if request.path == '/search' %}active{% endif %}">Search</a>{% endif %}
+          {% if can_access('reports', 'READ') %}<a href="{{ url_for('main.reports') }}" class="{% if request.path == '/reports' %}active{% endif %}">Reports</a>{% endif %}
+        </div>
+        <div class="nav-section">
+          <div class="nav-heading">Administration</div>
+          {% if can_access('admin', 'READ') %}<a href="{{ url_for('main.administration') }}" class="{% if request.path == '/administration' %}active{% endif %}">Administration</a>{% endif %}
+          {% if can_access('admin/users', 'WRITE') %}<a href="{{ url_for('main.administration_users') }}" class="{% if request.path.startswith('/administration/users') %}active{% endif %}">Users</a>{% endif %}
+          {% if can_access('admin/settings', 'WRITE') %}<a href="{{ url_for('main.settings') }}" class="{% if request.path.startswith('/settings') %}active{% endif %}">Settings</a>{% endif %}
+        </div>
+      </nav>
+      <main>
+  {% endif %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <article class="message {% if category == 'danger' %}is-danger{% elif category == 'success' %}is-success{% else %}is-info{% endif %}" style="margin-bottom: 16px;">
+                <div class="message-body">{{ message }}</div>
+              </article>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+  {% if auth_page %}
     </main>
-  </div>
+  {% else %}
+      </main>
+    </div>
+  {% endif %}
   <footer>
     Copyright Jared Dunbar 2026 ·
     <a href="https://github.com/jrddunbr/railroad-inventory" target="_blank" rel="noopener">GitHub</a>
@@ -338,6 +400,15 @@
     </div>
   </div>
   <script>
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    document.querySelectorAll('form[method="post"]').forEach((form) => {
+      if (form.querySelector('input[name="csrf_token"]')) return;
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'csrf_token';
+      input.value = csrfToken;
+      form.appendChild(input);
+    });
     const confirmModal = document.getElementById('mi-confirm-modal');
     const confirmSummary = document.getElementById('mi-confirm-summary');
     const confirmToggle = document.getElementById('mi-confirm-toggle');
@@ -427,6 +498,12 @@
           defaultValue = getSelectDefaultValue(input);
           displayValue = getSelectDisplay(input, currentValue);
           displayDefault = getSelectDisplay(input, defaultValue);
+          hasValue = currentValue !== '';
+        } else if (input.type === 'password') {
+          currentValue = input.value || '';
+          defaultValue = input.defaultValue || '';
+          displayValue = currentValue ? '**** (Changed)' : '-';
+          displayDefault = defaultValue ? '****' : '-';
           hasValue = currentValue !== '';
         } else {
           currentValue = (input.value || '').trim();

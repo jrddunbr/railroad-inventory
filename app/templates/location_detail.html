@@ -6,22 +6,27 @@ Location: {{ location.name }}
   <div class="box">
     <h1 class="title is-3">Location: {{ location.name }}</h1>
     <div class="actions buttons">
-      <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
-      <a class="button is-small is-primary" href="{{ url_for('main.car_new', location=location.name) }}">Add Car</a>
-      <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
-      <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
-      <a class="button is-small is-link" href="{{ url_for('main.tool_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Tool</a>
-      <a class="button is-small is-link" href="{{ url_for('main.part_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Parts</a>
+      {% if can_access('inventory/locations', 'WRITE') %}
+        <a class="button is-small is-info" href="{{ url_for('main.location_edit', location_id=location.id) }}">Edit</a>
+        <a class="button is-small is-primary" href="{{ url_for('main.car_new', location=location.name) }}">Add Car</a>
+        <a class="button is-small is-primary" href="{{ url_for('main.load_placement_new_generic', location_id=location.id) }}">Add Load</a>
+        <a class="button is-small is-primary" href="{{ url_for('main.location_inspect', location_id=location.id) }}">Inspect Cars</a>
+        <a class="button is-small is-link" href="{{ url_for('main.tool_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Tool</a>
+        <a class="button is-small is-link" href="{{ url_for('main.part_new', location_id=location.id, next=url_for('main.location_detail', location_id=location.id)) }}">Add Parts</a>
+      {% endif %}
       <a class="button is-small is-link" href="{{ url_for('main.location_inventory_pdf', location_id=location.id) }}">Inventory PDF</a>
       {% if location.location_type == "flat" or location.flat_length or location.flat_rows %}
         <a class="button is-small is-link" href="{{ url_for('main.flat_pack', location_id=location.id) }}">Pack Flat</a>
       {% endif %}
-      <form method="post" action="{{ url_for('main.location_delete', location_id=location.id) }}" data-action="delete" data-table="locations" data-id="{{ location.id }}" data-id-field="id" data-entity-label="location {{ location.name }}">
-        <button type="submit" class="button is-small is-danger">Delete</button>
-      </form>
+      {% if can_access('inventory/locations', 'WRITE') %}
+        <form method="post" action="{{ url_for('main.location_delete', location_id=location.id) }}" data-action="delete" data-table="locations" data-id="{{ location.id }}" data-id-field="id" data-entity-label="location {{ location.name }}">
+          <button type="submit" class="button is-small is-danger">Delete</button>
+        </form>
+      {% endif %}
       <a class="button is-small is-light" href="{{ url_for('main.locations') }}">Back to Locations</a>
     </div>
     <p><strong>Type:</strong> {{ location.location_type }}</p>
+    <p><strong>Owner:</strong> {{ user_label(location.owner) }}</p>
     {% if location.parent %}
       <p><strong>Parent:</strong> <a href="{{ url_for('main.location_detail', location_id=location.parent.id) }}">{{ location.parent.name }}</a></p>
     {% endif %}
@@ -82,6 +87,7 @@ Location: {{ location.name }}
           <th>Car #</th>
           <th>Type</th>
           <th>Class</th>
+          <th>Owner</th>
         </tr>
       </thead>
       <tbody>
@@ -130,6 +136,7 @@ Location: {{ location.name }}
               -
             {% endif %}
           </td>
+          <td>{{ user_label(car.owner) }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -142,6 +149,7 @@ Location: {{ location.name }}
         <tr>
           <th>Load</th>
           <th>Quantity</th>
+          <th>Owner</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -150,11 +158,14 @@ Location: {{ location.name }}
         <tr>
           <td><a href="{{ url_for('main.load_detail', load_id=placement.load.id) }}">{{ placement.load.name }}</a></td>
           <td>{{ placement.quantity }}</td>
+          <td>{{ user_label(placement.owner) }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
-            <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" data-action="delete" data-table="load_placements" data-id="{{ placement.id }}" data-id-field="id" data-entity-label="placement {{ placement.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-danger">Delete</button>
-            </form>
+            {% if can_access('inventory/loads', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.load_placement_edit', placement_id=placement.id) }}">Move/Edit</a>
+              <form method="post" action="{{ url_for('main.load_placement_delete', placement_id=placement.id) }}" data-action="delete" data-table="load_placements" data-id="{{ placement.id }}" data-id-field="id" data-entity-label="placement {{ placement.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -170,6 +181,7 @@ Location: {{ location.name }}
           <th>Description</th>
           <th>Brand</th>
           <th>Quantity</th>
+          <th>Owner</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -180,11 +192,14 @@ Location: {{ location.name }}
           <td>{{ tool.description or "-" }}</td>
           <td>{{ tool.brand or "-" }}</td>
           <td>{{ tool.quantity if tool.quantity is not none else "-" }}</td>
+          <td>{{ user_label(tool.owner) }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.tool_edit', tool_id=tool.id, next=url_for('main.location_detail', location_id=location.id)) }}">Edit</a>
-            <form method="post" action="{{ url_for('main.tool_delete', tool_id=tool.id, next=url_for('main.location_detail', location_id=location.id)) }}" data-action="delete" data-table="tool_items" data-id="{{ tool.id }}" data-id-field="id" data-entity-label="tool {{ tool.name or tool.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-danger">Delete</button>
-            </form>
+            {% if can_access('inventory/tools', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.tool_edit', tool_id=tool.id, next=url_for('main.location_detail', location_id=location.id)) }}">Edit</a>
+              <form method="post" action="{{ url_for('main.tool_delete', tool_id=tool.id, next=url_for('main.location_detail', location_id=location.id)) }}" data-action="delete" data-table="tool_items" data-id="{{ tool.id }}" data-id-field="id" data-entity-label="tool {{ tool.name or tool.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -201,6 +216,7 @@ Location: {{ location.name }}
           <th>Brand</th>
           <th>UPC</th>
           <th>Quantity</th>
+          <th>Owner</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -212,11 +228,14 @@ Location: {{ location.name }}
           <td>{{ part.brand or "-" }}</td>
           <td>{{ part.upc or "-" }}</td>
           <td>{{ part.quantity if part.quantity is not none else "-" }}</td>
+          <td>{{ user_label(part.owner) }}</td>
           <td>
-            <a class="button is-small is-light" href="{{ url_for('main.part_edit', part_id=part.id, next=url_for('main.location_detail', location_id=location.id)) }}">Edit</a>
-            <form method="post" action="{{ url_for('main.part_delete', part_id=part.id, next=url_for('main.location_detail', location_id=location.id)) }}" data-action="delete" data-table="part_items" data-id="{{ part.id }}" data-id-field="id" data-entity-label="part {{ part.name or part.id }}" style="display: inline;">
-              <button type="submit" class="button is-small is-danger">Delete</button>
-            </form>
+            {% if can_access('inventory/parts', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.part_edit', part_id=part.id, next=url_for('main.location_detail', location_id=location.id)) }}">Edit</a>
+              <form method="post" action="{{ url_for('main.part_delete', part_id=part.id, next=url_for('main.location_detail', location_id=location.id)) }}" data-action="delete" data-table="part_items" data-id="{{ part.id }}" data-id-field="id" data-entity-label="part {{ part.name or part.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
           </td>
         </tr>
         {% endfor %}

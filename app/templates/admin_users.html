@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">Users</h1>
+    <p class="subtitle is-6">Manage platform accounts, access, and recovery actions.</p>
+    <div class="actions buttons">
+      <a class="button is-primary" href="{{ url_for('main.administration_users_new') }}">Create New User</a>
+      <a class="button is-light" href="{{ url_for('main.administration') }}">Back to Administration</a>
+    </div>
+
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Email</th>
+          <th>Username</th>
+          <th>Permissions</th>
+          <th>MFA</th>
+          <th>Status</th>
+          <th>Last Login</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for user in users %}
+          <tr>
+            <td>
+              {% if user.gravatar_url %}
+                <img src="{{ user.gravatar_url }}" alt="{{ user.label }}" style="width: 28px; height: 28px; border-radius: 999px; vertical-align: middle; margin-right: 8px;" />
+              {% endif %}
+              {{ user.label }}
+            </td>
+            <td>{{ user.email or "-" }}</td>
+            <td><code>{{ user.username }}</code></td>
+            <td>
+              {% for permission in user.permissions %}
+                <div><code>{{ permission.scope }} {{ permission.access }}</code></div>
+              {% else %}
+                -
+              {% endfor %}
+            </td>
+            <td>
+              {% if user.has_mfa %}
+                Enabled
+              {% else %}
+                Read-only until configured
+              {% endif %}
+            </td>
+            <td>{{ "Active" if user.is_active else "Disabled" }}</td>
+            <td>{{ user.last_login_at or "-" }}</td>
+            <td>
+              <div class="buttons">
+                {% if current_user and current_user.id == user.id %}
+                  <button type="button" class="button is-small is-static">{{ "Disable" if user.is_active else "Enable" }}</button>
+                {% else %}
+                  <form method="post" action="{{ url_for('main.administration_users_toggle_active', user_id=user.id) }}" style="display: inline;">
+                    <button type="submit" class="button is-small is-light">{{ "Disable" if user.is_active else "Enable" }}</button>
+                  </form>
+                {% endif %}
+                <a class="button is-small is-light" href="{{ url_for('main.administration_users_reset_password', user_id=user.id) }}">Reset Password</a>
+                {% if current_user and current_user.id == user.id %}
+                  <button type="button" class="button is-small is-static">Delete</button>
+                {% else %}
+                  <form method="post" action="{{ url_for('main.administration_users_delete', user_id=user.id) }}" style="display: inline;">
+                    <button type="submit" class="button is-small is-danger">Delete</button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td colspan="8">No users created yet.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}

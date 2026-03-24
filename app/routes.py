@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import base64
+import hashlib
 import io
 import json
 import math
@@ -8,6 +10,7 @@ import os
 import platform
 import re
 import resource
+import secrets
 import subprocess
 import sys
 import time
@@ -15,11 +18,49 @@ from datetime import datetime
 from typing import Optional
 from urllib.parse import urlsplit
 
-from flask import Blueprint, Response, current_app, flash, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    flash,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from PIL import Image, ImageDraw, ImageFont
 from werkzeug.utils import secure_filename
+try:
+    import qrcode
+except ModuleNotFoundError:
+    qrcode = None
 
 from app import db
+from app.auth import (
+    base64url_to_bytes,
+    DEFAULT_PERMISSION_TEXT,
+    build_totp_uri,
+    bytes_to_base64url,
+    decrypt_value,
+    encrypt_value,
+    format_permissions,
+    generate_totp_secret,
+    get_csrf_token,
+    hash_password,
+    is_safe_next_url,
+    normalize_scope,
+    normalize_username,
+    parse_permissions,
+    permission_allows,
+    verify_totp_code,
+    utcnow_iso,
+    validate_csrf,
+    validate_password_strength,
+    verify_password,
+)
 from app.backup import (
     BACKUP_FILE_FORMAT,
     BACKUP_FILE_VERSION,
@@ -45,6 +86,20 @@ from app.models import (
     RailroadSlogan,
     ToolItem,
     PartItem,
+    User,
+)
+from webauthn import (
+    generate_authentication_options,
+    generate_registration_options,
+    options_to_json,
+    verify_authentication_response,
+    verify_registration_response,
+)
+from webauthn.helpers.structs import (
+    AuthenticatorSelectionCriteria,
+    PublicKeyCredentialDescriptor,
+    ResidentKeyRequirement,
+    UserVerificationRequirement,
 )
 
 
@@ -149,11 +204,463 @@ ADMIN_COUNTER_LABELS = {
     "app_settings": "App Settings",
     "tool_items": "Tool Items",
     "part_items": "Part Items",
+    "users": "Users",
 }
+PUBLIC_ENDPOINTS = {
+    "main.login",
+    "main.setup_users",
+    "main.logout",
+    "main.login_verify",
+    "main.login_passkey_options",
+    "main.login_passkey_verify",
+    "static",
+}
+MFA_LOGIN_ENDPOINTS = {
+    "main.login_verify",
+    "main.login_passkey_options",
+    "main.login_passkey_verify",
+}
+SELF_SERVICE_ENDPOINTS = {
+    "main.account_security",
+    "main.account_password",
+    "main.account_totp_setup",
+    "main.account_totp_start",
+    "main.account_totp_enable",
+    "main.account_totp_disable",
+    "main.account_passkey_options",
+    "main.account_passkey_verify",
+    "main.account_passkey_delete",
+}
+SCOPE_PREFIXES = [
+    ("/administration/users", "admin/users"),
+    ("/administration", "admin"),
+    ("/settings", "admin/settings"),
+    ("/reports", "reports"),
+    ("/search", "search"),
+    ("/railroads", "railroads"),
+    ("/car-classes", "inventory/car-classes"),
+    ("/locomotive-classes", "inventory/locomotive-classes"),
+    ("/cars", "inventory/cars"),
+    ("/consists", "inventory/consists"),
+    ("/loads", "inventory/loads"),
+    ("/load-placements", "inventory/loads/placements"),
+    ("/locations", "inventory/locations"),
+    ("/tool-inventory", "inventory/tools"),
+    ("/parts-inventory", "inventory/parts"),
+    ("/inventory2", "inventory"),
+    ("/inventory", "inventory"),
+    ("/api/cars", "inventory/cars"),
+    ("/api/car-classes", "inventory/car-classes"),
+    ("/api/railroads", "railroads"),
+    ("/api/search", "search/api"),
+    ("/tools/consist-creation", "tools/consist-creation"),
+    ("/tools/aar-plate-viewer", "tools/aar-plate-viewer"),
+    ("/tools/prr-home-shop-repair", "tools/prr-home-shop-repair"),
+    ("/tools", "tools"),
+]
+WRITE_ONLY_GET_PATTERNS = (
+    re.compile(r"^/cars/\d+/(edit|inspect)$"),
+    re.compile(r"^/locations/\d+/(edit|inspect)$"),
+    re.compile(r"^/consists/\d+/edit$"),
+    re.compile(r"^/loads/\d+/edit$"),
+    re.compile(r"^/load-placements/\d+/edit$"),
+    re.compile(r"^/tool-inventory/\d+/edit$"),
+    re.compile(r"^/parts-inventory/\d+/edit$"),
+    re.compile(r"^/railroads/\d+/edit$"),
+    re.compile(r"^/car-classes/\d+/edit$"),
+    re.compile(r"^/settings/inspection-types/\d+/edit$"),
+    re.compile(r"^/settings/inspection-types/new$"),
+    re.compile(r"^/locations/\d+/flat-pack$"),
+    re.compile(r"^/cars/new$"),
+    re.compile(r"^/locations/new$"),
+    re.compile(r"^/consists/new$"),
+    re.compile(r"^/loads/new$"),
+    re.compile(r"^/load-placements/new$"),
+    re.compile(r"^/tool-inventory/new$"),
+    re.compile(r"^/parts-inventory/new$"),
+    re.compile(r"^/administration/users$"),
+    re.compile(r"^/settings$"),
+)
 
 
 def ensure_db_backup() -> None:
     ensure_periodic_backup(db.store.db)
+
+
+def user_count() -> int:
+    return User.query.count()
+
+
+def users_exist() -> bool:
+    return user_count() > 0
+
+
+def get_current_user() -> User | None:
+    user_id = session.get("user_id")
+    if not isinstance(user_id, int):
+        return None
+    user = User.query.get(user_id)
+    if not user or not user.is_active:
+        session.pop("user_id", None)
+        return None
+    return user
+
+
+def get_pending_user() -> User | None:
+    user_id = session.get("pending_user_id")
+    if not isinstance(user_id, int):
+        return None
+    user = User.query.get(user_id)
+    if not user or not user.is_active:
+        session.pop("pending_user_id", None)
+        return None
+    return user
+
+
+def get_user_label(user: User | None) -> str:
+    if not user:
+        return "-"
+    return user.display_name or user.username or f"User {user.id}"
+
+
+def get_user_first_name(user: User | None) -> str:
+    label = get_user_label(user).strip()
+    if not label:
+        return "-"
+    return label.split()[0]
+
+
+def get_user_totp_secret(user: User | None) -> str | None:
+    if not user:
+        return None
+    return decrypt_value(user.totp_secret_encrypted)
+
+
+def normalize_email(value: str | None) -> str:
+    return (value or "").strip().lower()
+
+
+def get_gravatar_url(user: User | None, size: int = 64) -> str | None:
+    email = normalize_email(user.email if user else "")
+    if not email:
+        return None
+    digest = hashlib.md5(email.encode("utf-8")).hexdigest()
+    return f"https://www.gravatar.com/avatar/{digest}?s={size}&d=identicon"
+
+
+def user_has_verified_mfa(user: User | None) -> bool:
+    return bool(user and (user.totp_enabled or user.has_passkeys))
+
+
+def derive_scope(path: str) -> str:
+    normalized = path.rstrip("/") or "/"
+    if normalized == "/":
+        return "inventory"
+    if normalized.startswith("/api/cars/"):
+        return "inventory/cars"
+    for prefix, scope in SCOPE_PREFIXES:
+        if normalized == prefix or normalized.startswith(f"{prefix}/"):
+            return normalize_scope(scope)
+    return "inventory"
+
+
+def required_access_for_request() -> str:
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        return "WRITE"
+    for pattern in WRITE_ONLY_GET_PATTERNS:
+        if pattern.match(request.path):
+            return "WRITE"
+    return "READ"
+
+
+def user_has_access(user: User | None, scope: str, access: str = "READ") -> bool:
+    if not user:
+        return False
+    requested_access = access
+    if requested_access == "WRITE" and not user_has_verified_mfa(user):
+        return False
+    return permission_allows(user.permissions, scope, requested_access)
+
+
+def current_user_has_access(scope: str, access: str = "READ") -> bool:
+    return user_has_access(getattr(g, "current_user", None), scope, access)
+
+
+def deny_request(message: str, status_code: int):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": message}), status_code
+    if status_code == 401:
+        flash(message, "danger")
+        return redirect(url_for("main.login", next=request.full_path if request.query_string else request.path))
+    return render_template("error.html", title="Access Denied", message=message), status_code
+
+
+def backfill_ownerless_documents(owner: User) -> int:
+    updated = 0
+    owned_models = [
+        Railroad,
+        CarClass,
+        Location,
+        ToolItem,
+        PartItem,
+        Car,
+        Consist,
+        CarInspection,
+        RailroadColorScheme,
+        RailroadLogo,
+        RailroadSlogan,
+        LoadType,
+        LoadPlacement,
+    ]
+    for model_cls in owned_models:
+        for item in model_cls.query.all():
+            if item.owner_user_id:
+                continue
+            item.owner_user_id = owner.id
+            updated += 1
+    if updated:
+        db.session.commit()
+    return updated
+
+
+def build_user_row(user: User) -> dict[str, object]:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "email": user.email,
+        "label": get_user_label(user),
+        "permissions": user.permissions or [],
+        "permission_text": format_permissions(user.permissions),
+        "is_active": user.is_active,
+        "last_login_at": user.last_login_at,
+        "totp_enabled": user.totp_enabled,
+        "passkey_count": len(user.passkeys or []),
+        "has_mfa": user_has_verified_mfa(user),
+        "gravatar_url": get_gravatar_url(user, size=40),
+    }
+
+
+def build_user_form_defaults() -> dict[str, str]:
+    return {
+        "username": "",
+        "display_name": "",
+        "email": "",
+        "permissions": DEFAULT_PERMISSION_TEXT,
+    }
+
+
+def get_sorted_users() -> list[User]:
+    return User.query.order_by("username").all()
+
+
+def get_admin_user_rows() -> list[dict[str, object]]:
+    return [build_user_row(user) for user in get_sorted_users()]
+
+
+def get_enabled_users() -> list[User]:
+    return [user for user in get_sorted_users() if user.is_active]
+
+
+def resolve_owner_from_form(value: str | None):
+    username = normalize_username(value)
+    if not username:
+        return None
+    return User.query.filter_by(username=username, is_active=True).first()
+
+
+def apply_owner_form(model_obj, form) -> str | None:
+    owner = resolve_owner_from_form(form.get("owner_username"))
+    if form.get("owner_username", "").strip() and owner is None:
+        return "Owner must be an enabled user."
+    model_obj.owner_user_id = owner.id if owner else None
+    return None
+
+
+def create_user_from_form(force_superuser: bool = False) -> User:
+    username = normalize_username(request.form.get("username"))
+    display_name = request.form.get("display_name", "").strip()
+    email = normalize_email(request.form.get("email"))
+    password = request.form.get("password", "")
+    confirm_password = request.form.get("confirm_password", "")
+    if not username:
+        raise ValueError("Username is required.")
+    if User.query.filter_by(username=username).first():
+        raise ValueError("That username already exists.")
+    if password != confirm_password:
+        raise ValueError("Passwords do not match.")
+    validate_password_strength(password)
+    permissions = [{"scope": "*", "access": "WRITE"}] if force_superuser else parse_permissions(
+        request.form.get("permissions")
+    )
+    user = User(
+        username=username,
+        display_name=display_name or username,
+        email=email or None,
+        password_hash=hash_password(password),
+        permissions=permissions,
+        is_active=True,
+    )
+    db.session.add(user)
+    db.session.commit()
+    return user
+
+
+def get_post_login_redirect() -> str:
+    next_url = request.args.get("next", "").strip() or request.form.get("next", "").strip()
+    if is_safe_next_url(next_url):
+        return next_url
+    return url_for("main.inventory")
+
+
+def start_pending_login(user: User) -> None:
+    session.clear()
+    session["pending_user_id"] = user.id
+    session["login_next"] = get_post_login_redirect()
+    session["_csrf_token"] = secrets.token_urlsafe(32)
+
+
+def complete_login(user: User) -> None:
+    next_url = session.get("login_next")
+    session.clear()
+    session["user_id"] = user.id
+    session["_csrf_token"] = secrets.token_urlsafe(32)
+    session.permanent = True
+    if isinstance(next_url, str) and is_safe_next_url(next_url):
+        session["login_next"] = next_url
+    user.last_login_at = utcnow_iso()
+    db.session.commit()
+
+
+def consume_login_redirect() -> str:
+    next_url = session.pop("login_next", None)
+    if isinstance(next_url, str) and is_safe_next_url(next_url):
+        return next_url
+    return url_for("main.inventory")
+
+
+def get_webauthn_rp_id() -> str:
+    configured = (current_app.config.get("WEBAUTHN_RP_ID") or "").strip()
+    if configured:
+        return configured
+    host = request.host.split(":", 1)[0].strip().lower()
+    return host or "localhost"
+
+
+def get_webauthn_origin() -> str:
+    configured = (current_app.config.get("WEBAUTHN_ORIGIN") or "").strip()
+    if configured:
+        return configured.rstrip("/")
+    return request.host_url.rstrip("/")
+
+
+def get_webauthn_rp_name() -> str:
+    return str(current_app.config.get("WEBAUTHN_RP_NAME") or "Railroad Inventory")
+
+
+def get_login_passkey_user() -> User | None:
+    pending_user = get_pending_user()
+    if pending_user:
+        return pending_user
+    username = normalize_username(request.form.get("username") or (request.get_json(silent=True) or {}).get("username"))
+    if not username:
+        return None
+    return User.query.filter_by(username=username).first()
+
+
+def get_passkey_descriptors(user: User) -> list[PublicKeyCredentialDescriptor]:
+    descriptors: list[PublicKeyCredentialDescriptor] = []
+    for item in user.passkeys or []:
+        credential_id = item.get("credential_id")
+        if not isinstance(credential_id, str) or not credential_id:
+            continue
+        descriptors.append(PublicKeyCredentialDescriptor(id=base64url_to_bytes(credential_id)))
+    return descriptors
+
+
+def build_qr_data_uri(value: str) -> str:
+    if qrcode is None:
+        raise ModuleNotFoundError("No module named 'qrcode'")
+    image = qrcode.make(value)
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def find_passkey_record(user: User, credential_id: str | None) -> dict[str, object] | None:
+    if not credential_id:
+        return None
+    for item in user.passkeys or []:
+        if item.get("credential_id") == credential_id:
+            return item
+    return None
+
+
+@main_bp.before_app_request
+def load_request_security_context():
+    g.current_user = get_current_user()
+    g.pending_user = get_pending_user()
+    g.current_scope = derive_scope(request.path)
+    if request.endpoint == "static":
+        return None
+
+    get_csrf_token()
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        validate_csrf()
+
+    if not users_exist():
+        if request.endpoint in PUBLIC_ENDPOINTS:
+            return None
+        return redirect(url_for("main.setup_users"))
+
+    if request.endpoint in {"main.setup_users"}:
+        if g.current_user and current_user_has_access("admin/users", "WRITE"):
+            return redirect(url_for("main.administration_users"))
+        return redirect(url_for("main.login"))
+
+    if request.endpoint in MFA_LOGIN_ENDPOINTS:
+        if g.pending_user:
+            return None
+        if g.current_user:
+            return redirect(url_for("main.inventory"))
+        return redirect(url_for("main.login"))
+
+    if request.endpoint in {"main.login"} and g.current_user:
+        return redirect(url_for("main.inventory"))
+
+    if request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+
+    if not g.current_user:
+        return deny_request("Sign in to continue.", 401)
+
+    if request.endpoint in SELF_SERVICE_ENDPOINTS:
+        session.permanent = True
+        return None
+
+    session.permanent = True
+    required_access = required_access_for_request()
+    if not user_has_access(g.current_user, g.current_scope, required_access):
+        return deny_request(
+            f"{required_access} access to {g.current_scope} is required for this action.",
+            403,
+        )
+    return None
+
+
+@main_bp.app_context_processor
+def inject_auth_helpers() -> dict[str, object]:
+    return {
+        "current_user": getattr(g, "current_user", None),
+        "pending_user": getattr(g, "pending_user", None),
+        "csrf_token": get_csrf_token(),
+        "can_access": current_user_has_access,
+        "user_label": get_user_label,
+        "user_first_name": get_user_first_name,
+        "user_has_verified_mfa": user_has_verified_mfa,
+        "gravatar_url": get_gravatar_url,
+    }
 
 
 def get_repo_root() -> str:
@@ -382,6 +889,7 @@ def get_administration_summary() -> dict[str, object]:
             "flask": flask_health,
         },
         "stats": get_admin_database_counts(),
+        "user_count": user_count(),
         "assets": [
             {
                 "label": str(asset_root["label"]),
@@ -1290,6 +1798,274 @@ def save_logo_file(file_storage, railroad_id: int) -> str | None:
     return f"uploads/railroad-logos/{safe_name}"
 
 
+@main_bp.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = normalize_username(request.form.get("username"))
+        password = request.form.get("password", "")
+        user = User.query.filter_by(username=username).first()
+        if not user or not user.is_active or not verify_password(user.password_hash, password):
+            flash("Invalid username or password.", "danger")
+            return render_template("login.html", next_url=get_post_login_redirect()), 401
+        if user_has_verified_mfa(user):
+            start_pending_login(user)
+            return redirect(url_for("main.login_verify"))
+        complete_login(user)
+        flash("MFA is not enabled. Effective permissions are limited to read-only until TOTP or a passkey is configured.", "info")
+        return redirect(consume_login_redirect())
+    return render_template("login.html", next_url=get_post_login_redirect())
+
+
+@main_bp.route("/login/verify", methods=["GET", "POST"])
+def login_verify():
+    user = get_pending_user()
+    if not user:
+        return redirect(url_for("main.login"))
+    if request.method == "POST":
+        code = request.form.get("totp_code", "").strip()
+        secret = get_user_totp_secret(user)
+        if not user.totp_enabled or not secret or not verify_totp_code(secret, code):
+            flash("Invalid authentication code.", "danger")
+            return render_template("login_verify.html", user=user), 401
+        complete_login(user)
+        return redirect(consume_login_redirect())
+    return render_template("login_verify.html", user=user)
+
+
+@main_bp.route("/login/passkeys/options", methods=["POST"])
+def login_passkey_options():
+    user = get_login_passkey_user()
+    if not user or not user.is_active or not user.has_passkeys:
+        return jsonify({"error": "Passkey sign-in is unavailable for that account."}), 400
+    options = generate_authentication_options(
+        rp_id=get_webauthn_rp_id(),
+        allow_credentials=get_passkey_descriptors(user),
+        user_verification=UserVerificationRequirement.REQUIRED,
+    )
+    session["pending_user_id"] = user.id
+    session["passkey_auth_challenge"] = bytes_to_base64url(options.challenge)
+    session["login_next"] = get_post_login_redirect()
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@main_bp.route("/login/passkeys/verify", methods=["POST"])
+def login_passkey_verify():
+    user = get_pending_user()
+    payload = request.get_json(silent=True) or {}
+    credential = payload.get("credential")
+    challenge = session.get("passkey_auth_challenge")
+    if not user or not isinstance(credential, dict) or not isinstance(challenge, str):
+        return jsonify({"error": "Passkey authentication could not be completed."}), 400
+    credential_id = credential.get("id")
+    record = find_passkey_record(user, credential_id)
+    if not record:
+        return jsonify({"error": "Passkey credential was not recognized."}), 400
+    verification = verify_authentication_response(
+        credential=credential,
+        expected_challenge=base64url_to_bytes(challenge),
+        expected_rp_id=get_webauthn_rp_id(),
+        expected_origin=get_webauthn_origin(),
+        credential_public_key=base64url_to_bytes(str(record.get("public_key", ""))),
+        credential_current_sign_count=int(record.get("sign_count", 0) or 0),
+        require_user_verification=True,
+    )
+    record["sign_count"] = verification.new_sign_count
+    user.passkeys = list(user.passkeys or [])
+    session.pop("passkey_auth_challenge", None)
+    complete_login(user)
+    return jsonify({"ok": True, "redirect_url": consume_login_redirect()})
+
+
+@main_bp.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    flash("Signed out.", "success")
+    return redirect(url_for("main.login"))
+
+
+@main_bp.route("/setup", methods=["GET", "POST"])
+def setup_users():
+    if users_exist():
+        return redirect(url_for("main.login"))
+    form_values = build_user_form_defaults()
+    if request.method == "POST":
+        form_values["username"] = request.form.get("username", "").strip()
+        form_values["display_name"] = request.form.get("display_name", "").strip()
+        form_values["email"] = request.form.get("email", "").strip()
+        try:
+            user = create_user_from_form(force_superuser=True)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return render_template("account_setup.html", users=[], form_values=form_values, setup_mode=True), 400
+        session.clear()
+        session["user_id"] = user.id
+        session["_csrf_token"] = secrets.token_urlsafe(32)
+        session.permanent = True
+        user.last_login_at = utcnow_iso()
+        db.session.commit()
+        updated_count = backfill_ownerless_documents(user)
+        if updated_count:
+            flash(f"Assigned ownership for {updated_count} existing records to {get_user_label(user)}.", "success")
+        flash("Initial administrator account created. Configure TOTP or a passkey to unlock write access.", "success")
+        ensure_db_backup()
+        return redirect(url_for("main.account_security"))
+    return render_template("account_setup.html", users=[], form_values=form_values, setup_mode=True)
+
+
+@main_bp.route("/account", methods=["GET", "POST"])
+@main_bp.route("/account/security", methods=["GET", "POST"])
+def account_security():
+    user = g.current_user
+    if request.method == "POST":
+        user.email = normalize_email(request.form.get("email")) or None
+        db.session.commit()
+        ensure_db_backup()
+        flash("Account email updated.", "success")
+        return redirect(url_for("main.account_security"))
+    return render_template("account_security.html", user=user)
+
+
+@main_bp.route("/account/password", methods=["GET", "POST"])
+def account_password():
+    user = g.current_user
+    if request.method == "POST":
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+        if not verify_password(user.password_hash, current_password):
+            flash("Current password is incorrect.", "danger")
+            return render_template("account_password.html"), 400
+        if new_password != confirm_password:
+            flash("New passwords do not match.", "danger")
+            return render_template("account_password.html"), 400
+        validate_password_strength(new_password)
+        user.password_hash = hash_password(new_password)
+        db.session.commit()
+        ensure_db_backup()
+        flash("Password updated.", "success")
+        return redirect(url_for("main.account_password"))
+    return render_template("account_password.html")
+
+
+@main_bp.route("/account/totp/start", methods=["POST"])
+def account_totp_start():
+    user = g.current_user
+    secret = generate_totp_secret()
+    user.totp_secret_encrypted = encrypt_value(secret)
+    user.totp_enabled = False
+    db.session.commit()
+    return redirect(url_for("main.account_totp_setup"))
+
+
+@main_bp.route("/account/totp/setup", methods=["GET"])
+def account_totp_setup():
+    user = g.current_user
+    secret = get_user_totp_secret(user)
+    if not secret:
+        flash("Start TOTP setup first.", "danger")
+        return redirect(url_for("main.account_security"))
+    totp_uri = build_totp_uri(secret, user.username or "", get_webauthn_rp_name())
+    qr_code_data_uri = None
+    try:
+        qr_code_data_uri = build_qr_data_uri(totp_uri)
+    except ModuleNotFoundError:
+        flash("QR code rendering is unavailable in this Python environment. The setup secret is shown below instead.", "info")
+    return render_template(
+        "totp_setup.html",
+        user=user,
+        enrollment_secret=secret,
+        totp_uri=totp_uri,
+        qr_code_data_uri=qr_code_data_uri,
+    )
+
+
+@main_bp.route("/account/totp/enable", methods=["POST"])
+def account_totp_enable():
+    user = g.current_user
+    secret = get_user_totp_secret(user)
+    code = request.form.get("totp_code", "").strip()
+    if not secret or not verify_totp_code(secret, code):
+        flash("Invalid TOTP code.", "danger")
+        return redirect(url_for("main.account_security"))
+    user.totp_enabled = True
+    db.session.commit()
+    ensure_db_backup()
+    flash("TOTP is enabled.", "success")
+    return redirect(url_for("main.account_security"))
+
+
+@main_bp.route("/account/totp/disable", methods=["POST"])
+def account_totp_disable():
+    user = g.current_user
+    user.totp_secret_encrypted = None
+    user.totp_enabled = False
+    db.session.commit()
+    ensure_db_backup()
+    flash("TOTP was disabled.", "success")
+    return redirect(url_for("main.account_security"))
+
+
+@main_bp.route("/account/passkeys/options", methods=["POST"])
+def account_passkey_options():
+    user = g.current_user
+    options = generate_registration_options(
+        rp_id=get_webauthn_rp_id(),
+        rp_name=get_webauthn_rp_name(),
+        user_id=str(user.id).encode("utf-8"),
+        user_name=user.username or "",
+        user_display_name=get_user_label(user),
+        exclude_credentials=get_passkey_descriptors(user),
+        authenticator_selection=AuthenticatorSelectionCriteria(
+            resident_key=ResidentKeyRequirement.PREFERRED,
+            user_verification=UserVerificationRequirement.REQUIRED,
+        ),
+    )
+    session["passkey_registration_challenge"] = bytes_to_base64url(options.challenge)
+    return jsonify(json.loads(options_to_json(options)))
+
+
+@main_bp.route("/account/passkeys/verify", methods=["POST"])
+def account_passkey_verify():
+    user = g.current_user
+    payload = request.get_json(silent=True) or {}
+    credential = payload.get("credential")
+    challenge = session.get("passkey_registration_challenge")
+    if not isinstance(credential, dict) or not isinstance(challenge, str):
+        return jsonify({"error": "Passkey registration could not be completed."}), 400
+    verification = verify_registration_response(
+        credential=credential,
+        expected_challenge=base64url_to_bytes(challenge),
+        expected_rp_id=get_webauthn_rp_id(),
+        expected_origin=get_webauthn_origin(),
+        require_user_verification=True,
+    )
+    user.passkeys = list(user.passkeys or [])
+    user.passkeys.append(
+        {
+            "credential_id": bytes_to_base64url(verification.credential_id),
+            "public_key": bytes_to_base64url(verification.credential_public_key),
+            "sign_count": verification.sign_count,
+            "label": request.headers.get("X-Passkey-Label", "").strip() or f"Passkey {len(user.passkeys) + 1}",
+            "device_type": str(getattr(verification, "credential_device_type", "")),
+            "backed_up": bool(getattr(verification, "credential_backed_up", False)),
+        }
+    )
+    session.pop("passkey_registration_challenge", None)
+    db.session.commit()
+    ensure_db_backup()
+    return jsonify({"ok": True})
+
+
+@main_bp.route("/account/passkeys/<credential_id>/delete", methods=["POST"])
+def account_passkey_delete(credential_id: str):
+    user = g.current_user
+    user.passkeys = [item for item in (user.passkeys or []) if item.get("credential_id") != credential_id]
+    db.session.commit()
+    ensure_db_backup()
+    flash("Passkey removed.", "success")
+    return redirect(url_for("main.account_security"))
+
+
 @main_bp.route("/")
 def index():
     return redirect(url_for("main.inventory"))
@@ -1974,6 +2750,9 @@ def locations():
 def location_new():
     if request.method == "POST":
         location = Location(name=request.form.get("name", "").strip())
+        owner_error = apply_owner_form(location, request.form)
+        if owner_error:
+            return owner_error, 400
         location.location_type = request.form.get("location_type", "").strip()
         parent_id = request.form.get("parent_id", "").strip()
         if parent_id and parent_id.isdigit():
@@ -2041,6 +2820,8 @@ def location_new():
     return render_template(
         "location_form.html",
         location=None,
+        owner_username=(g.current_user.username if getattr(g, "current_user", None) else ""),
+        enabled_users=get_enabled_users(),
         locations=locations,
         descendant_ids=set(),
         location_types=location_types,
@@ -2281,6 +3062,9 @@ def apply_tool_form(tool: ToolItem, form) -> str | None:
         return "Tool name is required."
     if not location_id.isdigit():
         return "Location is required."
+    owner_error = apply_owner_form(tool, form)
+    if owner_error:
+        return owner_error
     tool.name = name
     tool.description = form.get("description", "").strip()
     tool.brand = form.get("brand", "").strip()
@@ -2296,6 +3080,9 @@ def apply_part_form(part: PartItem, form) -> str | None:
         return "Part name is required."
     if not location_id.isdigit():
         return "Location is required."
+    owner_error = apply_owner_form(part, form)
+    if owner_error:
+        return owner_error
     part.name = name
     part.description = form.get("description", "").strip()
     part.brand = form.get("brand", "").strip()
@@ -2320,6 +3107,7 @@ def tool_inventory():
 @main_bp.route("/tool-inventory/new", methods=["GET", "POST"])
 def tool_new():
     locations = Location.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     preset_location_id = request.args.get("location_id", "").strip()
     next_url = request.args.get("next", "").strip()
     if request.method == "POST":
@@ -2334,6 +3122,8 @@ def tool_new():
     return render_template(
         "tool_form.html",
         tool=None,
+        owner_username=(g.current_user.username if getattr(g, "current_user", None) else ""),
+        enabled_users=enabled_users,
         locations=locations,
         preset_location_id=preset_location_id,
         form_action=url_for("main.tool_new", location_id=preset_location_id, next=next_url),
@@ -2345,6 +3135,7 @@ def tool_new():
 def tool_edit(tool_id: int):
     tool = ToolItem.query.get_or_404(tool_id)
     locations = Location.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     next_url = request.args.get("next", "").strip()
     if request.method == "POST":
         error = apply_tool_form(tool, request.form)
@@ -2356,6 +3147,8 @@ def tool_edit(tool_id: int):
     return render_template(
         "tool_form.html",
         tool=tool,
+        owner_username=(tool.owner.username if tool.owner else ""),
+        enabled_users=enabled_users,
         locations=locations,
         preset_location_id=str(tool.location_id or ""),
         form_action=url_for("main.tool_edit", tool_id=tool.id, next=next_url),
@@ -2382,6 +3175,7 @@ def parts_inventory():
 @main_bp.route("/parts-inventory/new", methods=["GET", "POST"])
 def part_new():
     locations = Location.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     preset_location_id = request.args.get("location_id", "").strip()
     next_url = request.args.get("next", "").strip()
     if request.method == "POST":
@@ -2396,6 +3190,8 @@ def part_new():
     return render_template(
         "part_form.html",
         part=None,
+        owner_username=(g.current_user.username if getattr(g, "current_user", None) else ""),
+        enabled_users=enabled_users,
         locations=locations,
         preset_location_id=preset_location_id,
         form_action=url_for("main.part_new", location_id=preset_location_id, next=next_url),
@@ -2407,6 +3203,7 @@ def part_new():
 def part_edit(part_id: int):
     part = PartItem.query.get_or_404(part_id)
     locations = Location.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     next_url = request.args.get("next", "").strip()
     if request.method == "POST":
         error = apply_part_form(part, request.form)
@@ -2418,6 +3215,8 @@ def part_edit(part_id: int):
     return render_template(
         "part_form.html",
         part=part,
+        owner_username=(part.owner.username if part.owner else ""),
+        enabled_users=enabled_users,
         locations=locations,
         preset_location_id=str(part.location_id or ""),
         form_action=url_for("main.part_edit", part_id=part.id, next=next_url),
@@ -3127,9 +3926,13 @@ def loads():
 def load_new():
     classes = CarClass.query.order_by("code").all()
     railroads = Railroad.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     if request.method == "POST":
         load = LoadType(name=request.form.get("name", "").strip())
-        apply_load_form(load, request.form)
+        try:
+            apply_load_form(load, request.form)
+        except ValueError as exc:
+            return str(exc), 400
         db.session.add(load)
         db.session.commit()
         ensure_db_backup()
@@ -3139,6 +3942,8 @@ def load_new():
     return render_template(
         "load_form.html",
         load=None,
+        owner_username=(g.current_user.username if getattr(g, "current_user", None) else ""),
+        enabled_users=enabled_users,
         classes=classes,
         railroads=railroads,
         length_value="",
@@ -3178,9 +3983,13 @@ def load_edit(load_id: int):
     load = LoadType.query.get_or_404(load_id)
     classes = CarClass.query.order_by("code").all()
     railroads = Railroad.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     if request.method == "POST":
         load.name = request.form.get("name", "").strip()
-        apply_load_form(load, request.form)
+        try:
+            apply_load_form(load, request.form)
+        except ValueError as exc:
+            return str(exc), 400
         db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.load_detail", load_id=load.id))
@@ -3199,6 +4008,8 @@ def load_edit(load_id: int):
     return render_template(
         "load_form.html",
         load=load,
+        owner_username=(load.owner.username if load.owner else ""),
+        enabled_users=enabled_users,
         classes=classes,
         railroads=railroads,
         length_value=length_value,
@@ -4715,6 +5526,9 @@ def location_edit(location_id: int):
     location = Location.query.get_or_404(location_id)
     descendant_ids = get_location_descendant_ids(location)
     if request.method == "POST":
+        owner_error = apply_owner_form(location, request.form)
+        if owner_error:
+            return owner_error, 400
         location.name = request.form.get("name", "").strip()
         location.location_type = request.form.get("location_type", "").strip()
         parent_id = request.form.get("parent_id", "").strip()
@@ -4809,6 +5623,8 @@ def location_edit(location_id: int):
     return render_template(
         "location_form.html",
         location=location,
+        owner_username=(location.owner.username if location.owner else ""),
+        enabled_users=get_enabled_users(),
         locations=locations,
         descendant_ids=descendant_ids,
         location_types=location_types,
@@ -4961,7 +5777,10 @@ def car_edit(car_id: int):
         previous_weight = car.actual_weight
         previous_length = car.actual_length
         previous_scale = car.scale
-        apply_car_form(car, request.form)
+        try:
+            apply_car_form(car, request.form)
+        except ValueError as exc:
+            return str(exc), 400
         db.session.commit()
         ensure_db_backup()
         maybe_run_nmra_weight_check(car, previous_weight, previous_length, previous_scale)
@@ -4970,6 +5789,7 @@ def car_edit(car_id: int):
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
     locations = Location.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     wheel_arrangements = build_unique_text_values([c.wheel_arrangement for c in classes])
     tender_arrangements = build_unique_text_values([c.tender_axles for c in classes])
     scale_value = normalize_scale_input(car.scale)
@@ -4992,6 +5812,8 @@ def car_edit(car_id: int):
     return render_template(
         "car_form.html",
         car=car,
+        owner_username=(car.owner.username if car.owner else ""),
+        enabled_users=enabled_users,
         railroads=railroads,
         classes=classes,
         locations=locations,
@@ -5022,7 +5844,10 @@ def car_edit(car_id: int):
 def car_new():
     if request.method == "POST":
         car = Car()
-        apply_car_form(car, request.form)
+        try:
+            apply_car_form(car, request.form)
+        except ValueError as exc:
+            return str(exc), 400
         db.session.add(car)
         db.session.commit()
         ensure_db_backup()
@@ -5055,6 +5880,7 @@ def car_new():
     railroads = Railroad.query.order_by("reporting_mark").all()
     classes = CarClass.query.order_by("code").all()
     locations = Location.query.order_by("name").all()
+    enabled_users = get_enabled_users()
     wheel_arrangements = build_unique_text_values([c.wheel_arrangement for c in classes])
     tender_arrangements = build_unique_text_values([c.tender_axles for c in classes])
     scale_value = normalize_scale_input(prefill.get("scale", ""))
@@ -5077,6 +5903,8 @@ def car_new():
     return render_template(
         "car_form.html",
         car=None,
+        owner_username=(g.current_user.username if getattr(g, "current_user", None) else ""),
+        enabled_users=enabled_users,
         railroads=railroads,
         classes=classes,
         locations=locations,
@@ -5276,6 +6104,10 @@ def search_parts(query: str) -> list[PartItem]:
 
 
 def apply_load_form(load: LoadType, form) -> None:
+    owner = resolve_owner_from_form(form.get("owner_username"))
+    if form.get("owner_username", "").strip() and owner is None:
+        raise ValueError("Owner must be an enabled user.")
+    load.owner_user_id = owner.id if owner else None
     load.name = form.get("name", "").strip()
     load.era = form.get("era", "").strip()
     load.brand = form.get("brand", "").strip()
@@ -5324,6 +6156,10 @@ def apply_load_placement_form(placement: LoadPlacement, form) -> bool:
 
 
 def apply_car_form(car: Car, form) -> None:
+    owner = resolve_owner_from_form(form.get("owner_username"))
+    if form.get("owner_username", "").strip() and owner is None:
+        raise ValueError("Owner must be an enabled user.")
+    car.owner_user_id = owner.id if owner else None
     has_reporting_mark = "reporting_mark" in form
     has_railroad_name = "railroad_name" in form
     reporting_mark = (
@@ -5577,6 +6413,84 @@ def apply_car_form(car: Car, form) -> None:
 @main_bp.route("/administration")
 def administration():
     return render_template("administration.html", admin=get_administration_summary())
+
+
+@main_bp.route("/administration/users")
+def administration_users():
+    return render_template("admin_users.html", users=get_admin_user_rows())
+
+
+@main_bp.route("/administration/users/new", methods=["GET", "POST"])
+def administration_users_new():
+    form_values = build_user_form_defaults()
+    if request.method == "POST":
+        form_values["username"] = request.form.get("username", "").strip()
+        form_values["display_name"] = request.form.get("display_name", "").strip()
+        form_values["email"] = request.form.get("email", "").strip()
+        form_values["permissions"] = request.form.get("permissions", "").strip() or DEFAULT_PERMISSION_TEXT
+        try:
+            user = create_user_from_form(force_superuser=False)
+        except (ValueError, json.JSONDecodeError) as exc:
+            flash(str(exc), "danger")
+            return render_template("user_form.html", form_values=form_values, mode="create"), 400
+        flash(f"Created user {get_user_label(user)}.", "success")
+        ensure_db_backup()
+        return redirect(url_for("main.administration_users"))
+    return render_template("user_form.html", form_values=form_values, mode="create")
+
+
+@main_bp.route("/administration/users/<int:user_id>/reset-password", methods=["GET", "POST"])
+def administration_users_reset_password(user_id: int):
+    user = User.query.get_or_404(user_id)
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return render_template("user_form.html", mode="reset_password", target_user=user), 400
+        try:
+            validate_password_strength(password)
+        except ValueError as exc:
+            flash(str(exc), "danger")
+            return render_template("user_form.html", mode="reset_password", target_user=user), 400
+        user.password_hash = hash_password(password)
+        db.session.commit()
+        ensure_db_backup()
+        flash(f"Password reset for {get_user_label(user)}.", "success")
+        return redirect(url_for("main.administration_users"))
+    return render_template("user_form.html", mode="reset_password", target_user=user)
+
+
+@main_bp.route("/administration/users/<int:user_id>/toggle-active", methods=["POST"])
+def administration_users_toggle_active(user_id: int):
+    user = User.query.get_or_404(user_id)
+    if g.current_user and user.id == g.current_user.id:
+        flash("You cannot disable your own account from this page.", "danger")
+        return redirect(url_for("main.administration_users"))
+    if user.is_active and user_count() <= 1:
+        flash("The last user account cannot be disabled.", "danger")
+        return redirect(url_for("main.administration_users"))
+    user.is_active = not user.is_active
+    db.session.commit()
+    ensure_db_backup()
+    flash(f"{'Enabled' if user.is_active else 'Disabled'} {get_user_label(user)}.", "success")
+    return redirect(url_for("main.administration_users"))
+
+
+@main_bp.route("/administration/users/<int:user_id>/delete", methods=["POST"])
+def administration_users_delete(user_id: int):
+    user = User.query.get_or_404(user_id)
+    if g.current_user and user.id == g.current_user.id:
+        flash("You cannot delete your own account from this page.", "danger")
+        return redirect(url_for("main.administration_users"))
+    if user_count() <= 1:
+        flash("The last user account cannot be deleted.", "danger")
+        return redirect(url_for("main.administration_users"))
+    db.session.delete(user)
+    db.session.commit()
+    ensure_db_backup()
+    flash(f"Deleted {get_user_label(user)}.", "success")
+    return redirect(url_for("main.administration_users"))
 
 
 @main_bp.route("/administration/backup")
