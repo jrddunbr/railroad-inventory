@@ -45,6 +45,20 @@ resolve_git_commit() {
   fi
 }
 
+set_env_value() {
+  local key value tmp_file
+  key="$1"
+  value="$2"
+  tmp_file=$(mktemp)
+
+  if [ -f "$ENV_FILE" ]; then
+    grep -v "^${key}=" "$ENV_FILE" > "$tmp_file" || true
+  fi
+
+  printf "%s=%s\n" "$key" "$value" >> "$tmp_file"
+  mv "$tmp_file" "$ENV_FILE"
+}
+
 generate_password() {
   python3 - <<'PY'
 import secrets
@@ -123,9 +137,8 @@ cmd_up() {
   require_cmd "$DOCKER_CMD"
   require_cmd python3
   require_cmd curl
-  APP_GIT_COMMIT=$(resolve_git_commit)
-  export APP_GIT_COMMIT
   cmd_init
+  set_env_value "APP_GIT_COMMIT" "$(resolve_git_commit)"
   compose up -d couchdb
   wait_for_couchdb
   compose up -d --build app
@@ -142,8 +155,7 @@ cmd_update() {
   compose down
   backup_couchdb_data
   git -C "$ROOT_DIR" pull --ff-only
-  APP_GIT_COMMIT=$(resolve_git_commit)
-  export APP_GIT_COMMIT
+  set_env_value "APP_GIT_COMMIT" "$(resolve_git_commit)"
   compose up -d couchdb
   wait_for_couchdb
   compose up -d --build app
