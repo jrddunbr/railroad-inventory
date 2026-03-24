@@ -1,12 +1,16 @@
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        APP_GIT_COMMIT: ${APP_GIT_COMMIT:-}
     restart: unless-stopped
     ports:
       - "${APP_PORT:-5000}:5000"
     env_file:
       - .env
     environment:
+      APP_GIT_COMMIT: ${APP_GIT_COMMIT:-}
       COUCHDB_HOST: couchdb
       COUCHDB_PORT: "5984"
       COUCHDB_DATABASE: ${COUCHDB_DATABASE:-model_inventory}

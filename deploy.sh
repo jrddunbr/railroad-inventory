@@ -39,6 +39,12 @@ compose() {
   "$DOCKER_CMD" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
+resolve_git_commit() {
+  if command -v git >/dev/null 2>&1; then
+    git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true
+  fi
+}
+
 generate_password() {
   python3 - <<'PY'
 import secrets
@@ -117,6 +123,8 @@ cmd_up() {
   require_cmd "$DOCKER_CMD"
   require_cmd python3
   require_cmd curl
+  APP_GIT_COMMIT=$(resolve_git_commit)
+  export APP_GIT_COMMIT
   cmd_init
   compose up -d couchdb
   wait_for_couchdb
@@ -134,6 +142,8 @@ cmd_update() {
   compose down
   backup_couchdb_data
   git -C "$ROOT_DIR" pull --ff-only
+  APP_GIT_COMMIT=$(resolve_git_commit)
+  export APP_GIT_COMMIT
   compose up -d couchdb
   wait_for_couchdb
   compose up -d --build app

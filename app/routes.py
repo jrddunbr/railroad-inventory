@@ -161,6 +161,9 @@ def get_repo_root() -> str:
 
 
 def get_git_commit_hash() -> str | None:
+    env_commit = (os.environ.get("APP_GIT_COMMIT") or "").strip()
+    if env_commit:
+        return env_commit
     try:
         return (
             subprocess.check_output(
