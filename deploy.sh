@@ -6,6 +6,8 @@ ENV_FILE="${ENV_FILE:-${ROOT_DIR}/.env}"
 DOCKER_CMD="${DOCKER_CMD:-docker}"
 APP_PORT="${APP_PORT:-5000}"
 COUCHDB_PORT="${COUCHDB_PORT:-5984}"
+APP_BIND_HOST="${APP_BIND_HOST:-127.0.0.1}"
+COUCHDB_BIND_HOST="${COUCHDB_BIND_HOST:-127.0.0.1}"
 COMPOSE_FILE="${COMPOSE_FILE:-${ROOT_DIR}/docker-compose.yml}"
 
 usage() {
@@ -25,6 +27,8 @@ Environment overrides:
   DOCKER_CMD=docker
   APP_PORT=5000
   COUCHDB_PORT=5984
+  APP_BIND_HOST=127.0.0.1
+  COUCHDB_BIND_HOST=127.0.0.1
 EOF
 }
 
@@ -73,10 +77,13 @@ init_env() {
 COUCHDB_USER=admin
 COUCHDB_PASSWORD=${GENERATED_PASSWORD}
 APP_PORT=${APP_PORT}
+APP_BIND_HOST=${APP_BIND_HOST}
 COUCHDB_HOST=127.0.0.1
 COUCHDB_PORT=${COUCHDB_PORT}
+COUCHDB_BIND_HOST=${COUCHDB_BIND_HOST}
 COUCHDB_DATABASE=model_inventory
 SECRET_KEY=$(generate_password)
+SESSION_COOKIE_SECURE=true
 EOF
     echo "Created ${ENV_FILE}."
   fi
@@ -143,7 +150,7 @@ cmd_up() {
   wait_for_couchdb
   compose up -d --build app
   compose ps
-  echo "App should be available on http://127.0.0.1:${APP_PORT}/inventory"
+  echo "App should be available on http://${APP_BIND_HOST}:${APP_PORT}/inventory"
 }
 
 cmd_update() {

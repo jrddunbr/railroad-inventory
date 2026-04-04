@@ -5,8 +5,6 @@ services:
       args:
         APP_GIT_COMMIT: ${APP_GIT_COMMIT:-}
     restart: unless-stopped
-    ports:
-      - "${APP_PORT:-5000}:5000"
     env_file:
       - .env
     environment:
@@ -14,11 +12,14 @@ services:
       COUCHDB_HOST: couchdb
       COUCHDB_PORT: "5984"
       COUCHDB_DATABASE: ${COUCHDB_DATABASE:-model_inventory}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
     depends_on:
       - couchdb
     volumes:
       - ./data/app:/app/data
       - ./data/uploads:/app/app/static/uploads
+    ports:
+      - "${APP_BIND_HOST:-127.0.0.1}:${APP_PORT:-5000}:5000"
 
   couchdb:
     image: couchdb:3
@@ -27,6 +28,6 @@ services:
       COUCHDB_USER: ${COUCHDB_USER:-admin}
       COUCHDB_PASSWORD: ${COUCHDB_PASSWORD:-change-me}
     ports:
-      - "${COUCHDB_PORT:-5984}:5984"
+      - "${COUCHDB_BIND_HOST:-127.0.0.1}:${COUCHDB_PORT:-5984}:5984"
     volumes:
       - ./data/couchdb:/opt/couchdb/data

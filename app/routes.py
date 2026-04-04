@@ -13,7 +13,9 @@ import resource
 import secrets
 import subprocess
 import sys
+import threading
 import time
+from collections import defaultdict, deque
 from datetime import UTC, datetime, timedelta
 from typing import Optional
 from urllib.parse import urlsplit
@@ -25,6 +27,7 @@ from flask import (
     flash,
     g,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -105,6 +108,9 @@ from webauthn.helpers.structs import (
 
 
 main_bp = Blueprint("main", __name__)
+
+PASSWORD_AUTH_THROTTLE = defaultdict(deque)
+PASSWORD_AUTH_THROTTLE_LOCK = threading.Lock()
 
 PAGINATION_OPTIONS = ["25", "50", "100", "250", "all"]
 DEFAULT_PAGE_SIZE = "50"
@@ -331,6 +337,68 @@ def get_failure_limit() -> int:
         return 3
 
 
+def get_password_throttle_limit() -> int:
+    try:
+        return max(1, int(current_app.config.get("AUTH_PASSWORD_THROTTLE_LIMIT", 5)))
+    except (TypeError, ValueError):
+        return 5
+
+
+def get_password_throttle_max_delay_seconds() -> int:
+    try:
+        return max(1, int(current_app.config.get("AUTH_PASSWORD_THROTTLE_MAX_DELAY_SECONDS", 30)))
+    except (TypeError, ValueError):
+        return 30
+
+
+def get_client_address() -> str:
+    return (request.remote_addr or "unknown").strip() or "unknown"
+
+
+def get_password_throttle_key(username: str | None) -> str:
+    normalized_username = normalize_username(username)
+    return f"{get_client_address()}:{normalized_username}"
+
+
+def password_auth_is_throttled(username: str | None) -> tuple[bool, int]:
+    key = get_password_throttle_key(username)
+    window = get_timedelta_config("AUTH_PASSWORD_THROTTLE_WINDOW")
+    now_value = utcnow()
+    with PASSWORD_AUTH_THROTTLE_LOCK:
+        attempts = PASSWORD_AUTH_THROTTLE.get(key)
+        if not attempts:
+            return False, 0
+        while attempts and now_value - attempts[0] > window:
+            attempts.popleft()
+        if not attempts:
+            PASSWORD_AUTH_THROTTLE.pop(key, None)
+            return False, 0
+        limit = get_password_throttle_limit()
+        if len(attempts) < limit:
+            return False, 0
+        over_limit = len(attempts) - limit
+        delay_seconds = min(get_password_throttle_max_delay_seconds(), 2 ** max(over_limit, 0))
+        retry_after = max(1, delay_seconds - int((now_value - attempts[-1]).total_seconds()))
+        return retry_after > 0, retry_after
+
+
+def record_failed_password_attempt(username: str | None) -> None:
+    key = get_password_throttle_key(username)
+    window = get_timedelta_config("AUTH_PASSWORD_THROTTLE_WINDOW")
+    now_value = utcnow()
+    with PASSWORD_AUTH_THROTTLE_LOCK:
+        attempts = PASSWORD_AUTH_THROTTLE[key]
+        attempts.append(now_value)
+        while attempts and now_value - attempts[0] > window:
+            attempts.popleft()
+
+
+def clear_failed_password_throttle(username: str | None) -> None:
+    key = get_password_throttle_key(username)
+    with PASSWORD_AUTH_THROTTLE_LOCK:
+        PASSWORD_AUTH_THROTTLE.pop(key, None)
+
+
 def is_recent_auth(max_age: timedelta | None = None) -> bool:
     authenticated_at = parse_iso_datetime(session.get("recent_auth_at"))
     if not authenticated_at:
@@ -436,6 +504,15 @@ def bump_session_version(user: User | None) -> None:
     if not user:
         return
     user.session_version = int(user.session_version or 1) + 1
+
+
+def revoke_user_mfa(user: User | None) -> None:
+    if not user:
+        return
+    user.totp_secret_encrypted = None
+    user.totp_enabled = False
+    user.last_totp_counter = None
+    user.passkeys = []
 
 
 def pending_login_expired() -> bool:
@@ -705,6 +782,14 @@ def get_post_login_redirect() -> str:
     if is_safe_next_url(next_url):
         return next_url
     return url_for("main.inventory")
+
+
+def get_post_login_redirect_from_json(payload: dict[str, object] | None = None) -> str:
+    if isinstance(payload, dict):
+        next_url = str(payload.get("next", "") or "").strip()
+        if is_safe_next_url(next_url):
+            return next_url
+    return get_post_login_redirect()
 
 
 def consume_login_redirect() -> str:
@@ -1985,17 +2070,21 @@ def login():
     if request.method == "POST":
         username = normalize_username(request.form.get("username"))
         password = request.form.get("password", "")
+        throttled, retry_after = password_auth_is_throttled(username)
+        if throttled:
+            flash(f"Too many sign-in attempts from this client. Try again in about {retry_after} seconds.", "danger")
+            response = make_response(render_template("login.html", next_url=get_post_login_redirect()), 429)
+            response.headers["Retry-After"] = str(retry_after)
+            return response
         user = User.query.filter_by(username=username).first()
         if user and is_user_locked(user):
             flash("That account is temporarily locked after repeated sign-in failures. Try again later.", "danger")
             return render_template("login.html", next_url=get_post_login_redirect()), 423
         if not user or not user.is_active or not verify_password(user.password_hash, password):
-            locked = register_failed_auth_attempt(user, "password") if user and user.is_active else False
-            if locked:
-                flash("That account is temporarily locked after repeated sign-in failures. Try again later.", "danger")
-                return render_template("login.html", next_url=get_post_login_redirect()), 423
+            record_failed_password_attempt(username)
             flash("Invalid username or password.", "danger")
             return render_template("login.html", next_url=get_post_login_redirect()), 401
+        clear_failed_password_throttle(username)
         clear_failed_auth_attempts(user, "password")
         if user_has_verified_mfa(user):
             start_pending_login(user)
@@ -2036,17 +2125,18 @@ def login_verify():
 
 @main_bp.route("/login/passkeys/options", methods=["POST"])
 def login_passkey_options():
+    payload = request.get_json(silent=True) or {}
     user = get_login_passkey_user()
     if not user or not user.is_active or not user.has_passkeys or is_user_locked(user):
         return jsonify({"error": "Passkey sign-in is unavailable for that account."}), 400
+    start_pending_login(user)
+    session["login_next"] = get_post_login_redirect_from_json(payload)
     options = generate_authentication_options(
         rp_id=get_webauthn_rp_id(),
         allow_credentials=get_passkey_descriptors(user),
         user_verification=UserVerificationRequirement.REQUIRED,
     )
-    session["pending_user_id"] = user.id
     session["passkey_auth_challenge"] = bytes_to_base64url(options.challenge)
-    session["login_next"] = get_post_login_redirect()
     return jsonify(json.loads(options_to_json(options)))
 
 
@@ -6725,13 +6815,14 @@ def administration_users_reset_password(user_id: int):
             flash(str(exc), "danger")
             return render_template("user_form.html", mode="reset_password", target_user=user), 400
         bump_session_version(user)
+        revoke_user_mfa(user)
         user.password_hash = hash_password(password)
         user.failed_password_attempts = 0
         user.failed_mfa_attempts = 0
         user.locked_until = None
         db.session.commit()
         ensure_db_backup()
-        flash(f"Password reset for {get_user_label(user)}.", "success")
+        flash(f"Password reset for {get_user_label(user)}. Existing MFA credentials were revoked.", "success")
         return redirect(url_for("main.administration_users"))
     return render_template("user_form.html", mode="reset_password", target_user=user)
 

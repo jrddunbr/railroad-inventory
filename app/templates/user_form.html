@@ -6,7 +6,7 @@
   <div class="box">
     {% if mode == "reset_password" %}
       <h1 class="title is-3">Reset Password</h1>
-      <p class="subtitle is-6">Set a new password for <strong>{{ user_label(target_user) }}</strong>.</p>
+      <p class="subtitle is-6">Set a new password for <strong>{{ user_label(target_user) }}</strong>. This also revokes existing TOTP and passkey credentials so the user must re-enroll MFA.</p>
       <form method="post" action="{{ url_for('main.administration_users_reset_password', user_id=target_user.id) }}">
         <div class="grid">
           <div class="field">

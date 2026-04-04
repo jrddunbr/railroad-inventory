@@ -49,6 +49,7 @@ What it does:
 - creates persistent bind-mounted directories under `data/`
 - starts CouchDB first and waits for it to become ready
 - builds and starts the Flask app container
+- binds both published ports to `127.0.0.1` by default so they are not exposed directly to the internet
 
 Future updates from the cloned repo:
 
@@ -68,7 +69,9 @@ Notes:
 - install Docker and the Docker Compose plugin on the host first
 - application data persists in `data/couchdb` and uploaded assets persist in `data/uploads`
 - `./deploy.sh update` creates a timestamped CouchDB backup in `data/backups/update/` before pulling and restarting
-- edit `.env` if you want to change credentials, ports, or the database name before first startup
+- edit `.env` if you want to change credentials, ports, bind addresses, or the database name before first startup
+- keep `SESSION_COOKIE_SECURE=true` whenever the app is served behind HTTPS
+- if you want public internet access, put a reverse proxy with TLS in front of the app instead of changing the bind host to `0.0.0.0` directly
 
 ## Kubernetes
 Build and load the image into your cluster (example uses the local tag):
