@@ -242,6 +242,9 @@ class Car(BaseModel):
     brand: str | None = None
     upc: str | None = None
     dcc_id: str | None = None
+    dcc_decoder_type: str | None = None
+    dcc_decoder_connection_type: str | None = None
+    dcc_decoder_keep_alive: bool | None = None
     traction_drivers: bool | None = None
     car_type_override: str | None = None
     wheel_arrangement_override: str | None = None

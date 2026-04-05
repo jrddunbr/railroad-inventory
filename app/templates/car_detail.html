@@ -113,6 +113,17 @@
           <p><strong>Tender Axles:</strong> {{ car.tender_axles_override }}</p>
         {% endif %}
         <p><strong>DCC ID:</strong> {{ car.dcc_id or "-" }}</p>
+        <p><strong>DCC Decoder Type:</strong> {{ car.dcc_decoder_type or "-" }}</p>
+        <p><strong>DCC Decoder Connection Type:</strong> {{ car.dcc_decoder_connection_type or "-" }}</p>
+        <p><strong>Decoder Keep-Alive:</strong>
+          {% if car.dcc_decoder_keep_alive is none %}
+            -
+          {% elif car.dcc_decoder_keep_alive %}
+            Yes
+          {% else %}
+            No
+          {% endif %}
+        </p>
         <p><strong>Actual Weight:</strong> {{ car.actual_weight or "-" }}</p>
         <p><strong>Actual Length:</strong> {{ car.actual_length or "-" }}</p>
         <p><strong>Scale:</strong> {{ scale_label or "-" }}</p>
@@ -356,6 +367,9 @@
       { key: 'wheel_arrangement', label: 'Wheel Arrangement' },
       { key: 'tender_axles', label: 'Tender Axles' },
       { key: 'dcc_id', label: 'DCC ID' },
+      { key: 'dcc_decoder_type', label: 'DCC Decoder Type' },
+      { key: 'dcc_decoder_connection_type', label: 'DCC Decoder Connection Type' },
+      { key: 'dcc_decoder_keep_alive', label: 'Decoder Keep-Alive' },
       { key: 'capacity', label: 'Capacity' },
       { key: 'weight', label: 'Weight' },
       { key: 'load_limit', label: 'Load Limit' },

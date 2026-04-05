@@ -2526,6 +2526,9 @@ def inventory_export():
             "UPC",
             "Car #",
             "DCC ID",
+            "DCC Decoder Type",
+            "DCC Decoder Connection Type",
+            "DCC Decoder Keep-Alive",
             "Notes",
             "Traction Drivers",
             "Built (Lettering)",
@@ -2565,6 +2568,9 @@ def inventory_export():
                 car.upc or "",
                 car.car_number or "",
                 car.dcc_id or "",
+                car.dcc_decoder_type or "",
+                car.dcc_decoder_connection_type or "",
+                "Yes" if car.dcc_decoder_keep_alive else "",
                 car.notes or "",
                 "Yes" if car.traction_drivers else "",
                 car.built or "",
@@ -2594,7 +2600,9 @@ def locomotive_dcc_export():
         is_locomotive = (
             car.is_locomotive_override if car.is_locomotive_override is not None else class_is_locomotive
         )
-        if is_locomotive and car.dcc_id:
+        if is_locomotive and (
+            car.dcc_id or car.dcc_decoder_type or car.dcc_decoder_connection_type or car.dcc_decoder_keep_alive
+        ):
             locomotive_cars.append(car)
     locomotive_cars.sort(
         key=lambda car: (
@@ -2608,6 +2616,9 @@ def locomotive_dcc_export():
     writer.writerow(
         [
             "DCC ID",
+            "Decoder Type",
+            "Decoder Connection Type",
+            "Decoder Keep-Alive",
             "Reporting Mark",
             "Car #",
             "Car Class",
@@ -2618,6 +2629,9 @@ def locomotive_dcc_export():
         writer.writerow(
             [
                 car.dcc_id or "",
+                car.dcc_decoder_type or "",
+                car.dcc_decoder_connection_type or "",
+                "Yes" if car.dcc_decoder_keep_alive else "",
                 car.railroad.reporting_mark if car.railroad else (car.reporting_mark_override or ""),
                 car.car_number or "",
                 car.car_class.code if car.car_class else "",
@@ -6521,6 +6535,9 @@ def apply_car_form(car: Car, form) -> None:
     car.brand = form.get("brand", "").strip()
     car.upc = form.get("upc", "").strip()
     car.dcc_id = form.get("dcc_id", "").strip()
+    car.dcc_decoder_type = form.get("dcc_decoder_type", "").strip()
+    car.dcc_decoder_connection_type = form.get("dcc_decoder_connection_type", "").strip()
+    car.dcc_decoder_keep_alive = form.get("dcc_decoder_keep_alive") == "on"
     car.traction_drivers = form.get("traction_drivers") == "on"
     capacity_value = form.get("capacity", "").strip()
     weight_value = form.get("weight", "").strip()
@@ -7093,6 +7110,9 @@ def serialize_car(car: Car) -> dict:
         "brand": car.brand,
         "upc": car.upc,
         "dcc_id": car.dcc_id,
+        "dcc_decoder_type": car.dcc_decoder_type,
+        "dcc_decoder_connection_type": car.dcc_decoder_connection_type,
+        "dcc_decoder_keep_alive": car.dcc_decoder_keep_alive,
         "wheel_arrangement": car.wheel_arrangement_override
         or (car.car_class.wheel_arrangement if car.car_class else None),
         "tender_axles": car.tender_axles_override or (car.car_class.tender_axles if car.car_class else None),

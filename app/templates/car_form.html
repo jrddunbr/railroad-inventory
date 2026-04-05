@@ -159,6 +159,27 @@
               </label>
             </div>
           </div>
+          <div class="field">
+            <label class="label" for="dcc_decoder_type">DCC Decoder Type</label>
+            <div class="control">
+              <input class="input" id="dcc_decoder_type" name="dcc_decoder_type" value="{{ car.dcc_decoder_type if car else '' }}" placeholder='ESU LokSound 5, Digitrax DH126, dummy' />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label" for="dcc_decoder_connection_type">DCC Decoder Connection Type</label>
+            <div class="control">
+              <input class="input" id="dcc_decoder_connection_type" name="dcc_decoder_connection_type" value="{{ car.dcc_decoder_connection_type if car else '' }}" placeholder="Hardwired, 8 pin NEM 652, 21 pin MTC" />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Decoder Keep-Alive</label>
+            <div class="control">
+              <label class="checkbox">
+                <input id="dcc_decoder_keep_alive" type="checkbox" name="dcc_decoder_keep_alive" {% if car and car.dcc_decoder_keep_alive %}checked{% endif %} />
+                Installed
+              </label>
+            </div>
+          </div>
         </div>
         <h3 class="title is-5">Car Measurements</h3>
         <div class="grid">
@@ -632,6 +653,9 @@
     const tenderField = document.getElementById('class_tender_axles')?.closest('.field');
     const powerField = document.getElementById('power_type')?.closest('.field');
     const tractionField = document.getElementById('traction_drivers')?.closest('.field');
+    const decoderTypeField = document.getElementById('dcc_decoder_type')?.closest('.field');
+    const decoderConnectionField = document.getElementById('dcc_decoder_connection_type')?.closest('.field');
+    const decoderKeepAliveField = document.getElementById('dcc_decoder_keep_alive')?.closest('.field');
     const locomotiveInput = document.getElementById('is_locomotive');
     const updateTenderVisibility = () => {
       if (!locomotiveInput) return;
@@ -640,6 +664,9 @@
       if (tenderField) tenderField.style.display = show ? '' : 'none';
       if (powerField) powerField.style.display = show ? '' : 'none';
       if (tractionField) tractionField.style.display = show ? '' : 'none';
+      if (decoderTypeField) decoderTypeField.style.display = show ? '' : 'none';
+      if (decoderConnectionField) decoderConnectionField.style.display = show ? '' : 'none';
+      if (decoderKeepAliveField) decoderKeepAliveField.style.display = show ? '' : 'none';
     };
 
     const applyClassDetails = (carClass) => {
