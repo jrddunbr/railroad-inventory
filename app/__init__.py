@@ -6,6 +6,7 @@ import time
 from datetime import timedelta
 
 from flask import Flask, g
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.storage import db
 
@@ -62,6 +63,7 @@ def ensure_local_secret_key(project_root: str) -> str:
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)  # type: ignore[assignment]
     base_dir = os.path.abspath(os.path.dirname(__file__))
     project_root = os.path.dirname(base_dir)
     secret_key = ensure_local_secret_key(project_root)
