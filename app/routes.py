@@ -224,7 +224,6 @@ PUBLIC_ENDPOINTS = {
 }
 MFA_LOGIN_ENDPOINTS = {
     "main.login_verify",
-    "main.login_passkey_options",
     "main.login_passkey_verify",
 }
 SELF_SERVICE_ENDPOINTS = {
