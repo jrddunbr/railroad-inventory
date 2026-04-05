@@ -428,12 +428,13 @@ def establish_authenticated_session(user: User, next_url: str | None = None, upd
 
 
 def start_pending_login(user: User) -> None:
+    existing_csrf_token = session.get("_csrf_token")
     session.clear()
     session["pending_user_id"] = user.id
     session["pending_user_version"] = int(user.session_version or 1)
     session["pending_started_at"] = utcnow_iso()
     session["login_next"] = get_post_login_redirect()
-    session["_csrf_token"] = secrets.token_urlsafe(32)
+    session["_csrf_token"] = existing_csrf_token or secrets.token_urlsafe(32)
     session["last_seen_at"] = utcnow_iso()
     session.permanent = True
 
