@@ -3002,6 +3002,72 @@ def repairs_report():
     return render_template("repairs_report.html", cars=repairs, total=len(repairs))
 
 
+@main_bp.route("/reports/weight")
+def weight_report():
+    cars = Car.query.order_by("id").all()
+    by_weight = []
+    by_density = []
+
+    for car in cars:
+        weight_amount, weight_unit = parse_actual_weight(car.actual_weight)
+        if not weight_amount or not weight_unit:
+            continue
+        weight_kg = weight_to_kg(weight_amount, weight_unit)
+        if weight_kg is None or weight_kg <= 0:
+            continue
+
+        by_weight.append(
+            {
+                "car": car,
+                "weight_kg": weight_kg,
+                "weight_display": f"{weight_kg:.3f} kg",
+            }
+        )
+
+        length_amount, length_unit = parse_actual_length(car.actual_length)
+        if not length_amount or not length_unit:
+            continue
+        length_m = length_to_meters(length_amount, length_unit)
+        if length_m is None or length_m <= 0:
+            continue
+
+        by_density.append(
+            {
+                "car": car,
+                "weight_kg": weight_kg,
+                "length_m": length_m,
+                "density_g_per_mm": weight_kg / length_m,
+                "density_display": f"{format_linear_density(weight_kg / length_m)} g/mm",
+            }
+        )
+
+    by_weight.sort(
+        key=lambda item: (
+            -item["weight_kg"],
+            item["car"].railroad.reporting_mark if item["car"].railroad else (item["car"].reporting_mark_override or ""),
+            item["car"].car_number or "",
+            item["car"].id or 0,
+        )
+    )
+    by_density.sort(
+        key=lambda item: (
+            -item["density_g_per_mm"],
+            -item["weight_kg"],
+            item["car"].railroad.reporting_mark if item["car"].railroad else (item["car"].reporting_mark_override or ""),
+            item["car"].car_number or "",
+            item["car"].id or 0,
+        )
+    )
+
+    return render_template(
+        "weight_report.html",
+        by_weight=by_weight,
+        by_density=by_density,
+        weight_total=len(by_weight),
+        density_total=len(by_density),
+    )
+
+
 @main_bp.route("/reports/conflicts")
 def conflict_report():
     cars = Car.query.order_by("id").all()
