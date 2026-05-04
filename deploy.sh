@@ -43,6 +43,49 @@ compose() {
   "$DOCKER_CMD" compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" "$@"
 }
 
+current_branch() {
+  git -C "$ROOT_DIR" rev-parse --abbrev-ref HEAD
+}
+
+current_upstream() {
+  git -C "$ROOT_DIR" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'
+}
+
+require_clean_git_worktree() {
+  if ! git -C "$ROOT_DIR" diff --quiet --ignore-submodules --; then
+    echo "Refusing to update: tracked files have local modifications." >&2
+    git -C "$ROOT_DIR" status --short >&2 || true
+    exit 1
+  fi
+
+  if [ -n "$(git -C "$ROOT_DIR" ls-files --others --exclude-standard)" ]; then
+    echo "Refusing to update: untracked files are present in the repository." >&2
+    git -C "$ROOT_DIR" status --short >&2 || true
+    exit 1
+  fi
+}
+
+ensure_git_update_ready() {
+  local branch upstream
+  branch=$(current_branch)
+  upstream=$(current_upstream)
+
+  if [ "$branch" = "HEAD" ]; then
+    echo "Refusing to update: repository is in a detached HEAD state." >&2
+    exit 1
+  fi
+
+  require_clean_git_worktree
+
+  echo "Fetching latest git changes for ${branch} from ${upstream}..."
+  git -C "$ROOT_DIR" fetch --prune
+
+  if ! git -C "$ROOT_DIR" merge-base --is-ancestor HEAD "$upstream"; then
+    echo "Refusing to update: ${upstream} cannot be applied as a fast-forward from ${branch}." >&2
+    exit 1
+  fi
+}
+
 resolve_git_commit() {
   if command -v git >/dev/null 2>&1; then
     git -C "$ROOT_DIR" rev-parse HEAD 2>/dev/null || true
@@ -154,14 +197,17 @@ cmd_up() {
 }
 
 cmd_update() {
+  local upstream
   require_cmd git
   require_cmd tar
   require_cmd date
   require_cmd curl
   cmd_init
+  ensure_git_update_ready
+  upstream=$(current_upstream)
   compose down
   backup_couchdb_data
-  git -C "$ROOT_DIR" pull --ff-only
+  git -C "$ROOT_DIR" merge --ff-only "$upstream"
   set_env_value "APP_GIT_COMMIT" "$(resolve_git_commit)"
   compose up -d couchdb
   wait_for_couchdb
