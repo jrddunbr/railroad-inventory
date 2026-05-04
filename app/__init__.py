@@ -138,6 +138,11 @@ def create_app() -> Flask:
         AUTH_PASSWORD_THROTTLE_WINDOW=timedelta(minutes=15),
         AUTH_PASSWORD_THROTTLE_LIMIT=5,
         AUTH_PASSWORD_THROTTLE_MAX_DELAY_SECONDS=30,
+        DEV_LOCAL_AUTH_BYPASS=(
+            os.environ.get("DEV_LOCAL_AUTH_BYPASS", "").strip().lower() in {"1", "true", "yes"}
+            or os.environ.get("FLASK_DEBUG", "").strip().lower() in {"1", "true", "yes"}
+        ),
+        DEV_AUTH_TESTING=os.environ.get("DEV_AUTH_TESTING", "").strip().lower() in {"1", "true", "yes"},
         WEBAUTHN_RP_NAME=os.environ.get("WEBAUTHN_RP_NAME", "Railroad Inventory"),
         WEBAUTHN_RP_ID=os.environ.get("WEBAUTHN_RP_ID", ""),
         WEBAUTHN_ORIGIN=os.environ.get("WEBAUTHN_ORIGIN", ""),

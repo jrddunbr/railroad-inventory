@@ -5,6 +5,13 @@
   <div class="auth-card">
     <h1 class="title is-3">Sign In</h1>
     <p class="subtitle is-6">Access Railroad Inventory with your assigned account.</p>
+    {% if dev_local_auth_bypass_enabled() %}
+      <article class="message is-warning">
+        <div class="message-body">
+          Local development sign-in is enabled for loopback clients.
+        </div>
+      </article>
+    {% endif %}
     <form method="post" action="{{ url_for('main.login', next=next_url) }}" data-confirm-skip="true">
       <input type="hidden" name="next" value="{{ next_url }}" />
       <div class="field">
@@ -22,6 +29,9 @@
       <div class="actions buttons">
         <button type="submit" class="button is-primary">Sign In</button>
         <button type="button" class="button is-light" id="passkey-sign-in">Use Passkey</button>
+        {% if dev_local_auth_bypass_enabled() %}
+          <a class="button is-warning" href="{{ url_for('main.login_dev_local', next=next_url) }}">Local Dev Sign-In</a>
+        {% endif %}
       </div>
     </form>
     <p class="keyboard-hint" id="passkey-message" aria-live="polite"></p>

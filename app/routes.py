@@ -223,6 +223,8 @@ ADMIN_COUNTER_LABELS = {
 }
 PUBLIC_ENDPOINTS = {
     "main.login",
+    "main.login_dev_local",
+    "main.login_dev_local_user",
     "main.setup_users",
     "main.logout",
     "main.login_verify",
@@ -405,6 +407,34 @@ def get_password_throttle_max_delay_seconds() -> int:
 
 def get_client_address() -> str:
     return (request.remote_addr or "unknown").strip() or "unknown"
+
+
+def is_loopback_address(value: str | None) -> bool:
+    return (value or "").strip() in {"127.0.0.1", "::1"}
+
+
+def is_loopback_client() -> bool:
+    client_address = get_client_address()
+    if not is_loopback_address(client_address):
+        return False
+    proxy_fix_original = request.environ.get("werkzeug.proxy_fix.orig")
+    if isinstance(proxy_fix_original, dict):
+        original_remote_addr = proxy_fix_original.get("REMOTE_ADDR")
+        if original_remote_addr and not is_loopback_address(str(original_remote_addr)):
+            return False
+    return True
+
+
+def dev_local_auth_bypass_enabled() -> bool:
+    return (
+        bool(current_app.config.get("DEV_LOCAL_AUTH_BYPASS"))
+        and not bool(current_app.config.get("DEV_AUTH_TESTING"))
+        and is_loopback_client()
+    )
+
+
+def get_dev_local_login_users() -> list[User]:
+    return [user for user in get_sorted_users() if user.is_active]
 
 
 def get_password_throttle_key(username: str | None) -> str:
@@ -703,7 +733,6 @@ def deny_request(message: str, status_code: int):
     if request.path.startswith("/api/"):
         return jsonify({"error": message}), status_code
     if status_code == 401:
-        flash(message, "danger")
         return redirect(url_for("main.login", next=request.full_path if request.query_string else request.path))
     return render_template("error.html", title="Access Denied", message=message), status_code
 
@@ -981,6 +1010,7 @@ def inject_auth_helpers() -> dict[str, object]:
         "user_has_verified_mfa": user_has_verified_mfa,
         "gravatar_url": get_gravatar_url,
         "format_display_datetime": format_display_datetime,
+        "dev_local_auth_bypass_enabled": dev_local_auth_bypass_enabled,
     }
 
 
@@ -2147,6 +2177,46 @@ def login():
         flash("MFA is not enabled. Effective permissions are limited to read-only until TOTP or a passkey is configured.", "info")
         return redirect(consume_login_redirect())
     return render_template("login.html", next_url=get_post_login_redirect())
+
+
+@main_bp.route("/dev/local-login", methods=["GET"])
+def login_dev_local():
+    if current_app.config.get("DEV_AUTH_TESTING"):
+        flash("Development auth testing is enabled. Use the normal login flow to test password and MFA.", "info")
+        return redirect(url_for("main.login", next=get_post_login_redirect()))
+    if not dev_local_auth_bypass_enabled():
+        flash("Local development sign-in is unavailable.", "danger")
+        return redirect(url_for("main.login", next=get_post_login_redirect()))
+    return render_template(
+        "login_dev_local.html",
+        next_url=get_post_login_redirect(),
+        users=get_dev_local_login_users(),
+    )
+
+
+@main_bp.route("/dev/local-login/<int:user_id>", methods=["POST"])
+def login_dev_local_user(user_id: int):
+    if current_app.config.get("DEV_AUTH_TESTING"):
+        flash("Development auth testing is enabled. Use the normal login flow to test password and MFA.", "info")
+        return redirect(url_for("main.login", next=get_post_login_redirect()))
+    if not dev_local_auth_bypass_enabled():
+        flash("Local development sign-in is unavailable.", "danger")
+        return redirect(url_for("main.login", next=get_post_login_redirect()))
+    user = User.query.get_or_404(user_id)
+    if not user.is_active:
+        flash("That account is not available for local development sign-in.", "danger")
+        return redirect(url_for("main.login_dev_local", next=get_post_login_redirect()))
+    if is_user_locked(user):
+        flash("That account is temporarily locked after repeated sign-in failures. Try again later.", "danger")
+        return redirect(url_for("main.login_dev_local", next=get_post_login_redirect()))
+    clear_failed_password_throttle(user.username)
+    clear_failed_auth_attempts(user)
+    next_url = request.form.get("next", "").strip()
+    complete_login(user)
+    flash("Local development sign-in bypass used from loopback client.", "warning")
+    if is_safe_next_url(next_url):
+        return redirect(next_url)
+    return redirect(consume_login_redirect())
 
 
 @main_bp.route("/login/verify", methods=["GET", "POST"])

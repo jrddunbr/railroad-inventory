@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Local Dev Sign-In{% endblock %}
+{% set auth_page = true %}
+{% block content %}
+  <div class="auth-card">
+    <h1 class="title is-3">Local Dev Sign-In</h1>
+    <p class="subtitle is-6">Loopback-only development shortcut. Password and MFA are skipped on this screen.</p>
+    <article class="message is-warning">
+      <div class="message-body">
+        This flow is available only when local development bypass is enabled and the client address is loopback.
+      </div>
+    </article>
+    {% if users %}
+      <div class="buttons are-vertical" style="align-items: stretch;">
+        {% for user in users %}
+          <form method="post" action="{{ url_for('main.login_dev_local_user', user_id=user.id) }}" data-confirm-skip="true" style="margin-bottom: 8px;">
+            <input type="hidden" name="next" value="{{ next_url }}" />
+            <button type="submit" class="button is-warning is-fullwidth" style="justify-content: space-between;">
+              <span>{{ user_label(user) }}</span>
+              <span>@{{ user.username }}</span>
+            </button>
+          </form>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="keyboard-hint">No active users are currently available for local development sign-in.</p>
+    {% endif %}
+    <div class="actions buttons">
+      <a class="button is-light" href="{{ url_for('main.login', next=next_url) }}">Back to Password Login</a>
+    </div>
+  </div>
+{% endblock %}
