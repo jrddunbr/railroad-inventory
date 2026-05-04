@@ -55,6 +55,7 @@
       {% if can_access('inventory/cars', 'WRITE') %}
         <a class="button is-small is-info" href="{{ url_for('main.car_edit', car_id=car.id) }}">Edit</a>
         <a class="button is-small is-warning" href="{{ url_for('main.car_inspect', car_id=car.id) }}">Inspect</a>
+        <a class="button is-small is-primary" href="{{ url_for('main.car_repair_new', car_id=car.id) }}">Add Repair</a>
       {% endif %}
       <button type="button" class="button is-small is-success" id="copy-trigger">Copy...</button>
       <button type="button" id="compare-trigger" {% if not compare_cars %}disabled{% endif %} class="button is-small is-link">Compare</button>
@@ -182,37 +183,90 @@
       </div>
       <div>
         <h3 class="title is-5">Maintenance</h3>
-        <p><strong>Last Inspection Date:</strong> {{ car.last_inspection_date or "-" }}</p>
-        <p><strong>Repairs Required:</strong> {{ car.repairs_required or "None" }}</p>
+        <p><strong>Last Inspection Date:</strong> {{ format_display_datetime(car.last_inspection_date) }}</p>
+        <p><strong>Open Repairs:</strong> {{ open_repairs|length }}</p>
+        <p><strong>Repairs Required:</strong> <span style="white-space: pre-line;">{{ car.repairs_required or "None" }}</span></p>
         <p><strong>Notes:</strong> {{ car.notes or "-" }}</p>
       </div>
     </div>
+    <h3 class="title is-5">Open Repairs</h3>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Opened</th>
+          <th>Status</th>
+          <th>Class</th>
+          <th>Severity</th>
+          <th>Defect</th>
+          <th>Inspection</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for repair in open_repairs %}
+        <tr>
+          <td>{{ format_display_datetime(repair.opened_at) }}</td>
+          <td>{{ get_repair_status_label(repair.status) }}</td>
+          <td>{{ repair.repair_class or "-" }}</td>
+          <td>{{ repair.severity or "-" }}</td>
+          <td>{{ repair.defect_summary or repair.defect_details or "-" }}</td>
+          <td>
+            {% if repair.required_inspection_type %}
+              {{ repair.required_inspection_type.name }}
+            {% elif repair.requires_post_repair_inspection %}
+              Required
+            {% else %}
+              -
+            {% endif %}
+          </td>
+          <td>
+            {% if can_access('inventory/cars', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.car_repair_edit', repair_id=repair.id) }}">Edit</a>
+              <form method="post" action="{{ url_for('main.car_repair_delete', repair_id=repair.id) }}" data-action="delete" data-table="car_repairs" data-id="{{ repair.id }}" data-id-field="id" data-entity-label="repair {{ repair.id }}" style="display: inline;">
+                <button type="submit" class="button is-small is-danger">Delete</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7">No open repairs recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
     <h3 class="title is-5">Inspections</h3>
     <table class="table is-fullwidth is-striped">
       <thead>
         <tr>
           <th>Date</th>
           <th>Type</th>
+          <th>Scope</th>
           <th>Result</th>
+          <th>Inspector</th>
           <th>Details</th>
+          <th>Linked Repair</th>
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for inspection in car.inspections %}
         <tr>
-          <td>{{ inspection.inspection_date or "-" }}</td>
+          <td>{{ format_display_datetime(inspection.inspection_date) }}</td>
           <td>{{ inspection.inspection_type.name if inspection.inspection_type else "-" }}</td>
+          <td>{{ inspection.inspection_scope or "-" }}</td>
+          <td>{{ get_inspection_result_label(inspection.result, inspection.passed) }}</td>
+          <td>{{ inspection.performed_by or "-" }}</td>
+          <td>{{ inspection.details or "-" }}</td>
           <td>
-            {% if inspection.passed is none %}
-              -
-            {% elif inspection.passed %}
-              Passed
+            {% if inspection.opens_repair %}
+              Opened repair {{ inspection.opens_repair.id }}
+            {% elif inspection.closes_repair %}
+              Closed repair {{ inspection.closes_repair.id }}
             {% else %}
-              Failed
+              -
             {% endif %}
           </td>
-          <td>{{ inspection.details or "-" }}</td>
           <td>
             <form method="post" action="{{ url_for('main.inspection_delete', inspection_id=inspection.id) }}" data-action="delete" data-table="car_inspections" data-id="{{ inspection.id }}" data-id-field="id" data-entity-label="inspection {{ inspection.id }}" style="display: inline;">
               <input type="hidden" name="next" value="{{ url_for('main.car_detail', car_id=car.id) }}" />
@@ -222,7 +276,40 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="5">No inspections recorded.</td>
+          <td colspan="8">No inspections recorded.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <h3 class="title is-5">Repair History</h3>
+    <table class="table is-fullwidth is-striped">
+      <thead>
+        <tr>
+          <th>Opened</th>
+          <th>Status</th>
+          <th>Completed</th>
+          <th>Cleared</th>
+          <th>Summary</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for repair in repair_history %}
+        <tr>
+          <td>{{ format_display_datetime(repair.opened_at) }}</td>
+          <td>{{ get_repair_status_label(repair.status) }}</td>
+          <td>{{ format_display_datetime(repair.completed_at) }}</td>
+          <td>{{ format_display_datetime(repair.cleared_for_service_at) }}</td>
+          <td>{{ repair.defect_summary or repair.corrective_action or "-" }}</td>
+          <td>
+            {% if can_access('inventory/cars', 'WRITE') %}
+              <a class="button is-small is-light" href="{{ url_for('main.car_repair_edit', repair_id=repair.id) }}">View/Edit</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">No closed repairs recorded.</td>
         </tr>
         {% endfor %}
       </tbody>

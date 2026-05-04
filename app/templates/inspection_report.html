@@ -27,8 +27,9 @@ Inspection Report ({{ inspections|length }})
             <div class="select is-fullwidth">
               <select id="result" name="result" required>
                 <option value="">Select...</option>
-                <option value="passed" {% if selected_result == 'passed' %}selected{% endif %}>Passed</option>
-                <option value="failed" {% if selected_result == 'failed' %}selected{% endif %}>Failed</option>
+                {% for result in inspection_result_options %}
+                  <option value="{{ result }}" {% if selected_result == result %}selected{% endif %}>{{ result.replace('_', ' ').title() }}</option>
+                {% endfor %}
               </select>
             </div>
           </div>
@@ -49,7 +50,9 @@ Inspection Report ({{ inspections|length }})
           <th>Inspection Date</th>
           <th>Type</th>
           <th>Result</th>
+          <th>Inspector</th>
           <th>Details</th>
+          <th>Linked Repair</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -60,16 +63,20 @@ Inspection Report ({{ inspections|length }})
           <td><a href="{{ url_for('main.car_detail', car_id=inspection.car_id) }}">Car {{ inspection.car_id }}</a></td>
           <td>{{ car.railroad.reporting_mark if car and car.railroad else (car.reporting_mark_override if car else '-') }}</td>
           <td>{{ car.car_number if car else '-' }}</td>
-          <td>{{ inspection.inspection_date or '-' }}</td>
+          <td>{{ format_display_datetime(inspection.inspection_date) }}</td>
           <td>{{ inspection.inspection_type.name if inspection.inspection_type else '-' }}</td>
+          <td>{{ get_inspection_result_label(inspection.result, inspection.passed) }}</td>
+          <td>{{ inspection.performed_by or '-' }}</td>
+          <td>{{ inspection.details or '-' }}</td>
           <td>
-            {% if inspection.passed %}
-              Passed
+            {% if inspection.opens_repair %}
+              {{ get_repair_status_label(inspection.opens_repair.status) }} · Repair {{ inspection.opens_repair.id }}
+            {% elif inspection.closes_repair %}
+              {{ get_repair_status_label(inspection.closes_repair.status) }} · Repair {{ inspection.closes_repair.id }}
             {% else %}
-              Failed
+              -
             {% endif %}
           </td>
-          <td>{{ inspection.details or '-' }}</td>
           <td>
             <form method="post" action="{{ url_for('main.inspection_delete', inspection_id=inspection.id) }}" data-action="delete" data-table="car_inspections" data-id="{{ inspection.id }}" data-id-field="id" data-entity-label="inspection {{ inspection.id }}" style="display: inline;">
               <input type="hidden" name="next" value="{{ request.full_path }}" />
@@ -79,7 +86,7 @@ Inspection Report ({{ inspections|length }})
         </tr>
         {% else %}
         <tr>
-          <td colspan="8">No inspections match the selected filters.</td>
+          <td colspan="10">No inspections match the selected filters.</td>
         </tr>
         {% endfor %}
       </tbody>

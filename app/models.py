@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from app.storage import BaseModel, QueryDescriptor
 
@@ -334,7 +335,33 @@ class Car(BaseModel):
     def inspections(self) -> list[CarInspection]:
         if not self._store:
             return []
-        return CarInspection.query.filter_by(car_id=self.id).order_by("inspection_date", reverse=True).all()
+        inspections = CarInspection.query.filter_by(car_id=self.id).all()
+        inspections.sort(
+            key=lambda inspection: (
+                inspection.inspection_date is None,
+                _sortable_timestamp(inspection.inspection_date),
+            ),
+            reverse=True,
+        )
+        return inspections
+
+    @property
+    def repairs(self) -> list[CarRepair]:
+        if not self._store:
+            return []
+        repairs = CarRepair.query.filter_by(car_id=self.id).all()
+        repairs.sort(
+            key=lambda repair: (
+                repair.opened_at is None,
+                _sortable_timestamp(repair.opened_at),
+            ),
+            reverse=True,
+        )
+        return repairs
+
+    @property
+    def open_repairs(self) -> list[CarRepair]:
+        return [repair for repair in self.repairs if repair.status not in {"closed", "returned_to_service"}]
 
     def prepare_save(self) -> None:
         if self._railroad_ref and not self.railroad_id and self._railroad_ref.id:
@@ -388,6 +415,14 @@ class CarInspection(BaseModel):
     car_id: int | None = None
     inspection_type_id: int | None = None
     inspection_date: str | None = None
+    performed_by: str | None = None
+    location_id: int | None = None
+    inspection_scope: str | None = None
+    result: str | None = None
+    service_restrictions: str | None = None
+    opens_repair_id: int | None = None
+    closes_repair_id: int | None = None
+    next_inspection_due: str | None = None
     details: str | None = None
     passed: bool | None = None
 
@@ -402,6 +437,125 @@ class CarInspection(BaseModel):
         if not self._store or not self.inspection_type_id:
             return None
         return self._store.get(InspectionType, self.inspection_type_id)
+
+    @property
+    def location(self) -> Location | None:
+        if not self._store or not self.location_id:
+            return None
+        return self._store.get(Location, self.location_id)
+
+    @property
+    def opens_repair(self) -> CarRepair | None:
+        if not self._store or not self.opens_repair_id:
+            return None
+        return self._store.get(CarRepair, self.opens_repair_id)
+
+    @property
+    def closes_repair(self) -> CarRepair | None:
+        if not self._store or not self.closes_repair_id:
+            return None
+        return self._store.get(CarRepair, self.closes_repair_id)
+
+
+@dataclass
+class CarRepair(BaseModel):
+    doc_type = "car_repair"
+    counter_key = "car_repairs"
+    query = QueryDescriptor()
+    ownership_enabled = True
+
+    car_id: int | None = None
+    status: str | None = None
+    repair_class: str | None = None
+    severity: str | None = None
+    opened_at: str | None = None
+    reported_by: str | None = None
+    source: str | None = None
+    discovered_location_id: int | None = None
+    defect_summary: str | None = None
+    defect_details: str | None = None
+    defect_code: str | None = None
+    safe_to_move: bool | None = None
+    movement_restrictions: str | None = None
+    repair_destination: str | None = None
+    bad_order_tag: str | None = None
+    requires_post_repair_inspection: bool | None = None
+    required_inspection_type_id: int | None = None
+    assigned_to: str | None = None
+    work_started_at: str | None = None
+    completed_at: str | None = None
+    repaired_by: str | None = None
+    corrective_action: str | None = None
+    parts_used: str | None = None
+    cleared_for_service_at: str | None = None
+    cleared_by: str | None = None
+    linked_opening_inspection_id: int | None = None
+    linked_closing_inspection_id: int | None = None
+    closeout_notes: str | None = None
+
+    @property
+    def car(self) -> Car | None:
+        if not self._store or not self.car_id:
+            return None
+        return self._store.get(Car, self.car_id)
+
+    @property
+    def discovered_location(self) -> Location | None:
+        if not self._store or not self.discovered_location_id:
+            return None
+        return self._store.get(Location, self.discovered_location_id)
+
+    @property
+    def required_inspection_type(self) -> InspectionType | None:
+        if not self._store or not self.required_inspection_type_id:
+            return None
+        return self._store.get(InspectionType, self.required_inspection_type_id)
+
+    @property
+    def opening_inspection(self) -> CarInspection | None:
+        if not self._store or not self.linked_opening_inspection_id:
+            return None
+        return self._store.get(CarInspection, self.linked_opening_inspection_id)
+
+    @property
+    def closing_inspection(self) -> CarInspection | None:
+        if not self._store or not self.linked_closing_inspection_id:
+            return None
+        return self._store.get(CarInspection, self.linked_closing_inspection_id)
+
+    @property
+    def events(self) -> list[CarRepairEvent]:
+        if not self._store:
+            return []
+        events = CarRepairEvent.query.filter_by(repair_id=self.id).all()
+        events.sort(
+            key=lambda event: (
+                event.event_at is None,
+                _sortable_timestamp(event.event_at),
+            ),
+            reverse=True,
+        )
+        return events
+
+
+@dataclass
+class CarRepairEvent(BaseModel):
+    doc_type = "car_repair_event"
+    counter_key = "car_repair_events"
+    query = QueryDescriptor()
+    ownership_enabled = True
+
+    repair_id: int | None = None
+    event_type: str | None = None
+    event_at: str | None = None
+    performed_by: str | None = None
+    notes: str | None = None
+
+    @property
+    def repair(self) -> CarRepair | None:
+        if not self._store or not self.repair_id:
+            return None
+        return self._store.get(CarRepair, self.repair_id)
 
 
 @dataclass
@@ -609,9 +763,23 @@ class User(BaseModel):
         return bool(self.totp_enabled or self.has_passkeys)
 
 
+def _sortable_timestamp(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if parsed.tzinfo is None:
+        return parsed.isoformat()
+    return parsed.astimezone().isoformat()
+
+
 __all__ = [
     "Car",
     "CarInspection",
+    "CarRepair",
+    "CarRepairEvent",
     "CarClass",
     "Consist",
     "InspectionType",

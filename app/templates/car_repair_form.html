@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% block title %}
+{{ 'Edit' if repair else 'Add' }} Repair for Car {{ car.id }}
+{% endblock %}
+{% block content %}
+  <div class="box">
+    <h1 class="title is-3">{{ 'Edit' if repair else 'Add' }} Repair for Car {{ car.id }}</h1>
+    <p class="keyboard-hint">Track the defect, repair work, and any return-to-service requirements.</p>
+    {% if error_message %}
+      <article class="message is-danger">
+        <div class="message-body">{{ error_message }}</div>
+      </article>
+    {% endif %}
+    <form method="post" action="{{ url_for('main.car_repair_edit', repair_id=repair.id) if repair else url_for('main.car_repair_new', car_id=car.id) }}" data-confirm-skip="true">
+      <input type="hidden" name="client_timezone_offset" value="" />
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="opened_at">Opened At</label>
+          <div class="control">
+            <input class="input" id="opened_at" name="opened_at" type="datetime-local" value="{{ form_data.get('opened_at', '') }}" required />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="reported_by">Reported By</label>
+          <div class="control">
+            <input class="input" id="reported_by" name="reported_by" value="{{ form_data.get('reported_by', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="status">Status</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="status" name="status" required>
+                {% for value in status_options %}
+                  <option value="{{ value }}" {% if form_data.get('status', '') == value %}selected{% endif %}>{{ value.replace('_', ' ').title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="repair_class">Repair Class</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="repair_class" name="repair_class">
+                <option value="">Select...</option>
+                {% for value in repair_class_options %}
+                  <option value="{{ value }}" {% if form_data.get('repair_class', '') == value %}selected{% endif %}>{{ value.title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <p class="help">Use <strong>functional</strong> when operation or certification is affected. Use <strong>cosmetic</strong> for appearance-only work.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="severity">Severity</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="severity" name="severity">
+                <option value="">Select...</option>
+                {% for value in severity_options %}
+                  <option value="{{ value }}" {% if form_data.get('severity', '') == value %}selected{% endif %}>{{ value.replace('_', ' ').title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <p class="help"><strong>Minor</strong> is monitor-only, <strong>service affecting</strong> needs attention soon, <strong>out of service</strong> should not run normally.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="source">Source</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="source" name="source">
+                <option value="">Select...</option>
+                {% for value in source_options %}
+                  <option value="{{ value }}" {% if form_data.get('source', '') == value %}selected{% endif %}>{{ value.replace('_', ' ').title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="discovered_location_id">Found At</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="discovered_location_id" name="discovered_location_id">
+                <option value="">Select...</option>
+                {% for location in locations %}
+                  <option value="{{ location.id }}" {% if form_data.get('discovered_location_id', '') == (location.id ~ '') %}selected{% endif %}>{{ location.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="defect_code">Defect Code</label>
+          <div class="control">
+            <input class="input" id="defect_code" name="defect_code" list="defect_code_options" value="{{ form_data.get('defect_code', '') }}" />
+            <datalist id="defect_code_options">
+              <option value="coupler-height"></option>
+              <option value="coupler-trip-pin"></option>
+              <option value="coupler-spring"></option>
+              <option value="wheel-gauge"></option>
+              <option value="wheelset-drag"></option>
+              <option value="truck-mount"></option>
+              <option value="truck-swing"></option>
+              <option value="brake-rigging"></option>
+              <option value="weight-nmra"></option>
+              <option value="clearance-load"></option>
+              <option value="decoder-programming"></option>
+              <option value="electrical-pickup"></option>
+              <option value="motor-drive"></option>
+              <option value="gear-noise"></option>
+              <option value="handrail-detail"></option>
+              <option value="paint-lettering"></option>
+            </datalist>
+          </div>
+          <p class="help">Short, reusable code for filtering and reports. Suggested values cover common model railroad failure types.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="bad_order_tag">Bad Order / Shop Tag</label>
+          <div class="control">
+            <input class="input" id="bad_order_tag" name="bad_order_tag" value="{{ form_data.get('bad_order_tag', '') }}" />
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="defect_summary">Defect Summary</label>
+          <div class="control">
+            <input class="input" id="defect_summary" name="defect_summary" value="{{ form_data.get('defect_summary', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="assigned_to">Assigned To</label>
+          <div class="control">
+            <input class="input" id="assigned_to" name="assigned_to" value="{{ form_data.get('assigned_to', '') }}" />
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="defect_details">Defect Details</label>
+        <div class="control">
+          <textarea class="textarea" id="defect_details" name="defect_details" rows="4">{{ form_data.get('defect_details', '') }}</textarea>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="safe_to_move">Safe To Move</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="safe_to_move" name="safe_to_move">
+                <option value="">Unknown</option>
+                <option value="yes" {% if form_data.get('safe_to_move', '') == 'yes' %}selected{% endif %}>Yes</option>
+                <option value="no" {% if form_data.get('safe_to_move', '') == 'no' %}selected{% endif %}>No</option>
+              </select>
+            </div>
+          </div>
+          <p class="help">Use this for whether the car can be moved to the shop or staging without normal service use.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="repair_destination">Repair Destination</label>
+          <div class="control">
+            <input class="input" id="repair_destination" name="repair_destination" value="{{ form_data.get('repair_destination', '') }}" />
+          </div>
+          <p class="help">Examples: home shop, engine terminal, workbench, club maintenance track.</p>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="movement_restrictions">Movement Restrictions</label>
+        <div class="control">
+          <textarea class="textarea" id="movement_restrictions" name="movement_restrictions" rows="3">{{ form_data.get('movement_restrictions', '') }}</textarea>
+        </div>
+        <div class="buttons" style="margin-top: 8px;">
+          <button type="button" class="button is-small is-light restriction-fill" data-value="Do not operate in train service. Shop movement only.">Shop only</button>
+          <button type="button" class="button is-small is-light restriction-fill" data-value="Do not couple in service until coupler is repaired and tested.">No coupling</button>
+          <button type="button" class="button is-small is-light restriction-fill" data-value="Do not run at public events until repair is completed and inspection passes.">No public event use</button>
+          <button type="button" class="button is-small is-light restriction-fill" data-value="Restricted to 2 mph on 7 1/4 in. gauge trackage until issue is corrected.">2 mph restriction</button>
+          <button type="button" class="button is-small is-light restriction-fill" data-value="Maximum restricted shop speed only. Avoid turnouts and rough track.">Restricted movement</button>
+          <button type="button" class="button is-small is-light restriction-fill" data-value="">Clear</button>
+        </div>
+        <p class="help">Use a quick-fill button for common restrictions, then edit the text if needed.</p>
+      </div>
+      <div class="field">
+        <label class="checkbox" for="requires_post_repair_inspection">
+          <input id="requires_post_repair_inspection" name="requires_post_repair_inspection" type="checkbox" {% if form_data.get('requires_post_repair_inspection', '') == 'on' or form_data.get('requires_post_repair_inspection', '') == 'true' or form_data.get('requires_post_repair_inspection', '') == '1' or (repair and repair.requires_post_repair_inspection and 'requires_post_repair_inspection' not in form_data) %}checked{% endif %} />
+          Requires post-repair inspection
+        </label>
+      </div>
+      <div class="field">
+        <label class="label" for="required_inspection_type_id">Required Inspection Type</label>
+        <div class="control">
+          <div class="select is-fullwidth">
+            <select id="required_inspection_type_id" name="required_inspection_type_id">
+              <option value="">Select...</option>
+              {% for row in inspection_types %}
+                <option value="{{ row.type.id }}" {% if form_data.get('required_inspection_type_id', '') == (row.type.id ~ '') %}selected{% endif %}>{{ row.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <p class="help">Choose the inspection that clears the car back into service after the repair is done.</p>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="work_started_at">Work Started</label>
+          <div class="control">
+            <input class="input" id="work_started_at" name="work_started_at" type="datetime-local" value="{{ form_data.get('work_started_at', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="completed_at">Completed At</label>
+          <div class="control">
+            <input class="input" id="completed_at" name="completed_at" type="datetime-local" value="{{ form_data.get('completed_at', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="repaired_by">Repaired By</label>
+          <div class="control">
+            <input class="input" id="repaired_by" name="repaired_by" value="{{ form_data.get('repaired_by', '') }}" />
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="corrective_action">Corrective Action</label>
+        <div class="control">
+          <textarea class="textarea" id="corrective_action" name="corrective_action" rows="4">{{ form_data.get('corrective_action', '') }}</textarea>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="parts_used">Parts Used</label>
+        <div class="control">
+          <textarea class="textarea" id="parts_used" name="parts_used" rows="3">{{ form_data.get('parts_used', '') }}</textarea>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="cleared_for_service_at">Cleared For Service</label>
+          <div class="control">
+            <input class="input" id="cleared_for_service_at" name="cleared_for_service_at" type="datetime-local" value="{{ form_data.get('cleared_for_service_at', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="cleared_by">Cleared By</label>
+          <div class="control">
+            <input class="input" id="cleared_by" name="cleared_by" value="{{ form_data.get('cleared_by', '') }}" />
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="label" for="closeout_notes">Closeout Notes</label>
+        <div class="control">
+          <textarea class="textarea" id="closeout_notes" name="closeout_notes" rows="3">{{ form_data.get('closeout_notes', '') }}</textarea>
+        </div>
+      </div>
+      {% if repair %}
+        <div class="field">
+          <label class="label" for="event_performed_by">Timeline Entry By</label>
+          <div class="control">
+            <input class="input" id="event_performed_by" name="event_performed_by" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="event_notes">Update Note</label>
+          <div class="control">
+            <textarea class="textarea" id="event_notes" name="event_notes" rows="3"></textarea>
+          </div>
+        </div>
+      {% endif %}
+      <div class="actions buttons">
+        <button type="submit" class="button is-small is-primary">Save Repair</button>
+        <a class="button is-small is-light" href="{{ url_for('main.car_detail', car_id=car.id) }}">Cancel</a>
+      </div>
+    </form>
+    {% if repair and repair.events %}
+      <hr />
+      <h2 class="title is-5">Timeline</h2>
+      <table class="table is-fullwidth is-striped">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Event</th>
+            <th>By</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in repair.events %}
+          <tr>
+            <td>{{ format_display_datetime(event.event_at) }}</td>
+            <td>{{ event.event_type.replace('_', ' ').title() if event.event_type else '-' }}</td>
+            <td>{{ event.performed_by or '-' }}</td>
+            <td>{{ event.notes or '-' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </div>
+  <script>
+    const restrictionField = document.getElementById('movement_restrictions');
+    document.querySelectorAll('.restriction-fill').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (!restrictionField) return;
+        restrictionField.value = button.dataset.value || '';
+        restrictionField.focus();
+      });
+    });
+  </script>
+{% endblock %}

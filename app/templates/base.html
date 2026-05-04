@@ -409,6 +409,9 @@
       input.value = csrfToken;
       form.appendChild(input);
     });
+    document.querySelectorAll('input[name="client_timezone_offset"]').forEach((input) => {
+      input.value = String(new Date().getTimezoneOffset());
+    });
     const confirmModal = document.getElementById('mi-confirm-modal');
     const confirmSummary = document.getElementById('mi-confirm-summary');
     const confirmToggle = document.getElementById('mi-confirm-toggle');
@@ -426,6 +429,8 @@
       cars: 'car',
       loads: 'load',
       load_placements: 'load_placement',
+      car_repairs: 'car_repair',
+      car_repair_events: 'car_repair_event',
       railroad_color_schemes: 'railroad_color_scheme',
       railroad_logos: 'railroad_logo',
       railroad_slogans: 'railroad_slogan',

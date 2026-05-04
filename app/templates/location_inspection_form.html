@@ -7,11 +7,12 @@ Inspect Location: {{ location.name }}
     <h1 class="title is-3">Inspect Location {{ location.name }}</h1>
     <p class="keyboard-hint">Apply a single inspection to {{ cars_count }} car{{ "" if cars_count == 1 else "s" }} in this location.</p>
     <form method="post" action="{{ url_for('main.location_inspect', location_id=location.id) }}" data-confirm-skip="true">
+      <input type="hidden" name="client_timezone_offset" value="" />
       <div class="grid">
         <div class="field">
           <label class="label" for="inspection_date">Inspection Date</label>
           <div class="control">
-            <input class="input" id="inspection_date" name="inspection_date" type="date" required />
+            <input class="input" id="inspection_date" name="inspection_date" type="datetime-local" required />
           </div>
         </div>
         <div class="field">

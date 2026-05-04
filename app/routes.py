@@ -16,7 +16,7 @@ import sys
 import threading
 import time
 from collections import defaultdict, deque
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Optional
 from urllib.parse import urlsplit
 
@@ -78,6 +78,8 @@ from app.models import (
     AppSettings,
     Car,
     CarInspection,
+    CarRepair,
+    CarRepairEvent,
     CarClass,
     Consist,
     InspectionType,
@@ -114,6 +116,12 @@ PASSWORD_AUTH_THROTTLE_LOCK = threading.Lock()
 
 PAGINATION_OPTIONS = ["25", "50", "100", "250", "all"]
 DEFAULT_PAGE_SIZE = "50"
+REPAIR_STATUS_OPTIONS = ["open", "bad_order", "in_shop", "repaired", "returned_to_service", "closed"]
+REPAIR_CLASS_OPTIONS = ["functional", "cosmetic"]
+REPAIR_SEVERITY_OPTIONS = ["minor", "service_affecting", "out_of_service"]
+REPAIR_SOURCE_OPTIONS = ["inspection", "operator_report", "layout_observation", "shop", "other"]
+INSPECTION_SCOPE_OPTIONS = ["routine", "pre_service", "post_repair", "incident_followup", "weight_check"]
+INSPECTION_RESULT_OPTIONS = ["passed", "failed", "restricted", "advisory"]
 DEFAULT_SCALE_OPTIONS = [
     "G|1:22.5",
     "F|1:20.3",
@@ -275,6 +283,8 @@ SCOPE_PREFIXES = [
 ]
 WRITE_ONLY_GET_PATTERNS = (
     re.compile(r"^/cars/\d+/(edit|inspect)$"),
+    re.compile(r"^/cars/\d+/repairs/new$"),
+    re.compile(r"^/repairs/\d+/edit$"),
     re.compile(r"^/locations/\d+/(edit|inspect)$"),
     re.compile(r"^/consists/\d+/edit$"),
     re.compile(r"^/loads/\d+/edit$"),
@@ -316,6 +326,49 @@ def parse_iso_datetime(value: str | None) -> datetime | None:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
+
+
+def normalize_datetime_local_input(value: str | None, timezone_offset_minutes: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    if parsed.tzinfo is not None:
+        return parsed.replace(microsecond=0).isoformat()
+    try:
+        offset_minutes = int((timezone_offset_minutes or "").strip())
+    except (TypeError, ValueError):
+        return parsed.replace(microsecond=0).isoformat()
+    tz = timezone(-timedelta(minutes=offset_minutes))
+    return parsed.replace(tzinfo=tz, microsecond=0).isoformat()
+
+
+def datetime_local_value(value: str | None) -> str:
+    if not value:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    return parsed.replace(tzinfo=None).strftime("%Y-%m-%dT%H:%M")
+
+
+def format_display_datetime(value: str | None) -> str:
+    if not value:
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    formatted = parsed.strftime("%Y-%m-%d %H:%M")
+    if parsed.tzinfo is None:
+        return formatted
+    offset = parsed.strftime("%z")
+    if len(offset) == 5:
+        offset = f"{offset[:3]}:{offset[3:]}"
+    return f"{formatted} {offset}"
 
 
 def clear_session_and_auth_state() -> None:
@@ -927,6 +980,7 @@ def inject_auth_helpers() -> dict[str, object]:
         "user_first_name": get_user_first_name,
         "user_has_verified_mfa": user_has_verified_mfa,
         "gravatar_url": get_gravatar_url,
+        "format_display_datetime": format_display_datetime,
     }
 
 
@@ -2431,6 +2485,87 @@ def inspection_type_tree(types: list[InspectionType], excluded_id: int | None = 
     return results
 
 
+def get_repair_status_label(status: str | None) -> str:
+    if not status:
+        return "-"
+    return status.replace("_", " ").title()
+
+
+def get_inspection_result_label(result: str | None, passed: bool | None = None) -> str:
+    if result:
+        return result.replace("_", " ").title()
+    if passed is True:
+        return "Passed"
+    if passed is False:
+        return "Failed"
+    return "-"
+
+
+def get_repair_open_states() -> set[str]:
+    return {"open", "bad_order", "in_shop", "repaired"}
+
+
+def get_open_repairs_for_car(car_id: int | None, exclude_id: int | None = None) -> list[CarRepair]:
+    if not car_id:
+        return []
+    repairs = CarRepair.query.filter_by(car_id=car_id).order_by("opened_at", reverse=True).all()
+    return [
+        repair
+        for repair in repairs
+        if repair.id != exclude_id and repair.status in get_repair_open_states()
+    ]
+
+
+def summarize_open_repairs(car_id: int | None) -> str | None:
+    repairs = get_open_repairs_for_car(car_id)
+    if not repairs:
+        return None
+    summaries = []
+    for repair in repairs:
+        summary = (repair.defect_summary or repair.defect_details or "").strip()
+        if not summary:
+            summary = f"Repair {repair.id}"
+        summaries.append(f"{get_repair_status_label(repair.status)}: {summary}")
+    return "\n".join(summaries)
+
+
+def sync_car_repair_summary(car_id: int | None) -> None:
+    if not car_id:
+        return
+    car = Car.query.get(car_id)
+    if not car:
+        return
+    car.repairs_required = summarize_open_repairs(car_id)
+
+
+def add_repair_event(
+    repair: CarRepair,
+    event_type: str,
+    performed_by: str | None = None,
+    notes: str | None = None,
+    event_at: str | None = None,
+) -> None:
+    db.session.add(
+        CarRepairEvent(
+            repair_id=repair.id,
+            event_type=event_type,
+            event_at=event_at or utcnow().replace(microsecond=0).isoformat(),
+            performed_by=(performed_by or "").strip() or None,
+            notes=(notes or "").strip() or None,
+        )
+    )
+
+
+def inspection_sort_key(inspection: CarInspection) -> tuple[bool, str]:
+    parsed = parse_iso_datetime(inspection.inspection_date)
+    return (inspection.inspection_date is None, parsed.isoformat() if parsed else (inspection.inspection_date or ""))
+
+
+def repair_sort_key(repair: CarRepair) -> tuple[bool, str]:
+    parsed = parse_iso_datetime(repair.opened_at)
+    return (repair.opened_at is None, parsed.isoformat() if parsed else (repair.opened_at or ""))
+
+
 @main_bp.route("/reports/inspections")
 def inspections_report():
     inspection_types = InspectionType.query.all()
@@ -2438,13 +2573,10 @@ def inspections_report():
     selected_type_id = request.args.get("inspection_type_id", "").strip()
     selected_result = request.args.get("result", "").strip()
     inspections: list[CarInspection] = []
-    if selected_type_id.isdigit() and selected_result in {"passed", "failed"}:
+    if selected_type_id.isdigit() and selected_result in INSPECTION_RESULT_OPTIONS:
         type_id = int(selected_type_id)
         all_inspections = CarInspection.query.filter_by(inspection_type_id=type_id).all()
-        all_inspections.sort(
-            key=lambda inspection: (inspection.inspection_date is None, inspection.inspection_date or ""),
-            reverse=True,
-        )
+        all_inspections.sort(key=inspection_sort_key, reverse=True)
         latest_by_car: dict[int, CarInspection] = {}
         for inspection in all_inspections:
             if inspection.car_id is None:
@@ -2452,22 +2584,22 @@ def inspections_report():
             if inspection.car_id in latest_by_car:
                 continue
             latest_by_car[inspection.car_id] = inspection
-        passed_flag = selected_result == "passed"
         inspections = [
             inspection
             for inspection in latest_by_car.values()
-            if inspection.passed is not None and inspection.passed == passed_flag
+            if (inspection.result or ("passed" if inspection.passed else "failed" if inspection.passed is False else None))
+            == selected_result
         ]
-        inspections.sort(
-            key=lambda inspection: (inspection.inspection_date is None, inspection.inspection_date or ""),
-            reverse=True,
-        )
+        inspections.sort(key=inspection_sort_key, reverse=True)
     return render_template(
         "inspection_report.html",
         inspection_types=type_rows,
         selected_type_id=selected_type_id,
         selected_result=selected_result,
         inspections=inspections,
+        inspection_result_options=INSPECTION_RESULT_OPTIONS,
+        get_inspection_result_label=get_inspection_result_label,
+        get_repair_status_label=get_repair_status_label,
     )
 
 
@@ -2479,10 +2611,7 @@ def update_last_inspection_date(car_id: int | None) -> None:
         return
     inspections = CarInspection.query.filter_by(car_id=car.id).all()
     if inspections:
-        inspections.sort(
-            key=lambda inspection: (inspection.inspection_date is None, inspection.inspection_date or ""),
-            reverse=True,
-        )
+        inspections.sort(key=inspection_sort_key, reverse=True)
         car.last_inspection_date = inspections[0].inspection_date
     else:
         car.last_inspection_date = None
@@ -2492,13 +2621,269 @@ def update_last_inspection_date(car_id: int | None) -> None:
 def inspection_delete(inspection_id: int):
     inspection = CarInspection.query.get_or_404(inspection_id)
     car_id = inspection.car_id
+    if inspection.opens_repair_id:
+        repair = CarRepair.query.get(inspection.opens_repair_id)
+        if repair and repair.linked_opening_inspection_id == inspection.id:
+            repair.linked_opening_inspection_id = None
+    if inspection.closes_repair_id:
+        repair = CarRepair.query.get(inspection.closes_repair_id)
+        if repair and repair.linked_closing_inspection_id == inspection.id:
+            repair.linked_closing_inspection_id = None
     db.session.delete(inspection)
     update_last_inspection_date(car_id)
+    sync_car_repair_summary(car_id)
     db.session.commit()
     ensure_db_backup()
     next_url = request.form.get("next", "").strip()
     if next_url.startswith("/"):
         return redirect(next_url)
+    if car_id:
+        return redirect(url_for("main.car_detail", car_id=car_id))
+    return redirect(url_for("main.reports"))
+
+
+def build_repair_form_context(
+    car: Car,
+    repair: CarRepair | None,
+    form_data: dict[str, str] | None = None,
+    error_message: str | None = None,
+) -> dict[str, object]:
+    data = form_data or {}
+    open_repairs = get_open_repairs_for_car(car.id, exclude_id=repair.id if repair else None)
+    return {
+        "car": car,
+        "repair": repair,
+        "form_data": data,
+        "locations": Location.query.order_by("name").all(),
+        "inspection_types": inspection_type_tree(InspectionType.query.all()),
+        "status_options": REPAIR_STATUS_OPTIONS,
+        "repair_class_options": REPAIR_CLASS_OPTIONS,
+        "severity_options": REPAIR_SEVERITY_OPTIONS,
+        "source_options": REPAIR_SOURCE_OPTIONS,
+        "open_repairs": open_repairs,
+        "error_message": error_message,
+    }
+
+
+def build_inspection_form_context(
+    car: Car,
+    form_data: dict[str, str] | None = None,
+    error_message: str | None = None,
+) -> dict[str, object]:
+    return {
+        "car": car,
+        "inspection_types": inspection_type_tree(InspectionType.query.all()),
+        "locations": Location.query.order_by("name").all(),
+        "open_repairs": get_open_repairs_for_car(car.id),
+        "inspection_scope_options": INSPECTION_SCOPE_OPTIONS,
+        "inspection_result_options": INSPECTION_RESULT_OPTIONS,
+        "form_data": form_data or {},
+        "error_message": error_message,
+    }
+
+
+def apply_repair_form(repair: CarRepair, form) -> str | None:
+    status = form.get("status", "").strip() or "open"
+    timezone_offset = form.get("client_timezone_offset", "").strip()
+    repair_class = form.get("repair_class", "").strip()
+    severity = form.get("severity", "").strip()
+    source = form.get("source", "").strip()
+    required_inspection_type_id = form.get("required_inspection_type_id", "").strip()
+    discovered_location_id = form.get("discovered_location_id", "").strip()
+    if status not in REPAIR_STATUS_OPTIONS:
+        return "Repair status is required."
+    if repair_class and repair_class not in REPAIR_CLASS_OPTIONS:
+        return "Repair class is invalid."
+    if severity and severity not in REPAIR_SEVERITY_OPTIONS:
+        return "Repair severity is invalid."
+    if source and source not in REPAIR_SOURCE_OPTIONS:
+        return "Repair source is invalid."
+    repair.status = status
+    repair.repair_class = repair_class or None
+    repair.severity = severity or None
+    repair.opened_at = normalize_datetime_local_input(form.get("opened_at", "").strip(), timezone_offset)
+    repair.reported_by = form.get("reported_by", "").strip() or None
+    repair.source = source or None
+    repair.discovered_location_id = int(discovered_location_id) if discovered_location_id.isdigit() else None
+    repair.defect_summary = form.get("defect_summary", "").strip() or None
+    repair.defect_details = form.get("defect_details", "").strip() or None
+    repair.defect_code = form.get("defect_code", "").strip() or None
+    safe_to_move_value = form.get("safe_to_move", "").strip()
+    if safe_to_move_value == "yes":
+        repair.safe_to_move = True
+    elif safe_to_move_value == "no":
+        repair.safe_to_move = False
+    else:
+        repair.safe_to_move = None
+    repair.movement_restrictions = form.get("movement_restrictions", "").strip() or None
+    repair.repair_destination = form.get("repair_destination", "").strip() or None
+    repair.bad_order_tag = form.get("bad_order_tag", "").strip() or None
+    repair.requires_post_repair_inspection = form.get("requires_post_repair_inspection") == "on"
+    repair.required_inspection_type_id = int(required_inspection_type_id) if required_inspection_type_id.isdigit() else None
+    repair.assigned_to = form.get("assigned_to", "").strip() or None
+    repair.work_started_at = normalize_datetime_local_input(form.get("work_started_at", "").strip(), timezone_offset)
+    repair.completed_at = normalize_datetime_local_input(form.get("completed_at", "").strip(), timezone_offset)
+    repair.repaired_by = form.get("repaired_by", "").strip() or None
+    repair.corrective_action = form.get("corrective_action", "").strip() or None
+    repair.parts_used = form.get("parts_used", "").strip() or None
+    repair.cleared_for_service_at = normalize_datetime_local_input(
+        form.get("cleared_for_service_at", "").strip(),
+        timezone_offset,
+    )
+    repair.cleared_by = form.get("cleared_by", "").strip() or None
+    repair.closeout_notes = form.get("closeout_notes", "").strip() or None
+    if repair.requires_post_repair_inspection and not repair.required_inspection_type_id:
+        return "Select the required inspection type when post-repair inspection is required."
+    if not repair.defect_summary and not repair.defect_details:
+        return "Enter a defect summary or defect details."
+    return None
+
+
+@main_bp.route("/cars/<int:car_id>/repairs/new", methods=["GET", "POST"])
+def car_repair_new(car_id: int):
+    car = Car.query.get_or_404(car_id)
+    if request.method == "POST":
+        repair = CarRepair(car_id=car.id)
+        error = apply_repair_form(repair, request.form)
+        if error:
+            return render_template(
+                "car_repair_form.html",
+                **build_repair_form_context(car, None, request.form.to_dict(), error),
+            ), 400
+        db.session.add(repair)
+        db.session.commit()
+        add_repair_event(
+            repair,
+            "reported",
+            performed_by=repair.reported_by,
+            notes=repair.defect_summary or repair.defect_details,
+            event_at=repair.opened_at,
+        )
+        sync_car_repair_summary(car.id)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.car_detail", car_id=car.id))
+    defaults = {
+        "status": "open",
+        "opened_at": datetime.now().strftime("%Y-%m-%dT%H:%M"),
+    }
+    return render_template("car_repair_form.html", **build_repair_form_context(car, None, defaults))
+
+
+@main_bp.route("/repairs/<int:repair_id>/edit", methods=["GET", "POST"])
+def car_repair_edit(repair_id: int):
+    repair = CarRepair.query.get_or_404(repair_id)
+    car = repair.car
+    if not car:
+        abort(404)
+    previous_status = repair.status
+    tracked_fields = {
+        "opened_at": repair.opened_at,
+        "work_started_at": repair.work_started_at,
+        "completed_at": repair.completed_at,
+        "cleared_for_service_at": repair.cleared_for_service_at,
+        "assigned_to": repair.assigned_to,
+        "corrective_action": repair.corrective_action,
+        "parts_used": repair.parts_used,
+        "closeout_notes": repair.closeout_notes,
+        "defect_summary": repair.defect_summary,
+        "defect_details": repair.defect_details,
+    }
+    if request.method == "POST":
+        error = apply_repair_form(repair, request.form)
+        if error:
+            return render_template(
+                "car_repair_form.html",
+                **build_repair_form_context(car, repair, request.form.to_dict(), error),
+            ), 400
+        event_note = request.form.get("event_notes", "").strip()
+        event_actor = request.form.get("event_performed_by", "").strip() or repair.repaired_by or repair.reported_by
+        event_type = "status_changed" if repair.status != previous_status else "work_performed"
+        if repair.status in {"repaired", "returned_to_service", "closed"} and repair.completed_at:
+            event_type = "work_performed"
+        if repair.status == "returned_to_service" and repair.cleared_for_service_at:
+            event_type = "returned_to_service"
+        changed_labels = []
+        field_labels = {
+            "opened_at": "opened at",
+            "work_started_at": "work started",
+            "completed_at": "completed at",
+            "cleared_for_service_at": "cleared for service",
+            "assigned_to": "assigned to",
+            "corrective_action": "corrective action",
+            "parts_used": "parts used",
+            "closeout_notes": "closeout notes",
+            "defect_summary": "defect summary",
+            "defect_details": "defect details",
+        }
+        for key, before_value in tracked_fields.items():
+            if getattr(repair, key) != before_value:
+                changed_labels.append(field_labels[key])
+        db.session.commit()
+        if event_note or repair.status != previous_status or changed_labels:
+            add_repair_event(
+                repair,
+                event_type,
+                performed_by=event_actor,
+                notes=event_note
+                or (
+                    f"Status updated to {get_repair_status_label(repair.status)}."
+                    if repair.status != previous_status
+                    else f"Updated {', '.join(changed_labels)}."
+                ),
+                event_at=repair.cleared_for_service_at or repair.completed_at or repair.work_started_at or None,
+            )
+        sync_car_repair_summary(car.id)
+        db.session.commit()
+        ensure_db_backup()
+        return redirect(url_for("main.car_detail", car_id=car.id))
+    defaults = {
+        "status": repair.status or "",
+        "repair_class": repair.repair_class or "",
+        "severity": repair.severity or "",
+        "opened_at": datetime_local_value(repair.opened_at),
+        "reported_by": repair.reported_by or "",
+        "source": repair.source or "",
+        "discovered_location_id": str(repair.discovered_location_id or ""),
+        "defect_summary": repair.defect_summary or "",
+        "defect_details": repair.defect_details or "",
+        "defect_code": repair.defect_code or "",
+        "safe_to_move": "yes" if repair.safe_to_move is True else "no" if repair.safe_to_move is False else "",
+        "movement_restrictions": repair.movement_restrictions or "",
+        "repair_destination": repair.repair_destination or "",
+        "bad_order_tag": repair.bad_order_tag or "",
+        "required_inspection_type_id": str(repair.required_inspection_type_id or ""),
+        "assigned_to": repair.assigned_to or "",
+        "work_started_at": datetime_local_value(repair.work_started_at),
+        "completed_at": datetime_local_value(repair.completed_at),
+        "repaired_by": repair.repaired_by or "",
+        "corrective_action": repair.corrective_action or "",
+        "parts_used": repair.parts_used or "",
+        "cleared_for_service_at": datetime_local_value(repair.cleared_for_service_at),
+        "cleared_by": repair.cleared_by or "",
+        "closeout_notes": repair.closeout_notes or "",
+    }
+    return render_template("car_repair_form.html", **build_repair_form_context(car, repair, defaults))
+
+
+@main_bp.route("/repairs/<int:repair_id>/delete", methods=["POST"])
+def car_repair_delete(repair_id: int):
+    repair = CarRepair.query.get_or_404(repair_id)
+    car_id = repair.car_id
+    if repair.linked_opening_inspection_id:
+        inspection = CarInspection.query.get(repair.linked_opening_inspection_id)
+        if inspection:
+            inspection.opens_repair_id = None
+    if repair.linked_closing_inspection_id:
+        inspection = CarInspection.query.get(repair.linked_closing_inspection_id)
+        if inspection:
+            inspection.closes_repair_id = None
+    for event in CarRepairEvent.query.filter_by(repair_id=repair.id).all():
+        db.session.delete(event)
+    db.session.delete(repair)
+    sync_car_repair_summary(car_id)
+    db.session.commit()
+    ensure_db_backup()
     if car_id:
         return redirect(url_for("main.car_detail", car_id=car_id))
     return redirect(url_for("main.reports"))
@@ -2994,12 +3379,19 @@ def missing_worth_report():
 
 @main_bp.route("/reports/repairs")
 def repairs_report():
-    cars = Car.query.order_by("id").all()
-    repairs = []
-    for car in cars:
-        if car.repairs_required and car.repairs_required.strip():
-            repairs.append(car)
-    return render_template("repairs_report.html", cars=repairs, total=len(repairs))
+    repairs = CarRepair.query.order_by("opened_at", reverse=True).all()
+    open_repairs = [repair for repair in repairs if repair.status in get_repair_open_states()]
+    fallback_cars = []
+    for car in Car.query.order_by("id").all():
+        if car.repairs_required and car.repairs_required.strip() and not get_open_repairs_for_car(car.id):
+            fallback_cars.append(car)
+    return render_template(
+        "repairs_report.html",
+        repairs=open_repairs,
+        fallback_cars=fallback_cars,
+        total=len(open_repairs),
+        get_repair_status_label=get_repair_status_label,
+    )
 
 
 @main_bp.route("/reports/weight")
@@ -5872,7 +6264,11 @@ def location_inspect(location_id: int):
     inspection_types = InspectionType.query.all()
     type_rows = inspection_type_tree(inspection_types)
     if request.method == "POST":
-        inspection_date = request.form.get("inspection_date", "").strip()
+        timezone_offset = request.form.get("client_timezone_offset", "").strip()
+        inspection_date = normalize_datetime_local_input(
+            request.form.get("inspection_date", "").strip(),
+            timezone_offset,
+        )
         inspection_details = request.form.get("inspection_details", "").strip()
         inspection_type_id = request.form.get("inspection_type_id", "").strip()
         inspection_passed = request.form.get("inspection_passed", "").strip()
@@ -6087,43 +6483,141 @@ def car_detail(car_id: int):
         scale_label=format_scale_label(car.scale),
         gauge_label=format_gauge_label(car.gauge),
         linear_density=calculate_linear_density(car),
+        open_repairs=[repair for repair in car.repairs if repair.status in get_repair_open_states()],
+        repair_history=[repair for repair in car.repairs if repair.status not in get_repair_open_states()],
+        get_repair_status_label=get_repair_status_label,
+        get_inspection_result_label=get_inspection_result_label,
     )
 
 
 @main_bp.route("/cars/<int:car_id>/inspect", methods=["GET", "POST"])
 def car_inspect(car_id: int):
     car = Car.query.get_or_404(car_id)
-    inspection_types = InspectionType.query.all()
-    type_rows = inspection_type_tree(inspection_types)
     if request.method == "POST":
-        inspection_date = request.form.get("inspection_date", "").strip()
+        timezone_offset = request.form.get("client_timezone_offset", "").strip()
+        inspection_date = normalize_datetime_local_input(
+            request.form.get("inspection_date", "").strip(),
+            timezone_offset,
+        )
         inspection_details = request.form.get("inspection_details", "").strip()
         inspection_type_id = request.form.get("inspection_type_id", "").strip()
-        inspection_passed = request.form.get("inspection_passed", "").strip()
+        inspection_result = request.form.get("inspection_result", "").strip()
+        performed_by = request.form.get("performed_by", "").strip()
+        location_id = request.form.get("location_id", "").strip()
+        inspection_scope = request.form.get("inspection_scope", "").strip()
+        service_restrictions = request.form.get("service_restrictions", "").strip()
+        next_inspection_due = request.form.get("next_inspection_due", "").strip()
+        closes_repair_id = request.form.get("closes_repair_id", "").strip()
+        open_new_repair = request.form.get("open_new_repair") == "on"
         if not inspection_date:
-            return "Inspection date is required.", 400
+            return render_template(
+                "car_inspection_form.html",
+                **build_inspection_form_context(car, request.form.to_dict(), "Inspection date is required."),
+            ), 400
         if not inspection_type_id.isdigit():
-            return "Inspection type is required.", 400
-        if inspection_passed not in {"passed", "failed"}:
-            return "Inspection result is required.", 400
+            return render_template(
+                "car_inspection_form.html",
+                **build_inspection_form_context(car, request.form.to_dict(), "Inspection type is required."),
+            ), 400
+        if inspection_result not in INSPECTION_RESULT_OPTIONS:
+            return render_template(
+                "car_inspection_form.html",
+                **build_inspection_form_context(car, request.form.to_dict(), "Inspection result is required."),
+            ), 400
+        if inspection_scope and inspection_scope not in INSPECTION_SCOPE_OPTIONS:
+            return render_template(
+                "car_inspection_form.html",
+                **build_inspection_form_context(car, request.form.to_dict(), "Inspection scope is invalid."),
+            ), 400
+        if open_new_repair and closes_repair_id.isdigit():
+            return render_template(
+                "car_inspection_form.html",
+                **build_inspection_form_context(
+                    car,
+                    request.form.to_dict(),
+                    "Choose either opening a new repair or clearing an existing repair, not both.",
+                ),
+            ), 400
         inspection = CarInspection(
             car_id=car.id,
             inspection_date=inspection_date,
             details=inspection_details or None,
             inspection_type_id=int(inspection_type_id),
-            passed=inspection_passed == "passed",
+            performed_by=performed_by or None,
+            location_id=int(location_id) if location_id.isdigit() else None,
+            inspection_scope=inspection_scope or None,
+            result=inspection_result,
+            service_restrictions=service_restrictions or None,
+            next_inspection_due=next_inspection_due or None,
+            passed=inspection_result == "passed" if inspection_result in {"passed", "failed"} else None,
         )
         db.session.add(inspection)
         car.last_inspection_date = inspection_date
         db.session.commit()
+        if open_new_repair:
+            repair = CarRepair(
+                car_id=car.id,
+                status="bad_order" if inspection_result == "restricted" else "open",
+                repair_class="functional",
+                severity="out_of_service" if inspection_result == "restricted" else "service_affecting",
+                opened_at=inspection_date,
+                reported_by=performed_by or None,
+                source="inspection",
+                discovered_location_id=inspection.location_id,
+                defect_summary=inspection_details or (inspection.inspection_type.name if inspection.inspection_type else "Inspection finding"),
+                defect_details=inspection_details or None,
+                safe_to_move=False if inspection_result == "restricted" else None,
+                movement_restrictions=service_restrictions or None,
+                linked_opening_inspection_id=inspection.id,
+            )
+            db.session.add(repair)
+            db.session.commit()
+            inspection.opens_repair_id = repair.id
+            add_repair_event(
+                repair,
+                "reported",
+                performed_by=performed_by,
+                notes=inspection.details or f"Opened from {inspection.inspection_type.name if inspection.inspection_type else 'inspection'}.",
+                event_at=inspection_date,
+            )
+        elif closes_repair_id.isdigit():
+            repair = CarRepair.query.get(int(closes_repair_id))
+            if repair and repair.car_id == car.id:
+                inspection.closes_repair_id = repair.id
+                repair.linked_closing_inspection_id = inspection.id
+                if inspection_result == "passed":
+                    repair.cleared_for_service_at = repair.cleared_for_service_at or inspection_date
+                    repair.cleared_by = repair.cleared_by or performed_by or None
+                    repair.status = "returned_to_service"
+                elif inspection_result in {"failed", "restricted"}:
+                    repair.status = "in_shop"
+                add_repair_event(
+                    repair,
+                    "inspection_recorded",
+                    performed_by=performed_by,
+                    notes=inspection.details or f"Inspection result: {get_inspection_result_label(inspection_result)}.",
+                    event_at=inspection_date,
+                )
+        sync_car_repair_summary(car.id)
+        db.session.commit()
         ensure_db_backup()
         return redirect(url_for("main.car_detail", car_id=car.id))
-    return render_template("car_inspection_form.html", car=car, inspection_types=type_rows)
+    defaults = {
+        "inspection_date": datetime.now().strftime("%Y-%m-%dT%H:%M"),
+        "location_id": str(car.location.id) if car.location else "",
+    }
+    return render_template("car_inspection_form.html", **build_inspection_form_context(car, defaults))
 
 
 @main_bp.route("/cars/<int:car_id>/delete", methods=["POST"])
 def car_delete(car_id: int):
     car = Car.query.get_or_404(car_id)
+    for inspection in CarInspection.query.filter_by(car_id=car.id).all():
+        db.session.delete(inspection)
+    for repair in CarRepair.query.filter_by(car_id=car.id).all():
+        for event in CarRepairEvent.query.filter_by(repair_id=repair.id).all():
+            db.session.delete(event)
+        db.session.delete(repair)
     db.session.delete(car)
     db.session.commit()
     ensure_db_backup()

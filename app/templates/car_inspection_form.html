@@ -5,13 +5,19 @@ Inspect Car {{ car.id }}
 {% block content %}
   <div class="box">
     <h1 class="title is-3">Inspect Car {{ car.id }}</h1>
-    <p class="keyboard-hint">Record a new inspection and update the last inspection date.</p>
+    <p class="keyboard-hint">Record a new inspection, optionally open a repair, or clear an existing repair.</p>
+    {% if error_message %}
+      <article class="message is-danger">
+        <div class="message-body">{{ error_message }}</div>
+      </article>
+    {% endif %}
     <form method="post" action="{{ url_for('main.car_inspect', car_id=car.id) }}" data-confirm-skip="true">
+      <input type="hidden" name="client_timezone_offset" value="" />
       <div class="grid">
         <div class="field">
           <label class="label" for="inspection_date">Inspection Date</label>
           <div class="control">
-            <input class="input" id="inspection_date" name="inspection_date" type="date" required />
+            <input class="input" id="inspection_date" name="inspection_date" type="datetime-local" value="{{ form_data.get('inspection_date', '') }}" required />
           </div>
         </div>
         <div class="field">
@@ -21,20 +27,55 @@ Inspect Car {{ car.id }}
               <select id="inspection_type_id" name="inspection_type_id" required {% if not inspection_types %}disabled{% endif %}>
                 <option value="">Select...</option>
                 {% for row in inspection_types %}
-                  <option value="{{ row.type.id }}">{{ row.label }}</option>
+                  <option value="{{ row.type.id }}" {% if form_data.get('inspection_type_id', '') == (row.type.id ~ '') %}selected{% endif %}>{{ row.label }}</option>
                 {% endfor %}
               </select>
             </div>
           </div>
         </div>
         <div class="field">
-          <label class="label" for="inspection_passed">Result</label>
+          <label class="label" for="inspection_result">Result</label>
           <div class="control">
             <div class="select is-fullwidth">
-              <select id="inspection_passed" name="inspection_passed" required {% if not inspection_types %}disabled{% endif %}>
+              <select id="inspection_result" name="inspection_result" required {% if not inspection_types %}disabled{% endif %}>
                 <option value="">Select...</option>
-                <option value="passed">Passed</option>
-                <option value="failed">Failed</option>
+                {% for result in inspection_result_options %}
+                  <option value="{{ result }}" {% if form_data.get('inspection_result', '') == result %}selected{% endif %}>{{ result.replace('_', ' ').title() }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="performed_by">Inspector</label>
+          <div class="control">
+            <input class="input" id="performed_by" name="performed_by" value="{{ form_data.get('performed_by', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="location_id">Location</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="location_id" name="location_id">
+                <option value="">Select...</option>
+                {% for location in locations %}
+                  <option value="{{ location.id }}" {% if form_data.get('location_id', '') == (location.id ~ '') %}selected{% endif %}>{{ location.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="inspection_scope">Scope</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="inspection_scope" name="inspection_scope">
+                <option value="">Select...</option>
+                {% for scope in inspection_scope_options %}
+                  <option value="{{ scope }}" {% if form_data.get('inspection_scope', '') == scope %}selected{% endif %}>{{ scope.replace('_', ' ').title() }}</option>
+                {% endfor %}
               </select>
             </div>
           </div>
@@ -44,9 +85,42 @@ Inspect Car {{ car.id }}
         <div class="field">
           <label class="label" for="inspection_details">Comments</label>
           <div class="control">
-            <textarea class="textarea" id="inspection_details" name="inspection_details" rows="4"></textarea>
+            <textarea class="textarea" id="inspection_details" name="inspection_details" rows="4">{{ form_data.get('inspection_details', '') }}</textarea>
           </div>
         </div>
+        <div class="field">
+          <label class="label" for="service_restrictions">Restrictions</label>
+          <div class="control">
+            <textarea class="textarea" id="service_restrictions" name="service_restrictions" rows="4">{{ form_data.get('service_restrictions', '') }}</textarea>
+          </div>
+        </div>
+      </div>
+      <div class="grid">
+        <div class="field">
+          <label class="label" for="next_inspection_due">Next Inspection Due</label>
+          <div class="control">
+            <input class="input" id="next_inspection_due" name="next_inspection_due" type="date" value="{{ form_data.get('next_inspection_due', '') }}" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="closes_repair_id">Clear Existing Repair</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="closes_repair_id" name="closes_repair_id">
+                <option value="">None</option>
+                {% for repair in open_repairs %}
+                  <option value="{{ repair.id }}" {% if form_data.get('closes_repair_id', '') == (repair.id ~ '') %}selected{% endif %}>Repair {{ repair.id }} · {{ repair.defect_summary or repair.defect_details or repair.status }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="field">
+        <label class="checkbox" for="open_new_repair">
+          <input id="open_new_repair" name="open_new_repair" type="checkbox" {% if form_data.get('open_new_repair', '') == 'on' or form_data.get('open_new_repair', '') == 'true' or form_data.get('open_new_repair', '') == '1' %}checked{% endif %} />
+          Open a new repair from this inspection
+        </label>
       </div>
       {% if not inspection_types %}
         <p class="keyboard-hint">Add inspection types first in <a href="{{ url_for('main.settings') }}">Settings</a>.</p>
@@ -57,4 +131,25 @@ Inspect Car {{ car.id }}
       </div>
     </form>
   </div>
+  <script>
+    const openRepairCheckbox = document.getElementById('open_new_repair');
+    const closeRepairSelect = document.getElementById('closes_repair_id');
+    const syncRepairActions = () => {
+      if (!openRepairCheckbox || !closeRepairSelect) return;
+      if (openRepairCheckbox.checked) {
+        closeRepairSelect.value = '';
+        closeRepairSelect.disabled = true;
+      } else {
+        closeRepairSelect.disabled = false;
+      }
+      if (closeRepairSelect.value) {
+        openRepairCheckbox.checked = false;
+      }
+    };
+    if (openRepairCheckbox && closeRepairSelect) {
+      openRepairCheckbox.addEventListener('change', syncRepairActions);
+      closeRepairSelect.addEventListener('change', syncRepairActions);
+      syncRepairActions();
+    }
+  </script>
 {% endblock %}

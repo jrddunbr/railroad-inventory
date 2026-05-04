@@ -10,7 +10,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.storage import db
 
-SCHEMA_VERSION = "2.13.0"
+SCHEMA_VERSION = "2.14.0"
 DEFAULT_LOCATION_TYPES = ["bag", "carrier", "flat", "staging_track", "yard_track", "box"]
 
 
@@ -90,6 +90,8 @@ def create_app() -> Flask:
             "loads",
             "load_placements",
             "car_inspections",
+            "car_repairs",
+            "car_repair_events",
             "inspection_types",
             "railroad_color_schemes",
             "railroad_logos",
@@ -108,6 +110,8 @@ def create_app() -> Flask:
             {"doc_type": "load", "counter_key": "loads"},
             {"doc_type": "load_placement", "counter_key": "load_placements"},
             {"doc_type": "car_inspection", "counter_key": "car_inspections"},
+            {"doc_type": "car_repair", "counter_key": "car_repairs"},
+            {"doc_type": "car_repair_event", "counter_key": "car_repair_events"},
             {"doc_type": "inspection_type", "counter_key": "inspection_types"},
             {"doc_type": "railroad_color_scheme", "counter_key": "railroad_color_schemes"},
             {"doc_type": "railroad_logo", "counter_key": "railroad_logos"},
