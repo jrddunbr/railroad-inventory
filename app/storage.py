@@ -87,28 +87,142 @@ class CouchStore:
         if not self.db:
             return
         design_id = "_design/indexes"
-        map_source = (
-            "function(doc) {"
-            " if (doc.type && doc.id !== undefined && doc.id !== null) {"
-            " emit([doc.type, doc.id], null);"
-            " }"
-            "}"
-        )
+        views = {
+            "by_type_id": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type && doc.id !== undefined && doc.id !== null) {"
+                    " emit([doc.type, doc.id], null);"
+                    " }"
+                    "}"
+                )
+            },
+            "railroads_by_reporting_mark": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'railroad' && doc.reporting_mark) {"
+                    " emit(doc.reporting_mark.toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "railroads_by_name": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'railroad' && doc.name) {"
+                    " emit(doc.name.toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "locations_by_name": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'location' && doc.name) {"
+                    " emit(doc.name.toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "cars_by_number": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'car' && doc.car_number) {"
+                    " emit(String(doc.car_number).toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "cars_by_reporting_mark_override": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'car' && doc.reporting_mark_override) {"
+                    " emit(String(doc.reporting_mark_override).toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "cars_by_reporting_mark_override_number": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'car' && doc.reporting_mark_override && doc.car_number) {"
+                    " emit(["
+                    " String(doc.reporting_mark_override).toLowerCase().replace(/\\s+/g, ' ').trim(),"
+                    " String(doc.car_number).toLowerCase().replace(/\\s+/g, ' ').trim()"
+                    " ], null);"
+                    " }"
+                    "}"
+                )
+            },
+            "cars_by_railroad_id": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'car' && doc.railroad_id !== undefined && doc.railroad_id !== null) {"
+                    " emit(doc.railroad_id, null);"
+                    " }"
+                    "}"
+                )
+            },
+            "cars_by_railroad_id_number": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'car' && doc.railroad_id !== undefined && doc.railroad_id !== null && doc.car_number) {"
+                    " emit(["
+                    " doc.railroad_id,"
+                    " String(doc.car_number).toLowerCase().replace(/\\s+/g, ' ').trim()"
+                    " ], null);"
+                    " }"
+                    "}"
+                )
+            },
+            "cars_by_location_id": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'car' && doc.location_id !== undefined && doc.location_id !== null) {"
+                    " emit(doc.location_id, null);"
+                    " }"
+                    "}"
+                )
+            },
+            "parts_by_upc": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'part_item' && doc.upc) {"
+                    " emit(String(doc.upc).toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "parts_by_name": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'part_item' && doc.name) {"
+                    " emit(String(doc.name).toLowerCase().replace(/\\s+/g, ' ').trim(), null);"
+                    " }"
+                    "}"
+                )
+            },
+            "parts_by_location_id": {
+                "map": (
+                    "function(doc) {"
+                    " if (doc.type === 'part_item' && doc.location_id !== undefined && doc.location_id !== null) {"
+                    " emit(doc.location_id, null);"
+                    " }"
+                    "}"
+                )
+            },
+        }
         view_doc = {
             "_id": design_id,
-            "views": {
-                "by_type_id": {
-                    "map": map_source,
-                }
-            },
+            "views": views,
         }
         try:
             existing = self.db[design_id]
         except http.ResourceNotFound:
             self.db[design_id] = view_doc
             return
-        if existing.get("views", {}).get("by_type_id", {}).get("map") != map_source:
-            existing["views"] = view_doc["views"]
+        if existing.get("views") != views:
+            existing["views"] = views
             self.db.save(existing)
 
     def ensure_totals(self, totals: Iterable[dict[str, str]]) -> None:

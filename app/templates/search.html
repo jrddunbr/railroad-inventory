@@ -6,18 +6,97 @@
   <div class="box">
     <h1 class="title is-3">Search</h1>
     <form method="get" action="{{ url_for('main.search') }}">
-      <div class="actions buttons">
-        <input class="input" name="q" placeholder="Search by location, car number, UPC, or notes" value="{{ query }}" />
-        <button type="submit" class="button is-small is-primary">Search</button>
+      <input type="hidden" name="cars_page" value="1" />
+      <input type="hidden" name="parts_page" value="1" />
+      <div class="grid">
+        <div class="field" style="grid-column: span 2;">
+          <label class="label" for="search-q">Query</label>
+          <div class="field has-addons">
+            <div class="control is-expanded">
+              <input class="input" id="search-q" name="q" placeholder="Search by reporting mark, car number, location, UPC, or notes" value="{{ query }}" />
+            </div>
+            <div class="control">
+              <button type="submit" class="button is-primary">Search</button>
+            </div>
+            {% if filters_active %}
+              <div class="control">
+                <a class="button is-light" href="{{ url_for('main.search') }}">Clear</a>
+              </div>
+            {% endif %}
+          </div>
+          <p class="help">Combined identifiers like <strong>DBRX 1450</strong> now search cars directly.</p>
+        </div>
+        <div class="field">
+          <label class="label" for="search-owner">Owner</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="search-owner" name="owner">
+                <option value="">Any owner</option>
+                {% for user in enabled_users %}
+                  <option value="{{ user.username }}" {% if owner_username == user.username %}selected{% endif %}>{{ user.display_name or user.username }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="search-scale">Scale</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="search-scale" name="scale">
+                <option value="">Any scale</option>
+                {% for option in scale_options %}
+                  <option value="{{ option.value }}" {% if scale_value == option.value %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="search-gauge">Gauge</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="search-gauge" name="gauge">
+                <option value="">Any gauge</option>
+                {% for option in gauge_options %}
+                  <option value="{{ option.value }}" {% if gauge_value == option.value %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label" for="search-page-size">Page Size</label>
+          <div class="control">
+            <div class="select is-fullwidth">
+              <select id="search-page-size" name="page_size">
+                {% for option in page_size_options %}
+                  <option value="{{ option }}" {% if page_size == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
       </div>
     </form>
-    {% if query %}
-      <h3 class="title is-5">Results for "{{ query }}"</h3>
-      {% set car_count = cars|length %}
-      {% set part_count = parts|length %}
+    {% if filters_active %}
+      <h3 class="title is-5">
+        {% if query %}
+          Results for "{{ query }}"
+        {% else %}
+          Filtered Results
+        {% endif %}
+      </h3>
+      {% set car_count = all_car_count %}
+      {% set part_count = all_part_count %}
       <p class="keyboard-hint">Results: {{ car_count + part_count }} (Cars: {{ car_count }}, Parts: {{ part_count }})</p>
       {% if car_count %}
         <h4 class="title is-6">Cars</h4>
+        {% if cars_pagination %}
+          <p class="keyboard-hint">
+            Showing {{ cars_pagination.start }}-{{ cars_pagination.end }} of {{ cars_pagination.total }} cars
+          </p>
+        {% endif %}
         <table class="table is-fullwidth is-striped">
           <thead>
             <tr>
@@ -26,6 +105,8 @@
               <th>Car #</th>
               <th>Type</th>
               <th>Class</th>
+              <th>Scale / Gauge</th>
+              <th>Owner</th>
               <th>Location</th>
             </tr>
           </thead>
@@ -55,6 +136,8 @@
                   -
                 {% endif %}
               </td>
+              <td>{{ car.scale or "-" }} / {{ car.gauge or "-" }}</td>
+              <td>{{ user_label(car.owner) if car.owner else "-" }}</td>
               <td>
                 {% if car.location %}
                   <a href="{{ url_for('main.location_detail', location_id=car.location.id) }}">{{ car.location.name }}</a>
@@ -66,9 +149,34 @@
             {% endfor %}
           </tbody>
         </table>
+        {% if cars_pagination and cars_pagination.pages > 1 %}
+          <div class="pagination">
+            <div class="pagination-info">Page {{ cars_pagination.page }} of {{ cars_pagination.pages }}</div>
+            <div class="pagination-controls">
+              {% if cars_pagination.prev_url %}
+                <a class="button is-small is-light" href="{{ cars_pagination.prev_url }}">Prev Cars</a>
+              {% else %}
+                <span class="button is-small is-static">Prev Cars</span>
+              {% endif %}
+              {% if cars_pagination.next_url %}
+                <a class="button is-small is-light" href="{{ cars_pagination.next_url }}">Next Cars</a>
+              {% else %}
+                <span class="button is-small is-static">Next Cars</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+      {% if scale_value or gauge_value %}
+        <p class="keyboard-hint">Parts are hidden when scale or gauge filters are active because those filters only apply to cars.</p>
       {% endif %}
       {% if part_count %}
         <h4 class="title is-6">Parts</h4>
+        {% if parts_pagination %}
+          <p class="keyboard-hint">
+            Showing {{ parts_pagination.start }}-{{ parts_pagination.end }} of {{ parts_pagination.total }} parts
+          </p>
+        {% endif %}
         <table class="table is-fullwidth is-striped">
           <thead>
             <tr>
@@ -77,6 +185,7 @@
               <th>Brand</th>
               <th>UPC</th>
               <th>Quantity</th>
+              <th>Owner</th>
               <th>Location</th>
             </tr>
           </thead>
@@ -88,6 +197,7 @@
               <td>{{ part.brand or "-" }}</td>
               <td>{{ part.upc or "-" }}</td>
               <td>{{ part.quantity if part.quantity is not none else "-" }}</td>
+              <td>{{ user_label(part.owner) if part.owner else "-" }}</td>
               <td>
                 {% if part.location %}
                   <a href="{{ url_for('main.location_detail', location_id=part.location.id) }}">{{ part.location.name }}</a>
@@ -99,6 +209,23 @@
             {% endfor %}
           </tbody>
         </table>
+        {% if parts_pagination and parts_pagination.pages > 1 %}
+          <div class="pagination">
+            <div class="pagination-info">Page {{ parts_pagination.page }} of {{ parts_pagination.pages }}</div>
+            <div class="pagination-controls">
+              {% if parts_pagination.prev_url %}
+                <a class="button is-small is-light" href="{{ parts_pagination.prev_url }}">Prev Parts</a>
+              {% else %}
+                <span class="button is-small is-static">Prev Parts</span>
+              {% endif %}
+              {% if parts_pagination.next_url %}
+                <a class="button is-small is-light" href="{{ parts_pagination.next_url }}">Next Parts</a>
+              {% else %}
+                <span class="button is-small is-static">Next Parts</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
       {% endif %}
       {% if not car_count and not part_count %}
         <p class="keyboard-hint">No matches found.</p>

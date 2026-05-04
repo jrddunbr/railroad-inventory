@@ -1863,6 +1863,54 @@ def paginate_list(items: list, page: int, page_size: str, route: str, route_para
     )
 
 
+def paginate_list_param(
+    items: list,
+    page: int,
+    page_size: str,
+    route: str,
+    route_params: dict,
+    *,
+    page_param: str,
+) -> tuple[list, dict]:
+    total = len(items)
+    if page_size == "all":
+        start = 1 if total else 0
+        return (
+            items,
+            {
+                "page": 1,
+                "pages": 1,
+                "total": total,
+                "start": start,
+                "end": total,
+                "page_size": page_size,
+                "prev_url": None,
+                "next_url": None,
+            },
+        )
+    per_page = int(page_size)
+    pages = max(1, math.ceil(total / per_page))
+    page = min(max(1, page), pages)
+    start_index = (page - 1) * per_page
+    end_index = min(start_index + per_page, total)
+    base_params = {key: value for key, value in route_params.items() if key != page_param}
+    prev_url = url_for(route, **base_params, **{page_param: page - 1}) if page > 1 else None
+    next_url = url_for(route, **base_params, **{page_param: page + 1}) if page < pages else None
+    return (
+        items[start_index:end_index],
+        {
+            "page": page,
+            "pages": pages,
+            "total": total,
+            "start": start_index + 1 if total else 0,
+            "end": end_index,
+            "page_size": page_size,
+            "prev_url": prev_url,
+            "next_url": next_url,
+        },
+    )
+
+
 def paginate_query(query, page: int, page_size: str, route: str, route_params: dict) -> tuple[list, dict]:
     if page_size == "all":
         items = query.all()
@@ -6897,12 +6945,49 @@ def car_new():
 @main_bp.route("/search")
 def search():
     query = request.args.get("q", "").strip()
+    owner_username = normalize_username(request.args.get("owner", ""))
+    scale = request.args.get("scale", "").strip()
+    gauge = request.args.get("gauge", "").strip()
+    cars_page_value = request.args.get("cars_page", "").strip()
+    parts_page_value = request.args.get("parts_page", "").strip()
+    page_size_value = request.args.get("page_size", "").strip()
+    cars_page = int(cars_page_value) if cars_page_value.isdigit() else 1
+    parts_page = int(parts_page_value) if parts_page_value.isdigit() else 1
+    page_size = normalize_page_size(page_size_value) if page_size_value else get_page_size()
+    if page_size not in PAGINATION_OPTIONS:
+        page_size = get_page_size()
+    filters_active = bool(query or owner_username or scale or gauge)
     if query.lower().startswith("c") and query[1:].isdigit():
         car = Car.query.get(int(query[1:]))
         if car:
             return redirect(url_for("main.car_detail", car_id=car.id))
-    cars = search_cars(query)
-    parts = search_parts(query)
+    cars = search_cars(query, owner_username=owner_username, scale=scale, gauge=gauge)
+    parts = search_parts(query, owner_username=owner_username) if not scale and not gauge else []
+    route_params = {
+        "q": query,
+        "owner": owner_username,
+        "scale": scale,
+        "gauge": gauge,
+        "page_size": page_size,
+        "cars_page": cars_page,
+        "parts_page": parts_page,
+    }
+    paged_cars, cars_pagination = paginate_list_param(
+        cars,
+        cars_page,
+        page_size,
+        "main.search",
+        {**route_params, "parts_page": parts_page},
+        page_param="cars_page",
+    )
+    paged_parts, parts_pagination = paginate_list_param(
+        parts,
+        parts_page,
+        page_size,
+        "main.search",
+        {**route_params, "cars_page": cars_page},
+        page_param="parts_page",
+    )
     needle = query.lower()
     if needle:
         car_number_match = any(car.car_number == query for car in cars if car.car_number)
@@ -6913,7 +6998,25 @@ def search():
         ]
         if len(location_matches) == 1 and not car_number_match:
             return redirect(url_for("main.location_detail", location_id=location_matches[0].id))
-    return render_template("search.html", cars=cars, parts=parts, query=query)
+    return render_template(
+        "search.html",
+        cars=paged_cars,
+        parts=paged_parts,
+        all_car_count=len(cars),
+        all_part_count=len(parts),
+        cars_pagination=cars_pagination,
+        parts_pagination=parts_pagination,
+        query=query,
+        filters_active=filters_active,
+        scale_options=get_scale_options(),
+        gauge_options=get_gauge_options(),
+        enabled_users=get_enabled_users(),
+        owner_username=owner_username,
+        scale_value=scale,
+        gauge_value=gauge,
+        page_size=page_size,
+        page_size_options=PAGINATION_OPTIONS,
+    )
 
 
 @main_bp.route("/api/cars")
@@ -6993,10 +7096,13 @@ def api_car_classes():
 @main_bp.route("/api/search")
 def api_search():
     query = request.args.get("q", "").strip()
-    if not query:
+    owner_username = normalize_username(request.args.get("owner", ""))
+    scale = request.args.get("scale", "").strip()
+    gauge = request.args.get("gauge", "").strip()
+    if not query and not owner_username and not scale and not gauge:
         return jsonify({"cars": [], "parts": []})
-    cars = search_cars(query)
-    parts = search_parts(query)
+    cars = search_cars(query, owner_username=owner_username, scale=scale, gauge=gauge)
+    parts = search_parts(query, owner_username=owner_username) if not scale and not gauge else []
     return jsonify(
         {
             "cars": [serialize_car(car) for car in cars],
@@ -7005,63 +7111,209 @@ def api_search():
     )
 
 
-def search_cars(query: str) -> list[Car]:
-    if not query:
-        return []
-    needle = query.lower()
+def get_search_tokens(query: str) -> list[str]:
+    return [token for token in normalize_search_term(query).split() if token]
 
-    def matches(value: str | None) -> bool:
-        return bool(value) and needle in value.lower()
+
+def normalize_search_term(value: str | None) -> str:
+    return " ".join((value or "").strip().lower().split())
+
+
+def matches_search_tokens(tokens: list[str], values: list[str], *, compact_spaces: bool = False) -> bool:
+    if not tokens:
+        return True
+    aggregate = " ".join(value.lower() for value in values if value).strip()
+    if not aggregate:
+        return False
+    compact = aggregate.replace(" ", "") if compact_spaces else ""
+    return all(token in aggregate or (compact_spaces and token in compact) for token in tokens)
+
+
+def get_view_models(model_cls, view_name: str, **params):
+    database = db.store.db
+    if not database:
+        return []
+    rows = database.view(f"_design/indexes/_view/{view_name}", include_docs=True, **params)
+    items = []
+    for row in rows:
+        doc = getattr(row, "doc", None)
+        if not doc:
+            continue
+        item = model_cls.from_doc(doc, db.store)
+        if item.id is not None:
+            db.store.cache[(model_cls, item.id)] = item
+        items.append(item)
+    return items
+
+
+def unique_by_id(items: list):
+    seen = set()
+    unique_items = []
+    for item in items:
+        item_id = getattr(item, "id", None)
+        key = (item.__class__, item_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_items.append(item)
+    return unique_items
+
+
+def apply_car_search_filters(cars: list[Car], *, owner, scale: str, gauge: str) -> list[Car]:
+    results = []
+    for car in cars:
+        if owner and car.owner_user_id != owner.id:
+            continue
+        if scale and (car.scale or "") != scale:
+            continue
+        if gauge and (car.gauge or "") != gauge:
+            continue
+        results.append(car)
+    return results
+
+
+def apply_part_search_filters(parts: list[PartItem], *, owner) -> list[PartItem]:
+    if not owner:
+        return parts
+    return [part for part in parts if part.owner_user_id == owner.id]
+
+
+def get_railroad_search_matches(normalized_query: str) -> list[Railroad]:
+    return unique_by_id(
+        get_view_models(Railroad, "railroads_by_reporting_mark", key=normalized_query)
+        + get_view_models(Railroad, "railroads_by_name", key=normalized_query)
+    )
+
+
+def get_location_search_matches(normalized_query: str) -> list[Location]:
+    return unique_by_id(get_view_models(Location, "locations_by_name", key=normalized_query))
+
+
+def search_cars(
+    query: str,
+    *,
+    owner_username: str = "",
+    scale: str = "",
+    gauge: str = "",
+) -> list[Car]:
+    if not query and not owner_username and not scale and not gauge:
+        return []
+    normalized_query = normalize_search_term(query)
+    tokens = get_search_tokens(query)
+
+    owner = resolve_owner_from_form(owner_username) if owner_username else None
+    if owner_username and owner is None:
+        return []
+    indexed_results: list[Car] = []
+    if normalized_query:
+        if len(tokens) == 1:
+            token = tokens[0]
+            indexed_results.extend(get_view_models(Car, "cars_by_number", key=token))
+            indexed_results.extend(get_view_models(Car, "cars_by_reporting_mark_override", key=token))
+            for railroad in get_railroad_search_matches(token):
+                if railroad.id is not None:
+                    indexed_results.extend(get_view_models(Car, "cars_by_railroad_id", key=railroad.id))
+            for location in get_location_search_matches(token):
+                if location.id is not None:
+                    indexed_results.extend(get_view_models(Car, "cars_by_location_id", key=location.id))
+            compact_match = re.match(r"^([a-z][a-z0-9-]*?)\s*([0-9][a-z0-9-]*)$", token)
+            if compact_match:
+                mark_token = normalize_search_term(compact_match.group(1))
+                number_token = normalize_search_term(compact_match.group(2))
+                indexed_results.extend(
+                    get_view_models(Car, "cars_by_reporting_mark_override_number", key=[mark_token, number_token])
+                )
+                for railroad in get_railroad_search_matches(mark_token):
+                    if railroad.id is not None:
+                        indexed_results.extend(
+                            get_view_models(Car, "cars_by_railroad_id_number", key=[railroad.id, number_token])
+                        )
+        elif len(tokens) >= 2:
+            mark_or_name = normalize_search_term(" ".join(tokens[:-1]))
+            number_token = tokens[-1]
+            indexed_results.extend(
+                get_view_models(Car, "cars_by_reporting_mark_override_number", key=[mark_or_name, number_token])
+            )
+            for railroad in get_railroad_search_matches(mark_or_name):
+                if railroad.id is not None:
+                    indexed_results.extend(
+                        get_view_models(Car, "cars_by_railroad_id_number", key=[railroad.id, number_token])
+                    )
+    indexed_results = apply_car_search_filters(unique_by_id(indexed_results), owner=owner, scale=scale, gauge=gauge)
+    if indexed_results:
+        return indexed_results
+    railroads_by_id = {railroad.id: railroad for railroad in Railroad.query.all() if railroad.id is not None}
+    locations_by_id = {location.id: location for location in Location.query.all() if location.id is not None}
 
     results = []
     for car in Car.query.all():
+        if owner and car.owner_user_id != owner.id:
+            continue
+        if scale and (car.scale or "") != scale:
+            continue
+        if gauge and (car.gauge or "") != gauge:
+            continue
+        railroad = railroads_by_id.get(car.railroad_id)
+        location = locations_by_id.get(car.location_id)
+        reporting_mark = (railroad.reporting_mark if railroad else car.reporting_mark_override) or ""
+        railroad_name = (railroad.name if railroad else "") or ""
+        location_name = (location.name if location else "") or ""
+        car_number = (car.car_number or "").strip()
         values = [
-            car.car_number,
-            car.reporting_mark_override,
-            car.car_type_override,
-            car.load,
-            car.notes,
-            car.actual_weight,
-            car.actual_length,
-            car.scale,
-            car.gauge,
-            car.upc,
+            reporting_mark,
+            railroad_name,
+            car_number,
+            location_name,
             str(car.id),
             f"c{car.id}",
         ]
-        if car.car_class:
-            values.extend([car.car_class.code, car.car_class.car_type])
-        if car.railroad:
-            values.extend([car.railroad.reporting_mark, car.railroad.name])
-        if car.location:
-            values.append(car.location.name)
-        if any(matches(value) for value in values):
+        if reporting_mark and car_number:
+            values.extend(
+                [
+                    f"{reporting_mark} {car_number}",
+                    f"{reporting_mark}{car_number}",
+                ]
+            )
+        text_values = [str(value).strip() for value in values if value is not None and str(value).strip()]
+        if matches_search_tokens(tokens, text_values, compact_spaces=True):
             results.append(car)
     return results
 
 
-def search_parts(query: str) -> list[PartItem]:
-    if not query:
+def search_parts(query: str, *, owner_username: str = "") -> list[PartItem]:
+    if not query and not owner_username:
         return []
-    needle = query.lower()
-
-    def matches(value: str | None) -> bool:
-        return bool(value) and needle in value.lower()
+    normalized_query = normalize_search_term(query)
+    tokens = get_search_tokens(query)
+    owner = resolve_owner_from_form(owner_username) if owner_username else None
+    if owner_username and owner is None:
+        return []
+    indexed_results: list[PartItem] = []
+    if normalized_query:
+        indexed_results.extend(get_view_models(PartItem, "parts_by_upc", key=normalized_query))
+        indexed_results.extend(get_view_models(PartItem, "parts_by_name", key=normalized_query))
+        for location in get_location_search_matches(normalized_query):
+            if location.id is not None:
+                indexed_results.extend(get_view_models(PartItem, "parts_by_location_id", key=location.id))
+    indexed_results = apply_part_search_filters(unique_by_id(indexed_results), owner=owner)
+    if indexed_results:
+        return indexed_results
+    locations_by_id = {location.id: location for location in Location.query.all() if location.id is not None}
 
     results = []
     for part in PartItem.query.all():
+        if owner and part.owner_user_id != owner.id:
+            continue
+        location = locations_by_id.get(part.location_id)
         values = [
             part.name,
-            part.description,
             part.brand,
             part.upc,
+            location.name if location else None,
             str(part.id),
         ]
-        if part.quantity is not None:
-            values.append(str(part.quantity))
-        if part.location:
-            values.append(part.location.name)
-        if any(matches(value) for value in values):
+        text_values = [str(value).strip() for value in values if value is not None and str(value).strip()]
+        if matches_search_tokens(tokens, text_values):
             results.append(part)
     return results
 
